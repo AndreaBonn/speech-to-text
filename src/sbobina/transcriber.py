@@ -51,7 +51,7 @@ def _collect_segments(
 
 
 def transcribe_file(audio_path: Path, config: Settings) -> Transcript:
-    """Run Whisper on ``audio_path`` with word timestamps and VAD enabled."""
+    """Run Whisper on ``audio_path`` with word timestamps; VAD per ``config``."""
     preload_cuda_libraries()
     from faster_whisper import WhisperModel  # after preload: ctranslate2 needs cuDNN
 
@@ -64,7 +64,7 @@ def transcribe_file(audio_path: Path, config: Settings) -> Transcript:
         language=config.language,
         beam_size=config.beam_size,
         word_timestamps=True,
-        vad_filter=True,
+        vad_filter=config.vad_filter,
         condition_on_previous_text=config.condition_on_previous_text,
     )
     return Transcript(

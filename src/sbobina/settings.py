@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # Off by default: on hour-long audio, conditioning on previous text is the
     # usual trigger of Whisper's repetition loops. To be re-measured on a gold set.
     condition_on_previous_text: bool = False
+    # Off: on an 85-min phone recording Silero VAD merged speech into windows of
+    # up to 297 s that Whisper under-decoded (5971 words vs 9136 without VAD).
+    vad_filter: bool = False
     uncertain_threshold: float = Field(default=0.7, gt=0.0, le=1.0)
     paragraph_gap_s: float = Field(default=2.0, gt=0.0)
     paragraph_max_s: float = Field(default=120.0, gt=0.0)
