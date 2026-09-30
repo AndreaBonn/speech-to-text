@@ -3,8 +3,10 @@ from pathlib import Path
 import pytest
 from conftest import make_segment, make_transcript, make_word
 
+from sbobina import llm_corrector
 from sbobina.cli import main
-from sbobina.models import save_transcript
+from sbobina.correction import Corrector, Edit
+from sbobina.models import load_transcript, save_transcript
 
 
 @pytest.fixture
@@ -53,7 +55,9 @@ def test_missing_input_file_returns_error_code(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("threshold", ["0", "1.5", "abc"])
-def test_rendi_rejects_threshold_outside_zero_one(transcript_json: Path, threshold: str) -> None:
+def test_rendi_rejects_threshold_outside_zero_one(
+    transcript_json: Path, threshold: str
+) -> None:
     with pytest.raises(SystemExit):
         main(["rendi", str(transcript_json), "--soglia", threshold])
 
@@ -65,3 +69,45 @@ def test_trascrivi_output_dir_that_is_a_file_returns_error_code(tmp_path: Path) 
     not_a_dir.write_text("x", encoding="utf-8")
 
     assert main(["trascrivi", str(audio), "-o", str(not_a_dir)]) == 1
+
+
+def test_correggi_writes_corrected_transcript_and_report(
+    transcript_json: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_factory(model: str, host: str, subject: str | None) -> Corrector:
+        assert subject == "fisica"
+        return lambda text, context: [Edit(original="Sennberg", corrected="Heisenberg")]
+
+    monkeypatch.setattr(llm_corrector, "make_ollama_corrector", fake_factory)
+
+    exit_code = main(["correggi", str(transcript_json), "--materia", "fisica"])
+
+    corrected_md = transcript_json.with_name("lezione.corretto.md").read_text(
+        encoding="utf-8"
+    )
+    report = transcript_json.with_name("lezione.correzioni.md").read_text(
+        encoding="utf-8"
+    )
+    assert exit_code == 0
+    assert "teorema Heisenberg" in corrected_md
+    assert "[?" not in corrected_md
+    assert "Sennberg → **Heisenberg**" in report
+    assert load_transcript(transcript_json.with_name("lezione.corretto.json")).text == (
+        "teorema Heisenberg"
+    )
+
+
+def test_correggi_returns_error_when_ollama_unreachable(
+    transcript_json: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def failing_corrector(text: str, context: str) -> list[Edit]:
+        raise ConnectionError("Failed to connect to Ollama")
+
+    monkeypatch.setattr(
+        llm_corrector,
+        "make_ollama_corrector",
+        lambda model, host, subject: failing_corrector,
+    )
+
+    assert main(["correggi", str(transcript_json)]) == 1
+    assert not transcript_json.with_name("lezione.corretto.json").exists()

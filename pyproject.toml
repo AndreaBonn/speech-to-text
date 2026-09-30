@@ -13,6 +13,7 @@ dependencies = [
     "jiwer>=4.0.0",
     "nvidia-cublas-cu12>=12.9.2.10",
     "nvidia-cudnn-cu12==9.*",
+    "ollama>=0.6.3",
     "pydantic-settings>=2.15.0",
 ]
 

@@ -1,17 +1,24 @@
+from __future__ import annotations
+
 import argparse
 import logging
 import sys
 from collections.abc import Callable
 from pathlib import Path
 
+from sbobina import llm_corrector
+from sbobina.cleanup import remove_silence_fillers
+from sbobina.correction import Corrector, Edit, chunk_segments, correct_transcript
 from sbobina.models import Transcript, load_transcript, save_transcript
 from sbobina.render import RenderOptions, render_markdown
+from sbobina.report import render_corrections_report
 from sbobina.settings import settings
 from sbobina.wer import compute_wer
 
 logger = logging.getLogger("sbobina")
 
 INPUT_FILE_ARGS = ("audio", "trascrizione", "riferimento", "ipotesi")
+CORRECTION_PROGRESS_EVERY = 10
 
 
 def parse_threshold(value: str) -> float:
@@ -87,6 +94,55 @@ def cmd_wer(args: argparse.Namespace) -> int:
     return 0
 
 
+def _with_progress(corrector: Corrector, total: int) -> Corrector:
+    done = 0
+
+    def tracked(text: str, context: str) -> list[Edit]:
+        nonlocal done
+        edits = corrector(text, context)
+        done += 1
+        if done % CORRECTION_PROGRESS_EVERY == 0 or done == total:
+            logger.info("Corretti %d paragrafi su %d", done, total)
+        return edits
+
+    return tracked
+
+
+def cmd_correggi(args: argparse.Namespace) -> int:
+    from ollama import ResponseError  # heavy import only when needed
+
+    json_path: Path = args.trascrizione
+    model: str = args.modello or settings.ollama_model
+    transcript, removed = remove_silence_fillers(load_transcript(json_path))
+    corrector = llm_corrector.make_ollama_corrector(
+        model, settings.ollama_host, args.materia
+    )
+    chunk_words = settings.correction_chunk_words
+    total = len(chunk_segments(transcript.segments, max_words=chunk_words))
+    try:
+        result = correct_transcript(
+            transcript,
+            corrector=_with_progress(corrector, total),
+            max_words=chunk_words,
+        )
+    except (ConnectionError, ResponseError) as err:
+        logger.error(
+            "Ollama non raggiungibile o modello %s non scaricato: %s", model, err
+        )
+        return 1
+    stem = json_path.with_suffix("")
+    corrected_json = stem.with_name(f"{stem.name}.corretto.json")
+    save_transcript(result.transcript, corrected_json)
+    _write_markdown(result.transcript, corrected_json, args.soglia)
+    report_path = stem.with_name(f"{stem.name}.correzioni.md")
+    report = render_corrections_report(
+        transcript.source, model, result.applied, result.rejected, removed
+    )
+    report_path.write_text(report, encoding="utf-8")
+    logger.info("Scritti %s e %s", corrected_json.with_suffix(".md"), report_path)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sbobina", description="Sbobinature di lezioni"
@@ -116,13 +172,32 @@ def build_parser() -> argparse.ArgumentParser:
         "ipotesi", type=Path, help="Trascrizione da valutare (.json o .txt)"
     )
     wer.set_defaults(handler=cmd_wer)
+    _add_correggi_parser(commands)
     return parser
+
+
+def _add_correggi_parser(
+    commands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    correggi = commands.add_parser(
+        "correggi",
+        help="Corregge le parole sentite male con un modello locale (Ollama)",
+    )
+    correggi.add_argument(
+        "trascrizione", type=Path, help="Il .json prodotto da trascrivi"
+    )
+    correggi.add_argument("--materia", default=None, help='Es. "diritto privato"')
+    correggi.add_argument("--modello", default=None, help="Modello Ollama da usare")
+    correggi.add_argument("--soglia", type=parse_threshold, default=None)
+    correggi.set_defaults(handler=cmd_correggi)
 
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
     )
+    # httpx logs every Ollama request at INFO, burying the progress lines.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     args = build_parser().parse_args(argv)
     inputs = [getattr(args, name) for name in INPUT_FILE_ARGS if hasattr(args, name)]
     missing = [path for path in inputs if not path.is_file()]
