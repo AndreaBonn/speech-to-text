@@ -1,0 +1,43 @@
+[project]
+name = "sbobina"
+version = "0.1.0"
+description = "Sbobinature fedeli di lezioni registrate, tutto in locale"
+readme = "README.md"
+authors = [
+    { name = "AndreaBonn", email = "andreabonacci95@protonmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "av>=17,<19",
+    "faster-whisper>=1.2.1",
+    "jiwer>=4.0.0",
+    "nvidia-cublas-cu12>=12.9.2.10",
+    "nvidia-cudnn-cu12==9.*",
+    "pydantic-settings>=2.15.0",
+]
+
+[project.scripts]
+sbobina = "sbobina.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+    "ruff>=0.16.9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+
+[tool.mypy]
+strict = true
+
+[[tool.mypy.overrides]]
+# Third-party packages shipped without type information.
+module = ["faster_whisper.*", "nvidia.*", "jiwer.*"]
+ignore_missing_imports = true

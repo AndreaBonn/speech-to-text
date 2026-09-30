@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.env
+# Lecture recordings and transcripts are personal data: never commit them.
+audio/
+sbobine/
+*.m4a
+*.wav
+*.mp3
