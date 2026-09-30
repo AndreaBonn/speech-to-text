@@ -1,3 +1,4 @@
+import html
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +36,21 @@ def mark_word(text: str) -> str:
     return f"{prefix}{leading}[?{body}?]{trailing}"
 
 
+def mark_correction(text: str, heard: str) -> str:
+    """Show what Whisper heard as a superscript after the corrected word body."""
+    match = _WORD_PARTS.match(text)
+    if match is None or not match.group(3):
+        return text
+    prefix, leading, body, trailing = match.groups()
+    return f"{prefix}{leading}{body}<sup>{html.escape(heard)}</sup>{trailing}"
+
+
+def _render_word(word: Word, threshold: float) -> str:
+    if word.corrected_from is not None:
+        return mark_correction(word.text, word.corrected_from)
+    return mark_word(word.text) if word.probability < threshold else word.text
+
+
 def find_uncertain_spans(
     words: tuple[Word, ...], threshold: float
 ) -> list[tuple[int, int]]:
@@ -70,9 +86,7 @@ def group_paragraphs(
 
 def _render_paragraph(paragraph: list[Segment], threshold: float) -> str:
     body = "".join(
-        mark_word(word.text) if word.probability < threshold else word.text
-        for segment in paragraph
-        for word in segment.words
+        _render_word(word, threshold) for segment in paragraph for word in segment.words
     )
     return f"[{format_timestamp(paragraph[0].start)}] {body.strip()}"
 

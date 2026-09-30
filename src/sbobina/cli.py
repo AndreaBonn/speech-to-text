@@ -8,9 +8,15 @@ from pathlib import Path
 
 from sbobina import llm_corrector
 from sbobina.cleanup import remove_silence_fillers
-from sbobina.correction import Corrector, Edit, chunk_segments, correct_transcript
-from sbobina.models import Transcript, load_transcript, save_transcript
-from sbobina.render import RenderOptions, render_markdown
+from sbobina.correction import (
+    CorrectionResult,
+    Corrector,
+    Edit,
+    chunk_segments,
+    correct_transcript,
+)
+from sbobina.models import Segment, Transcript, load_transcript, save_transcript
+from sbobina.render import RenderOptions, format_timestamp, render_markdown
 from sbobina.report import render_corrections_report
 from sbobina.settings import settings
 from sbobina.wer import compute_wer
@@ -108,39 +114,49 @@ def _with_progress(corrector: Corrector, total: int) -> Corrector:
     return tracked
 
 
-def cmd_correggi(args: argparse.Namespace) -> int:
-    from ollama import ResponseError  # heavy import only when needed
+def _model_name(args: argparse.Namespace) -> str:
+    return str(args.modello or settings.ollama_model)
 
+
+def _write_correction_outputs(
+    json_path: Path,
+    result: CorrectionResult,
+    removed: list[Segment],
+    args: argparse.Namespace,
+) -> None:
+    stem = json_path.with_suffix("")
+    corrected_json = stem.with_name(f"{stem.name}.corretto.json")
+    save_transcript(result.transcript, corrected_json)
+    _write_markdown(result.transcript, corrected_json, args.soglia)
+    report_path = stem.with_name(f"{stem.name}.correzioni.md")
+    report = render_corrections_report(result, model=_model_name(args), removed=removed)
+    report_path.write_text(report, encoding="utf-8")
+    logger.info("Scritti %s e %s", corrected_json.with_suffix(".md"), report_path)
+
+
+def cmd_correggi(args: argparse.Namespace) -> int:
     json_path: Path = args.trascrizione
-    model: str = args.modello or settings.ollama_model
+    model = _model_name(args)
     transcript, removed = remove_silence_fillers(load_transcript(json_path))
     corrector = llm_corrector.make_ollama_corrector(
         model, settings.ollama_host, args.materia
     )
     chunk_words = settings.correction_chunk_words
     total = len(chunk_segments(transcript.segments, max_words=chunk_words))
-    try:
-        result = correct_transcript(
-            transcript,
-            corrector=_with_progress(corrector, total),
-            max_words=chunk_words,
-        )
-    except (ConnectionError, ResponseError) as err:
-        logger.error(
-            "Ollama non raggiungibile o modello %s non scaricato: %s", model, err
-        )
-        return 1
-    stem = json_path.with_suffix("")
-    corrected_json = stem.with_name(f"{stem.name}.corretto.json")
-    save_transcript(result.transcript, corrected_json)
-    _write_markdown(result.transcript, corrected_json, args.soglia)
-    report_path = stem.with_name(f"{stem.name}.correzioni.md")
-    report = render_corrections_report(
-        transcript.source, model, result.applied, result.rejected, removed
+    result = correct_transcript(
+        transcript, corrector=_with_progress(corrector, total), max_words=chunk_words
     )
-    report_path.write_text(report, encoding="utf-8")
-    logger.info("Scritti %s e %s", corrected_json.with_suffix(".md"), report_path)
-    return 0
+    if result.interrupted_at is None:
+        _write_correction_outputs(json_path, result, removed, args)
+        return 0
+    if result.interrupted_at > transcript.segments[0].start:
+        _write_correction_outputs(json_path, result, removed, args)
+    logger.error(
+        "Ollama non raggiungibile o modello %s non scaricato: correzione interrotta a %s",
+        model,
+        format_timestamp(result.interrupted_at),
+    )
+    return 1
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "av>=17,<19",
     "faster-whisper>=1.2.1",
+    "httpx>=0.28.1",
     "jiwer>=4.0.0",
     "nvidia-cublas-cu12>=12.9.2.10",
     "nvidia-cudnn-cu12==9.*",

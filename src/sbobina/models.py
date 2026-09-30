@@ -9,6 +9,7 @@ class Word:
     end: float
     text: str
     probability: float
+    corrected_from: str | None = None  # what Whisper heard, when the LLM fixed it
 
 
 @dataclass(frozen=True)

@@ -1,7 +1,10 @@
+import pytest
 from conftest import make_segment, make_transcript, make_word
 
 from sbobina.correction import (
+    CorrectorUnavailableError,
     Edit,
+    InvalidResponseError,
     apply_edits,
     chunk_segments,
     correct_transcript,
@@ -238,3 +241,85 @@ def test_apply_edits_elision_split_by_whisper_is_not_a_correction() -> None:
         ("progetto", "processo")
     ]
     assert result.words[2].probability == 0.5
+
+
+def test_apply_edits_corrected_word_remembers_what_whisper_heard() -> None:
+    words = _words("per la legione, degli interessi")
+
+    result = apply_edits(words, [Edit(original="legione", corrected="lesione")])
+
+    assert result.words[2].corrected_from == "legione"
+
+
+def test_apply_edits_rejection_carries_similarity_and_sentence_start() -> None:
+    words = _words("la tutela giustiziaria dei diritti")
+
+    result = apply_edits(
+        words,
+        [Edit(original="tutela giustiziaria", corrected="tutela giurisdizionale")],
+    )
+
+    rejected = result.rejected[0]
+    assert rejected.reason == "troppo diverso dal suono originale"
+    assert rejected.similarity == pytest.approx(0.59, abs=0.01)
+    assert rejected.start == words[1].start
+
+
+def test_correct_transcript_skips_chunk_with_invalid_response_and_records_it() -> None:
+    transcript = make_transcript(
+        [
+            make_segment(list(_words("ha esinto il credito"))),
+            make_segment([make_word(f" p{i}", 10.0 + i) for i in range(4)]),
+        ]
+    )
+
+    def corrector(text: str, context: str) -> list[Edit]:
+        if text.startswith("p0"):
+            raise InvalidResponseError("json non valido")
+        return [Edit(original="esinto", corrected="estinto")]
+
+    result = correct_transcript(transcript, corrector=corrector, max_words=4)
+
+    assert result.failed_chunks == [10.0]
+    assert result.interrupted_at is None
+    assert result.transcript.text == "ha estinto il credito p0 p1 p2 p3"
+
+
+def test_correct_transcript_keeps_done_work_when_model_becomes_unavailable() -> None:
+    transcript = make_transcript(
+        [
+            make_segment(list(_words("ha esinto il credito"))),
+            make_segment([make_word(f" p{i}", 10.0 + i) for i in range(4)]),
+            make_segment([make_word(f" q{i}", 20.0 + i) for i in range(4)]),
+        ]
+    )
+    calls = 0
+
+    def corrector(text: str, context: str) -> list[Edit]:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise CorrectorUnavailableError("ollama down")
+        return [Edit(original="esinto", corrected="estinto")]
+
+    result = correct_transcript(transcript, corrector=corrector, max_words=4)
+
+    assert calls == 2
+    assert result.interrupted_at == 10.0
+    assert result.transcript.text == "ha estinto il credito p0 p1 p2 p3 q0 q1 q2 q3"
+    assert len(result.applied) == 1
+
+
+def test_apply_edits_chained_edits_keep_what_whisper_heard() -> None:
+    words = _words("la lesione degli interessi")
+
+    result = apply_edits(
+        words,
+        [
+            Edit(original="lesione", corrected="legione"),
+            Edit(original="legione", corrected="regione"),
+        ],
+    )
+
+    assert result.words[1].text == " regione"
+    assert result.words[1].corrected_from == "lesione"

@@ -996,6 +996,7 @@ source = { editable = "." }
 dependencies = [
     { name = "av" },
     { name = "faster-whisper" },
+    { name = "httpx" },
     { name = "jiwer" },
     { name = "nvidia-cublas-cu12" },
     { name = "nvidia-cudnn-cu12" },
@@ -1014,6 +1015,7 @@ dev = [
 requires-dist = [
     { name = "av", specifier = ">=17,<19" },
     { name = "faster-whisper", specifier = ">=1.2.1" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "jiwer", specifier = ">=4.0.0" },
     { name = "nvidia-cublas-cu12", specifier = ">=12.9.2.10" },
     { name = "nvidia-cudnn-cu12", specifier = "==9.*" },

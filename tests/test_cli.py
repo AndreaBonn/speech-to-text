@@ -5,7 +5,7 @@ from conftest import make_segment, make_transcript, make_word
 
 from sbobina import llm_corrector
 from sbobina.cli import main
-from sbobina.correction import Corrector, Edit
+from sbobina.correction import Corrector, CorrectorUnavailableError, Edit
 from sbobina.models import load_transcript, save_transcript
 
 
@@ -101,7 +101,7 @@ def test_correggi_returns_error_when_ollama_unreachable(
     transcript_json: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def failing_corrector(text: str, context: str) -> list[Edit]:
-        raise ConnectionError("Failed to connect to Ollama")
+        raise CorrectorUnavailableError("Failed to connect to Ollama")
 
     monkeypatch.setattr(
         llm_corrector,
@@ -111,3 +111,32 @@ def test_correggi_returns_error_when_ollama_unreachable(
 
     assert main(["correggi", str(transcript_json)]) == 1
     assert not transcript_json.with_name("lezione.corretto.json").exists()
+
+
+def test_correggi_interrupted_midway_saves_done_work_and_returns_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transcript = make_transcript(
+        [make_segment([make_word(f" w{i}", i * 30.0, 0.5)]) for i in range(300)]
+    )
+    path = tmp_path / "lezione.json"
+    save_transcript(transcript, path)
+    calls = 0
+
+    def flaky_corrector(text: str, context: str) -> list[Edit]:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise CorrectorUnavailableError("ollama crashed")
+        return [Edit(original="w1", corrected="w11")]
+
+    monkeypatch.setattr(
+        llm_corrector,
+        "make_ollama_corrector",
+        lambda model, host, subject: flaky_corrector,
+    )
+
+    assert main(["correggi", str(path)]) == 1
+    report = path.with_name("lezione.correzioni.md").read_text(encoding="utf-8")
+    assert "Correzione interrotta a [01:40:00]" in report
+    assert len(load_transcript(path.with_name("lezione.corretto.json")).words) == 300

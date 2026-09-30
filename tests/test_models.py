@@ -26,3 +26,17 @@ def test_save_then_load_transcript_roundtrips_all_fields(tmp_path: Path) -> None
 
     assert load_transcript(path) == transcript
     assert "Perché" in path.read_text(encoding="utf-8")
+
+
+def test_load_transcript_accepts_files_written_before_corrected_from(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "old.json"
+    path.write_text(
+        '{"source": "a.m4a", "model": "large-v3", "language": "it", "duration": 1.0,'
+        ' "segments": [{"start": 0.0, "end": 1.0, "words":'
+        ' [{"start": 0.0, "end": 1.0, "text": " ciao", "probability": 0.9}]}]}',
+        encoding="utf-8",
+    )
+
+    assert load_transcript(path).words[0].corrected_from is None

@@ -1,9 +1,11 @@
 from conftest import make_segment, make_transcript, make_word
 
+from sbobina.models import Word
 from sbobina.render import (
     RenderOptions,
     find_uncertain_spans,
     format_timestamp,
+    mark_correction,
     mark_word,
     render_markdown,
 )
@@ -101,3 +103,18 @@ def test_render_splits_paragraph_longer_than_max_duration() -> None:
 
 def test_mark_word_keeps_elision_apostrophe_inside_marker() -> None:
     assert mark_word(" po'") == " [?po'?]"
+
+
+def test_render_shows_correction_with_original_as_superscript() -> None:
+    corrected = Word(
+        start=0.5, end=0.9, text=" lesione,", probability=1.0, corrected_from="legione"
+    )
+    transcript = make_transcript([make_segment([make_word(" la", 0.0), corrected])])
+
+    markdown = render_markdown(transcript, OPTIONS)
+
+    assert "[00:00:00] la lesione<sup>legione</sup>," in markdown
+
+
+def test_mark_correction_escapes_html_in_what_whisper_heard() -> None:
+    assert mark_correction(" lesione", "a<b") == " lesione<sup>a&lt;b</sup>"
