@@ -7,7 +7,7 @@ from starlette.types import ASGIApp
 from sbobina.settings import Settings
 from sbobina.web.responses import error_response
 
-MUTATING_METHODS = frozenset({"POST", "DELETE"})
+MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
 def web_origin(settings: Settings) -> str:

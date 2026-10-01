@@ -75,14 +75,14 @@ def test_origin_middleware_checks_mutations(tmp_path: Path, host: str) -> None:
     config = Settings(web_host=host, web_port=9876)
     app = create_app(settings=config, data_dir=tmp_path)
 
-    @app.api_route("/test", methods=["POST", "DELETE", "GET"])
+    @app.api_route("/test", methods=["POST", "PUT", "PATCH", "DELETE", "GET"])
     def endpoint() -> dict[str, str]:
         return {"result": "ok"}
 
     url_host = f"[{host}]" if ":" in host else host
     origin = f"http://{url_host}:9876"
     client = TestClient(app, base_url=origin)
-    for method in ["POST", "DELETE"]:
+    for method in ["POST", "PUT", "PATCH", "DELETE"]:
         blocked = client.request(
             method, "/test", headers={"Origin": "https://evil.example"}
         )
