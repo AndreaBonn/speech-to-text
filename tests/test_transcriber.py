@@ -10,6 +10,7 @@ import pytest
 
 from sbobina import platform_info, transcriber
 from sbobina.models import Word
+from sbobina.notices import USER_NOTICE
 from sbobina.platform_info import PlatformInfo, SystemName
 from sbobina.settings import Settings
 from sbobina.transcriber import to_segment
@@ -223,7 +224,7 @@ def test_transcribe_file_cuda_runtime_error_falls_back_to_cpu(
     assert second_call.kwargs["device"] == "cpu"
     assert second_call.kwargs["compute_type"] == "int8"
     assert transcriber.GPU_FALLBACK_NOTICE in caplog.text
-    notices = [r for r in caplog.records if getattr(r, transcriber.USER_NOTICE, False)]
+    notices = [r for r in caplog.records if getattr(r, USER_NOTICE, False)]
     assert [record.getMessage() for record in notices] == [
         transcriber.GPU_FALLBACK_NOTICE
     ]

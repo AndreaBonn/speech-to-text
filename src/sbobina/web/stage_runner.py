@@ -9,6 +9,7 @@ from pathlib import Path
 from threading import Thread
 
 from sbobina.correction import CorrectorUnavailableError
+from sbobina.notices import USER_NOTICE
 from sbobina.pipeline import (
     CorrectionOutcome,
     correct_to_dir,
@@ -16,7 +17,6 @@ from sbobina.pipeline import (
     transcribe_to_dir,
 )
 from sbobina.settings import Settings, settings
-from sbobina.transcriber import USER_NOTICE
 from sbobina.web.job_models import JobRecord, JobStage
 from sbobina.web.job_store import JobStore
 

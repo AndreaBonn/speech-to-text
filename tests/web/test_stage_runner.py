@@ -9,9 +9,9 @@ from unittest.mock import patch
 import pytest
 from conftest import make_segment, make_transcript, make_word
 
-from sbobina import transcriber
 from sbobina.correction import CorrectionResult, CorrectorUnavailableError
 from sbobina.models import load_transcript, save_transcript
+from sbobina.notices import USER_NOTICE
 from sbobina.pipeline import CorrectionOutcome
 from sbobina.settings import Settings, settings
 from sbobina.web import stage_runner
@@ -340,7 +340,7 @@ def test_run_stage_user_notice_from_pipeline_reaches_progress(job_dir: Path) -> 
         on_progress: Callable[[float, float], None],
     ) -> Path:
         logging.getLogger("sbobina.transcriber").warning(
-            "GPU non utilizzabile", extra={transcriber.USER_NOTICE: True}
+            "GPU non utilizzabile", extra={USER_NOTICE: True}
         )
         logging.getLogger("sbobina.transcriber").warning("solo per il log")
         return output_dir / "audio.json"

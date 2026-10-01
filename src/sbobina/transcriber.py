@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from sbobina import platform_info
 from sbobina.cuda_libs import preload_cuda_libraries
 from sbobina.models import Segment, Transcript, Word
+from sbobina.notices import USER_NOTICE
 from sbobina.render import format_timestamp
 from sbobina.settings import Settings
 
@@ -17,10 +18,7 @@ logger = logging.getLogger(__name__)
 
 PROGRESS_EVERY_S = 300.0
 ProgressCallback = Callable[[float, float], None]
-# Emitted verbatim when a CUDA load fails and the stage falls back to CPU;
-# Log records carrying this attribute are meant for the person using the app,
-# not only for the log: the web stage runner copies them into progress.json.
-USER_NOTICE = "user_notice"
+# Emitted verbatim when a CUDA load fails and the stage falls back to CPU.
 GPU_FALLBACK_NOTICE = "GPU non utilizzabile, trascrizione sul processore"
 _CUDA_PRELOAD_SYSTEMS = ("linux", "windows")
 # Substrings of ctranslate2 errors raised by the CUDA runtime or its libraries.
