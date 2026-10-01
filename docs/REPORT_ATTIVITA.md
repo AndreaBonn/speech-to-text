@@ -150,3 +150,109 @@ file README non è stato aggiornato in attesa di conferma.
 Complessità alta: 74 file toccati, nuovo server web con coda di processi,
 supporto multipiattaforma. Stato completato e verificato su Linux; da
 verificare su Windows e macOS.
+
+## 2026-10-01 - 20:14 | Sessione #3 [FEATURE]
+
+### Richiesta
+
+Sul branch `feature/editable-corrected-exports`: permettere l'esportazione della
+trascrizione (corretta o originale) in un formato leggibile come dispensa, e
+introdurre nel lettore web la correzione manuale del testo, parola per parola o
+su una frase intera.
+
+### Azioni Eseguite
+
+- Esportazione in DOCX e TXT con impaginazione da dispensa: titolo (materia del
+  corso o nome del file), formato A4, carattere Cambria 12pt giustificato con
+  rientro di prima riga, lingua italiana e sillabazione automatica, numeri di
+  pagina. Nessun timestamp e nessun segno di incertezza o di correzione nel
+  testo esportato. Una lezione di 85 minuti occupa 11 pagine A4.
+- Correzione manuale nel lettore web: un interruttore "Correggi a mano" attiva
+  la selezione di una parola con un clic o di una frase trascinando il mouse
+  (Shift+clic estende la selezione); da lì si può riascoltare il tratto audio
+  corrispondente, digitare la correzione e salvare (Invio salva, Esc annulla,
+  testo vuoto elimina le parole selezionate). Il salvataggio sovrascrive la
+  versione corretta memorizzata (JSON e file `.md` corretto), quindi la
+  modifica resta e si riflette nelle esportazioni DOCX/TXT successive. Se non
+  esiste ancora una correzione automatica via LLM, la prima modifica manuale
+  avvia una copia corretta a partire dall'originale; l'originale non viene mai
+  alterato.
+- Protezione contro salvataggi in conflitto: ogni salvataggio dichiara la
+  versione del file su cui si basa; una modifica partita da una scheda del
+  browser non aggiornata viene rifiutata con un messaggio chiaro, mostrando il
+  testo appena digitato per non perderlo, invece di sovrascrivere le parole
+  sbagliate.
+- Corretta una falla di sicurezza individuata durante il lavoro: la protezione
+  dell'app web contro le richieste da altre origini copriva solo i metodi POST
+  e DELETE; ora copre anche PUT e PATCH.
+- Corretto un bug emerso su dati reali prima del rilascio: le elisioni
+  dell'italiano ("l'impressione") venivano esportate con uno spazio in più.
+- Verifica eseguita: 478 test automatici verdi, ruff e mypy puliti; percorso di
+  modifica completo verificato nel browser con 30 controlli su 30 passati; gate
+  di accessibilità (axe tema chiaro/scuro, responsive, contrasto degli stati)
+  passati, con un limite noto del gate sul cursore audio preesistente, la cui
+  traccia reale misura un contrasto di 4,37:1 contro una soglia di 3:1; render
+  verificato a 375 e 1280 px.
+
+BASIS: measured. Conteggio dei test, esito di ruff/mypy, click-through nel
+browser e misure di contrasto osservati nella sessione.
+
+### File Modificati
+
+| File | Tipo | Descrizione |
+|---|---|---|
+| `src/sbobina/book.py` | Nuovo | Impaginazione da dispensa (titolo, sillabazione, numeri di pagina) |
+| `src/sbobina/docx_export.py` | Nuovo | Esportazione DOCX in formato dispensa |
+| `src/sbobina/manual_edit.py` | Nuovo | Applicazione delle correzioni manuali con controllo di versione |
+| `src/sbobina/web/api_corrected.py` | Nuovo | Endpoint web per leggere e salvare le correzioni manuali |
+| `src/sbobina/web/static/js/reader-edit.js` | Nuovo | Interazione di selezione, riascolto e salvataggio nel lettore |
+| `tests/test_book.py` | Nuovo | Test sull'impaginazione da dispensa |
+| `tests/test_docx_export.py` | Nuovo | Test sull'esportazione DOCX |
+| `tests/test_manual_edit.py` | Nuovo | Test sulle correzioni manuali e sui conflitti di versione |
+| `tests/web/test_api_corrected.py` | Nuovo | Test sull'endpoint di correzione |
+| `src/sbobina/web/api_files.py` | Modificato | Esposizione delle esportazioni DOCX/TXT da dispensa |
+| `src/sbobina/web/app.py` | Modificato | Registrazione delle nuove rotte |
+| `src/sbobina/web/middleware.py` | Modificato | Protezione cross-origin estesa a PUT e PATCH |
+| `src/sbobina/web/reader.py` | Modificato | Supporto alla correzione manuale nel lettore |
+| `src/sbobina/web/job_store.py` | Modificato | Gestione della versione del file corretto |
+| `src/sbobina/models.py` | Modificato | Modelli dati per la correzione manuale |
+| `src/sbobina/edits.py` | Modificato | Fix dello spazio spurio sulle elisioni italiane |
+| `src/sbobina/web/static/js/reader.js` | Modificato | Integrazione con la modalità di correzione manuale |
+| `src/sbobina/web/static/css/app.css` | Modificato | Stili per selezione, stati e messaggi di conflitto |
+| `src/sbobina/web/templates/reader.html` | Modificato | Interruttore "Correggi a mano" e markup di supporto |
+| `CLAUDE.md` | Modificato | Aggiornamento alla documentazione tecnica del progetto |
+| `pyproject.toml`, `uv.lock` | Modificato | Nuova dipendenza `python-docx` |
+| `tests/web/test_api_files.py`, `tests/web/test_app.py`, `tests/web/test_reader.py` | Modificato | Copertura delle nuove rotte e del nuovo markup |
+
+Totale: 24 file toccati nella sessione.
+
+### Note per il Cliente
+
+Due novità nel lettore web. La prima: la trascrizione, corretta o originale,
+si scarica anche come dispensa pronta da leggere o stampare, in Word o in
+testo semplice, con titolo, pagine numerate e senza le annotazioni tecniche
+(niente timestamp, niente segni di incertezza). Una lezione di un'ora e
+mezza diventa undici pagine A4.
+
+La seconda: ora è possibile correggere a mano il testo direttamente dal
+lettore, parola per parola o su una frase intera, riascoltando il tratto
+audio corrispondente prima di scrivere la correzione. Le modifiche restano
+salvate e compaiono anche nei file scaricati. Se due persone (o due schede
+dello stesso browser) provano a correggere lo stesso punto in momenti diversi,
+il sistema avvisa invece di perdere una delle due modifiche.
+
+Nel corso del lavoro è stata chiusa anche una falla di sicurezza
+sull'applicazione web, che non riguardava i dati delle trascrizioni ma un
+controllo di protezione incompleto.
+
+Limiti da segnalare: su telefono, selezionare una frase di più parole
+richiede di tenere premuto Maiusc (non c'è ancora la selezione con il dito);
+le correzioni manuali non compaiono nel report delle correzioni automatiche,
+che resta dedicato solo a quelle fatte dal correttore LLM; non esiste un
+"annulla", si corregge ridigitando (la parola originariamente riconosciuta
+resta visibile come "prima: ...").
+
+### Riepilogo (Complessità / Stato)
+
+Complessità medio-alta: 24 file toccati tra nuova esportazione e correzione
+manuale. Stato completato e verificato su Linux.
