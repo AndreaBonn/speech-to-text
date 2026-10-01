@@ -118,7 +118,7 @@ FileResponse Range): URL citati nei commenti dove la scelta non è ovvia.
   `GET /api/v1/jobs` paginato, `GET /jobs/{id}`, `POST /jobs/{id}/cancel`, `DELETE /jobs/{id}`.
   Rischio: medio. verify: wav fixture → 201 queued; `.pdf` → 422 `field=file`; testo rinominato
   `.mp3` → 422; limite 1 MB e upload da 2 MB → 413 senza cartella residua; DELETE su running → 409.
-- [ ] **T018** `web/sse.py`: `GET /api/v1/jobs/{id}/events` plan §7, con velocità ed ETA calcolate
+- [x] **T018** `web/sse.py`: `GET /api/v1/jobs/{id}/events` plan §7, con velocità ed ETA calcolate
   da `audio_s/elapsed_s`. Rischio: medio. verify: stream su job con progress scritto dal test →
   `event: progress` crescenti, `event: end` su stato terminale, nessun duplicato senza cambio.
 - [ ] **T019** Pagine minime Jinja (form upload con config e default da `/api/v1/system`, coda con

@@ -21,6 +21,7 @@ from sbobina.web.responses import (
     http_error_handler,
     request_validation_handler,
 )
+from sbobina.web.sse import router as events_router
 from sbobina.web.supervisor import Supervisor, SupervisorOptions
 from sbobina.web.upload_limit import UploadLimitMiddleware, upload_limit_bytes
 
@@ -71,4 +72,5 @@ def create_app(
     app.add_exception_handler(HTTPException, http_error_handler)
     app.include_router(create_system_router(settings=settings))
     app.include_router(jobs_router)
+    app.include_router(events_router)
     return app
