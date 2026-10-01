@@ -97,6 +97,27 @@ def test_correggi_writes_corrected_transcript_and_report(
     )
 
 
+def test_correggi_model_option_reaches_corrector_and_report(
+    transcript_json: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    models: list[str] = []
+
+    def fake_factory(model: str, host: str, subject: str | None) -> Corrector:
+        models.append(model)
+        return lambda text, context: []
+
+    monkeypatch.setattr(llm_corrector, "make_ollama_corrector", fake_factory)
+
+    exit_code = main(["correggi", str(transcript_json), "--modello", "gemma3:4b"])
+
+    report = transcript_json.with_name("lezione.correzioni.md").read_text(
+        encoding="utf-8"
+    )
+    assert exit_code == 0
+    assert models == ["gemma3:4b"]
+    assert "gemma3:4b" in report
+
+
 def test_correggi_returns_error_when_ollama_unreachable(
     transcript_json: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

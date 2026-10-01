@@ -6,25 +6,15 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from sbobina import llm_corrector
-from sbobina.cleanup import remove_silence_fillers
-from sbobina.correction import (
-    CorrectionResult,
-    Corrector,
-    Edit,
-    chunk_segments,
-    correct_transcript,
-)
-from sbobina.models import Segment, Transcript, load_transcript, save_transcript
-from sbobina.render import RenderOptions, format_timestamp, render_markdown
-from sbobina.report import render_corrections_report
-from sbobina.settings import settings
+from sbobina import pipeline
+from sbobina.models import load_transcript
+from sbobina.render import format_timestamp
+from sbobina.settings import Settings, settings
 from sbobina.wer import compute_wer
 
 logger = logging.getLogger("sbobina")
 
 INPUT_FILE_ARGS = ("audio", "trascrizione", "riferimento", "ipotesi")
-CORRECTION_PROGRESS_EVERY = 10
 
 
 def parse_threshold(value: str) -> float:
@@ -38,46 +28,36 @@ def parse_threshold(value: str) -> float:
     return threshold
 
 
-def _render_options(threshold: float | None) -> RenderOptions:
-    return RenderOptions(
-        uncertain_threshold=threshold
-        if threshold is not None
-        else settings.uncertain_threshold,
-        paragraph_gap_s=settings.paragraph_gap_s,
-        paragraph_max_s=settings.paragraph_max_s,
+def _config_for(args: argparse.Namespace) -> Settings:
+    """Apply the command-line overrides to the global settings."""
+    options = vars(args)
+    overrides = {
+        "uncertain_threshold": options.get("soglia"),
+        "ollama_model": options.get("modello"),
+    }
+    return settings.model_copy(
+        update={key: value for key, value in overrides.items() if value is not None}
     )
-
-
-def _write_markdown(
-    transcript: Transcript, json_path: Path, threshold: float | None
-) -> Path:
-    markdown_path = json_path.with_suffix(".md")
-    markdown_path.write_text(
-        render_markdown(transcript, _render_options(threshold)), encoding="utf-8"
-    )
-    return markdown_path
 
 
 def cmd_trascrivi(args: argparse.Namespace) -> int:
-    from sbobina.transcriber import transcribe_file  # heavy import only when needed
-
     audio_path: Path = args.audio
     output_dir: Path = args.output_dir or audio_path.parent
     if output_dir.exists() and not output_dir.is_dir():
         logger.error("La destinazione non è una cartella: %s", output_dir)
         return 1
-    output_dir.mkdir(parents=True, exist_ok=True)
-    transcript = transcribe_file(audio_path, settings)
-    json_path = output_dir / f"{audio_path.stem}.json"
-    save_transcript(transcript, json_path)
-    markdown_path = _write_markdown(transcript, json_path, args.soglia)
-    logger.info("Scritti %s e %s", json_path, markdown_path)
+    json_path = pipeline.transcribe_to_dir(
+        audio_path, output_dir=output_dir, config=_config_for(args)
+    )
+    logger.info("Scritti %s e %s", json_path, json_path.with_suffix(".md"))
     return 0
 
 
 def cmd_rendi(args: argparse.Namespace) -> int:
     json_path: Path = args.trascrizione
-    markdown_path = _write_markdown(load_transcript(json_path), json_path, args.soglia)
+    markdown_path = pipeline.write_markdown(
+        load_transcript(json_path), json_path=json_path, config=_config_for(args)
+    )
     logger.info("Scritto %s", markdown_path)
     return 0
 
@@ -100,61 +80,30 @@ def cmd_wer(args: argparse.Namespace) -> int:
     return 0
 
 
-def _with_progress(corrector: Corrector, total: int) -> Corrector:
-    done = 0
-
-    def tracked(text: str, context: str) -> list[Edit]:
-        nonlocal done
-        edits = corrector(text, context)
-        done += 1
-        if done % CORRECTION_PROGRESS_EVERY == 0 or done == total:
-            logger.info("Corretti %d paragrafi su %d", done, total)
-        return edits
-
-    return tracked
-
-
-def _model_name(args: argparse.Namespace) -> str:
-    return str(args.modello or settings.ollama_model)
-
-
-def _write_correction_outputs(
-    json_path: Path,
-    result: CorrectionResult,
-    removed: list[Segment],
-    args: argparse.Namespace,
-) -> None:
-    stem = json_path.with_suffix("")
-    corrected_json = stem.with_name(f"{stem.name}.corretto.json")
-    save_transcript(result.transcript, corrected_json)
-    _write_markdown(result.transcript, corrected_json, args.soglia)
-    report_path = stem.with_name(f"{stem.name}.correzioni.md")
-    report = render_corrections_report(result, model=_model_name(args), removed=removed)
-    report_path.write_text(report, encoding="utf-8")
-    logger.info("Scritti %s e %s", corrected_json.with_suffix(".md"), report_path)
-
-
 def cmd_correggi(args: argparse.Namespace) -> int:
     json_path: Path = args.trascrizione
-    model = _model_name(args)
-    transcript, removed = remove_silence_fillers(load_transcript(json_path))
-    corrector = llm_corrector.make_ollama_corrector(
-        model, settings.ollama_host, args.materia
+    config = _config_for(args)
+    outcome = pipeline.correct_to_dir(
+        json_path,
+        config=config,
+        subject=args.materia,
+        on_progress=lambda done, total: logger.info(
+            "Corretti %d paragrafi su %d", done, total
+        ),
     )
-    chunk_words = settings.correction_chunk_words
-    total = len(chunk_segments(transcript.segments, max_words=chunk_words))
-    result = correct_transcript(
-        transcript, corrector=_with_progress(corrector, total), max_words=chunk_words
-    )
-    if result.interrupted_at is None:
-        _write_correction_outputs(json_path, result, removed, args)
+    if outcome.corrected_json is not None:
+        _, report_path = pipeline.corrected_paths(json_path)
+        logger.info(
+            "Scritti %s e %s", outcome.corrected_json.with_suffix(".md"), report_path
+        )
+    if not outcome.interrupted:
         return 0
-    if result.interrupted_at > transcript.segments[0].start:
-        _write_correction_outputs(json_path, result, removed, args)
+    interrupted_at = outcome.result.interrupted_at
+    assert interrupted_at is not None
     logger.error(
         "Ollama non raggiungibile o modello %s non scaricato: correzione interrotta a %s",
-        model,
-        format_timestamp(result.interrupted_at),
+        config.ollama_model,
+        format_timestamp(interrupted_at),
     )
     return 1
 

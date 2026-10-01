@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +11,7 @@ from sbobina.settings import Settings
 logger = logging.getLogger(__name__)
 
 PROGRESS_EVERY_S = 300.0
+ProgressCallback = Callable[[float, float], None]
 
 
 def to_segment(raw_segment: Any) -> Segment | None:
@@ -32,7 +33,9 @@ def to_segment(raw_segment: Any) -> Segment | None:
 
 
 def _collect_segments(
-    raw_segments: Iterable[Any], duration: float
+    raw_segments: Iterable[Any],
+    duration: float,
+    on_progress: ProgressCallback | None = None,
 ) -> tuple[Segment, ...]:
     segments: list[Segment] = []
     next_report = PROGRESS_EVERY_S
@@ -40,6 +43,8 @@ def _collect_segments(
         segment = to_segment(raw_segment)
         if segment is not None:
             segments.append(segment)
+        if on_progress is not None:
+            on_progress(raw_segment.end, duration)
         if raw_segment.end >= next_report:
             logger.info(
                 "Trascritti %s di %s",
@@ -50,7 +55,9 @@ def _collect_segments(
     return tuple(segments)
 
 
-def transcribe_file(audio_path: Path, config: Settings) -> Transcript:
+def transcribe_file(
+    audio_path: Path, config: Settings, on_progress: ProgressCallback | None = None
+) -> Transcript:
     """Run Whisper on ``audio_path`` with word timestamps; VAD per ``config``."""
     preload_cuda_libraries()
     from faster_whisper import WhisperModel  # after preload: ctranslate2 needs cuDNN
@@ -72,5 +79,7 @@ def transcribe_file(audio_path: Path, config: Settings) -> Transcript:
         model=config.whisper_model,
         language=config.language,
         duration=float(info.duration),
-        segments=_collect_segments(raw_segments, duration=float(info.duration)),
+        segments=_collect_segments(
+            raw_segments, duration=float(info.duration), on_progress=on_progress
+        ),
     )

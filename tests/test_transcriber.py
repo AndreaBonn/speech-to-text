@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import faster_whisper
 import numpy as np
@@ -59,3 +60,49 @@ def test_transcribe_file_passes_vad_setting_to_whisper(
 
     assert captured["vad_filter"] is False
     assert captured["word_timestamps"] is True
+
+
+@pytest.mark.parametrize("track_progress", [True, False])
+def test_transcribe_file_empty_segment_advances_progress(
+    tmp_path: Path, track_progress: bool
+) -> None:
+    calls: list[tuple[float, float]] = []
+    raw_segments = [
+        SimpleNamespace(start=0.0, end=10.0, words=None),
+        SimpleNamespace(
+            start=10.0,
+            end=30.0,
+            words=[
+                SimpleNamespace(start=10.0, end=30.0, word=" ciao", probability=0.9)
+            ],
+        ),
+    ]
+    with patch("faster_whisper.WhisperModel") as model:
+        model.return_value.transcribe.return_value = (
+            raw_segments,
+            SimpleNamespace(duration=30.0),
+        )
+        if track_progress:
+            result = transcriber.transcribe_file(
+                tmp_path / "a.m4a",
+                config=Settings(),
+                on_progress=lambda end, duration: calls.append((end, duration)),
+            )
+        else:
+            result = transcriber.transcribe_file(tmp_path / "a.m4a", config=Settings())
+
+    assert result.text == "ciao"
+    assert calls == ([(10.0, 30.0), (30.0, 30.0)] if track_progress else [])
+
+
+def test_collect_segments_default_callback_preserves_segments() -> None:
+    raw = SimpleNamespace(
+        start=0.0,
+        end=10.0,
+        words=[SimpleNamespace(start=0.0, end=10.0, word=" ciao", probability=0.9)],
+    )
+
+    segments = transcriber._collect_segments([raw], duration=10.0)
+
+    assert len(segments) == 1
+    assert segments[0].text == "ciao"
