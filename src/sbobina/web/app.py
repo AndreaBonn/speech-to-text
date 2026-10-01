@@ -6,6 +6,7 @@ from pathlib import Path
 import anyio.to_thread
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -21,6 +22,7 @@ from sbobina.web.errors import AppError
 from sbobina.web.gpu_release import unload_ollama_models
 from sbobina.web.job_store import JobStore
 from sbobina.web.middleware import OriginMiddleware, web_origin
+from sbobina.web.pages import router as pages_router
 from sbobina.web.responses import (
     app_error_handler,
     http_error_handler,
@@ -86,4 +88,10 @@ def create_app(
     app.include_router(files_router)
     app.include_router(wer_router)
     app.include_router(events_router)
+    app.include_router(pages_router)
+    app.mount(
+        "/static",
+        StaticFiles(directory=Path(__file__).parent / "static"),
+        name="static",
+    )
     return app

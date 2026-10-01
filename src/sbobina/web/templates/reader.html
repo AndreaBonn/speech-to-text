@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if not_found %}
+<div class="empty-state" role="alert">
+  <p class="empty-state__text">
+    La trascrizione {{ job_id }} non esiste, oppure è stata rimossa.
+  </p>
+  <a class="btn btn--secondary" href="/storico">Vai allo storico</a>
+</div>
+{% else %}
+<div class="reader" data-job-id="{{ job_id }}">
+  <div class="reader__toolbar">
+    <div class="reader__toolbar-title">
+      <h2 class="reader__title">{{ title }}</h2>
+      <p class="reader__subtitle">Caricata il {{ created_at }}</p>
+    </div>
+    <div class="reader__toolbar-actions">
+      <div id="variant-switch" class="segmented" role="group" aria-label="Versione del testo" hidden>
+        <button type="button" class="segmented__option is-active" data-variant="original">Originale</button>
+        <button type="button" class="segmented__option" data-variant="corrected">Corretta</button>
+      </div>
+      <div class="reader__downloads">
+        <a class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/files/md" download>Scarica .md</a>
+        <a class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/files/json" download>Scarica .json</a>
+        <a id="download-corrected-md" class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/files/corrected_md" download hidden>Scarica corretta (.md)</a>
+        <a id="download-report" class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/files/report" download hidden>Report correzioni</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="reader-status" class="reader__status" aria-live="polite"></div>
+
+  <div class="reader__layout">
+    <article id="reader-text" class="reader__text" aria-label="Trascrizione">
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+    </article>
+    <aside id="reader-points" class="reader__points" aria-label="Punti da riascoltare"></aside>
+  </div>
+</div>
+
+<div id="audio-bar" class="audio-bar" hidden>
+  <audio
+    id="audio-player"
+    preload="metadata"
+    src="/api/v1/jobs/{{ job_id }}/audio"
+  ></audio>
+  <button
+    type="button"
+    id="audio-playpause"
+    class="btn btn--secondary audio-bar__play"
+    aria-label="Riproduci"
+  ><span id="audio-playpause-icon" aria-hidden="true">&#9654;</span></button>
+  <button type="button" id="audio-back" class="btn btn--ghost audio-bar__skip" aria-label="Indietro di 10 secondi">&minus;10s</button>
+  <button type="button" id="audio-forward" class="btn btn--ghost audio-bar__skip" aria-label="Avanti di 10 secondi">+10s</button>
+  <span id="audio-time" class="audio-bar__time">0:00 / 0:00</span>
+  <input
+    type="range"
+    id="audio-seek"
+    class="audio-bar__seek"
+    min="0"
+    max="1000"
+    value="0"
+    aria-label="Posizione nell'audio"
+  />
+  <select id="audio-speed" class="select-input audio-bar__speed" aria-label="Velocità">
+    <option value="1">1&times;</option>
+    <option value="1.25">1.25&times;</option>
+    <option value="1.5">1.5&times;</option>
+  </select>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if not not_found %}
+<script src="/static/js/reader.js" defer></script>
+{% endif %}
+{% endblock %}

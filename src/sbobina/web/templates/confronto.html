@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="confronto-root" class="wer">
+  <p class="wer__intro">
+    Scrivi i numeri in cifre nel testo di riferimento: il confronto lavora
+    parola per parola, quindi "tre" e "3" contano come parole diverse.
+  </p>
+
+  <form id="wer-form" class="wer__form" novalidate>
+    <div class="field">
+      <label class="field__label" for="wer-reference">Testo di riferimento (.txt)</label>
+      <input id="wer-reference" class="text-input" type="file" accept=".txt" />
+      <p id="wer-reference-error" class="field__error" hidden></p>
+    </div>
+
+    <div id="wer-source-switch" class="segmented" role="group" aria-label="Sorgente da confrontare">
+      <button type="button" class="segmented__option is-active" data-source="job">Una trascrizione</button>
+      <button type="button" class="segmented__option" data-source="file">Un file di testo</button>
+    </div>
+
+    <div id="wer-job-fields" class="wer__source-fields">
+      <div class="field">
+        <label class="field__label" for="wer-job">Trascrizione</label>
+        <select id="wer-job" class="select-input"></select>
+        <p id="wer-job-error" class="field__error" hidden></p>
+      </div>
+      <div class="field">
+        <label class="field__label" for="wer-variant">Versione</label>
+        <select id="wer-variant" class="select-input">
+          <option value="original" selected>Originale</option>
+          <option value="corrected">Corretta</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="wer-file-fields" class="wer__source-fields" hidden>
+      <div class="field">
+        <label class="field__label" for="wer-hypothesis">Testo da confrontare (.txt)</label>
+        <input id="wer-hypothesis" class="text-input" type="file" accept=".txt" />
+        <p id="wer-hypothesis-error" class="field__error" hidden></p>
+      </div>
+    </div>
+
+    <div id="wer-form-error" class="form-error" hidden role="alert"></div>
+
+    <button id="wer-submit" class="btn btn--primary" type="submit">
+      <span class="btn__label">Confronta</span>
+    </button>
+  </form>
+
+  <div id="wer-result" class="wer__result" hidden aria-live="polite">
+    <div class="wer__score">
+      <span id="wer-score-value" class="wer__score-value">0%</span>
+      <span class="wer__score-label">Word Error Rate</span>
+    </div>
+    <dl class="wer__counts">
+      <div><dt>Parole di riferimento</dt><dd id="wer-reference-words">0</dd></div>
+      <div><dt>Sostituzioni</dt><dd id="wer-substitutions">0</dd></div>
+      <div><dt>Eliminazioni</dt><dd id="wer-deletions">0</dd></div>
+      <div><dt>Inserimenti</dt><dd id="wer-insertions">0</dd></div>
+    </dl>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/confronto.js" defer></script>
+{% endblock %}

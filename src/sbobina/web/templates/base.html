@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}{{ page_title }} · sbobina{% endblock %}</title>
+  <link
+    rel="icon"
+    type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2307657d'/%3E%3Crect x='8' y='10' width='16' height='2.5' rx='1.25' fill='%23f4f7fb'/%3E%3Crect x='8' y='15' width='16' height='2.5' rx='1.25' fill='%23f4f7fb'/%3E%3Crect x='8' y='20' width='10' height='2.5' rx='1.25' fill='%23f4f7fb'/%3E%3C/svg%3E"
+  />
+  <link rel="stylesheet" href="/static/tokens.css" />
+  <link rel="stylesheet" href="/static/css/app.css" />
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Vai al contenuto</a>
+  <div class="app-shell">
+    <nav class="rail" aria-label="Navigazione principale">
+      <div class="rail__brand">sbobina</div>
+      <div class="rail__scroll">
+        <ul class="rail__list">
+          {% for item in nav_items %}
+          <li class="rail__item">
+            {% if item.disabled %}
+            <span class="rail__link rail__link--disabled" aria-disabled="true">{{ item.label }}</span>
+            {% else %}
+            <a
+              class="rail__link{% if item.active %} rail__link--active{% endif %}"
+              href="{{ item.href }}"
+              {% if item.active %}aria-current="page"{% endif %}
+            >{{ item.label }}</a>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div id="rail-indicator" class="rail__indicator" aria-live="polite"></div>
+    </nav>
+    <div class="app-shell__main">
+      <div id="system-banner" class="banner-region" aria-live="polite"></div>
+      <main id="main-content">
+        <h1 class="page-title">{{ page_title }}</h1>
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var region = document.getElementById("system-banner");
+      var indicator = document.getElementById("rail-indicator");
+
+      function bannerMarkup(kind, message) {
+        var el = document.createElement("div");
+        el.className = "banner banner--" + kind;
+        el.textContent = message;
+        return el;
+      }
+
+      fetch("/api/v1/system")
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("system info non disponibile");
+          }
+          return response.json();
+        })
+        .then(function (body) {
+          var data = body.data;
+          var ollama = data.ollama || {};
+          var banners = [];
+          if (data.device === "cpu") {
+            banners.push(
+              bannerMarkup(
+                "warning",
+                "Trascrizione su CPU: sarà più lenta. " + data.reason + "."
+              )
+            );
+          }
+          if (ollama.status && ollama.status !== "ready") {
+            banners.push(bannerMarkup("warning", ollama.message));
+          }
+          if (banners.length > 0) {
+            region.replaceChildren.apply(region, banners);
+            return;
+          }
+          region.replaceChildren();
+          if (indicator) {
+            indicator.textContent =
+              data.device.toUpperCase() + " · " + data.whisper_model;
+          }
+        })
+        .catch(function () {
+          // Non critico: se /api/v1/system non risponde il resto della
+          // pagina funziona comunque, il banner resta semplicemente vuoto.
+        });
+    })();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

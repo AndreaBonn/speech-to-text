@@ -121,7 +121,7 @@ FileResponse Range): URL citati nei commenti dove la scelta non è ovvia.
 - [x] **T018** `web/sse.py`: `GET /api/v1/jobs/{id}/events` plan §7, con velocità ed ETA calcolate
   da `audio_s/elapsed_s`. Rischio: medio. verify: stream su job con progress scritto dal test →
   `event: progress` crescenti, `event: end` su stato terminale, nessun duplicato senza cambio.
-- [ ] **T019** Pagine minime Jinja (form upload con config e default da `/api/v1/system`, coda con
+- [x] **T019** Pagine minime Jinja (form upload con config e default da `/api/v1/system`, coda con
   barra via EventSource, annulla). File: `web/pages.py`, `templates/{base,index}.html`,
   `static/jobs.js`. Rischio: basso. verify: `uv run sbobina web`, upload di una fixture da 30 s dal
   browser, barra fino a "completato"; `curl -N .../events` mostra gli stessi eventi.
@@ -158,19 +158,19 @@ rilevati e segnalati (permessi admin / download lunghi gestiti dalla UI con avan
   `GET /jobs/{id}/files/{kind}` (md, json, corrected_md, corrected_json, report). Rischio: medio.
   verify: `Range: bytes=0-1023` → 206, `Content-Range: bytes 0-1023/<size>`, 1024 byte; kind ignoto
   → 422; file non prodotto → 404.
-- [ ] **T022** `templates/reader.html`: parole come `<span data-start data-end>`, classi
+- [x] **T022** `templates/reader.html`: parole come `<span data-start data-end>`, classi
   incerta/corretta, `<audio>` nativo. Rischio: basso. verify: HTML del job fixture ha tanti span
   quante le parole del transcript.
 
 **[B-8] T023-T025**
 
-- [ ] **T023** `static/reader.js`: clic → `currentTime = start` + play; `timeupdate` → ricerca
+- [x] **T023** `static/reader.js`: clic → `currentTime = start` + play; `timeupdate` → ricerca
   binaria, classe attiva, scroll solo se fuori viewport; errore di decodifica → messaggio visibile.
   Rischio: medio. verify: manuale su job reale: clic su una parola a 12:30 → audio a 12:30;
   l'evidenza avanza parola per parola.
-- [ ] **T024** Storico `templates/history.html` paginato: stato, durata, riapri, elimina (solo
+- [x] **T024** Storico `templates/history.html` paginato: stato, durata, riapri, elimina (solo
   terminali). Rischio: basso. verify: 12 job fixture, per_page 10 → 2 pagine; "riapri" apre il lettore.
-- [ ] **T025** Gate di fase: pytest/ruff/mypy verdi, file ≤ 300 righe.
+- [x] **T025** Gate di fase: pytest/ruff/mypy verdi, file ≤ 300 righe.
 
 ## F5 - Modelli e stato Ollama
 
@@ -194,7 +194,7 @@ rilevati e segnalati (permessi admin / download lunghi gestiti dalla UI con avan
 - [x] **T033** `GET /api/v1/models`, `POST /api/v1/models/downloads`, SSE
   `/api/v1/models/downloads/events`; download duplicato → 409. Rischio: basso.
   verify: POST due volte `tiny` → 202 poi 409.
-- [ ] **T034** `templates/models.html` + `static/models.js`: tabelle Whisper/Ollama, badge device,
+- [x] **T034** `templates/models.html` + `static/models.js`: tabelle Whisper/Ollama, badge device,
   modelli consigliati su CPU, "scarica per nome" Ollama, stato Ollama con azione. Rischio: basso.
   verify: manuale: download di `tiny` dall'UI con barra e stato finale scaricato.
 
@@ -205,21 +205,21 @@ rilevati e segnalati (permessi admin / download lunghi gestiti dalla UI con avan
 - [x] **T040** `POST /api/v1/wer`: riferimento `.txt` + `job_id`/`variant` (original|corrected) o
   ipotesi `.txt`; `compute_wer`. Rischio: basso. verify: stessi valori di `uv run sbobina wer` sulle
   stesse fixture; variant corrected senza correzione → 404.
-- [ ] **T041** `templates/wer.html`. verify: manuale, numero identico alla CLI.
+- [x] **T041** `templates/wer.html`. verify: manuale, numero identico alla CLI.
 
 ## F7 - UI finale (orchestratore con skill di design)
 
-- [ ] **T050** Riga `DIAL:` (strumento di lavoro locale, lettura lunga) e sistema visivo in
+- [x] **T050** Riga `DIAL:` (strumento di lavoro locale, lettura lunga) e sistema visivo in
   `static/app.css`; `design.md` a root da `hallmark` prima della seconda pagina.
   verify: riga DIAL nel report, `design.md` presente.
-- [ ] **T051** Redesign pagine F3-F6: stati Loading/Empty/Error/Populated/Edge per coda, storico,
+- [x] **T051** Redesign pagine F3-F6: stati Loading/Empty/Error/Populated/Edge per coda, storico,
   modelli, lettore (edge: 10k parole, nome file da 200 caratteri, Ollama giù, device cpu).
   verify: ogni superficie mostrata nei 5 stati con fixture.
-- [ ] **T052** Avvisi piattaforma: banner OS/device, avviso large-v3 su CPU prima di accodare,
+- [x] **T052** Avvisi piattaforma: banner OS/device, avviso large-v3 su CPU prima di accodare,
   avviso tempi correzione, velocità ed ETA reali. verify: con `SBOBINA_DEVICE=cpu` il form
   preseleziona `large-v3-turbo` e scegliere `large-v3` mostra l'avviso.
-- [ ] **T053** Gate: `a11y-gate` verde, `hallmark audit`, render osservato a 375 e 1280 px.
-- [ ] **T054** Click-through di ogni controllo (upload, annulla, riapri, elimina, clic parola →
+- [x] **T053** Gate: `a11y-gate` verde, `hallmark audit`, render osservato a 375 e 1280 px.
+- [x] **T054** Click-through di ogni controllo (upload, annulla, riapri, elimina, clic parola →
   seek, download, scarica modello, calcola WER), console senza errori. verify: elenco
   `controllo -> esito` nel report.
 

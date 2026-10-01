@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="storico-root" class="history">
+  <div id="storico-status" class="history__status" role="alert" hidden></div>
+
+  <div class="table-wrap">
+    <table class="table history-table">
+      <thead>
+        <tr>
+          <th scope="col">Lezione</th>
+          <th scope="col">Data</th>
+          <th scope="col">Stato</th>
+          <th scope="col">Azioni</th>
+        </tr>
+      </thead>
+      <tbody id="storico-tbody">
+        <tr><td colspan="4"><div class="skeleton-row"></div></td></tr>
+        <tr><td colspan="4"><div class="skeleton-row"></div></td></tr>
+        <tr><td colspan="4"><div class="skeleton-row"></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div id="storico-empty" class="empty-state" hidden>
+    <p class="empty-state__text">Non hai ancora nessuna trascrizione. Caricane una per iniziare.</p>
+    <a class="btn btn--primary" href="/">Nuova trascrizione</a>
+  </div>
+
+  <nav id="storico-pagination" class="pagination" aria-label="Pagine dello storico" hidden></nav>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/storico.js" defer></script>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="modelli-root" class="models">
+  <p class="models__notice">
+    I download dei modelli possono pesare diversi gigabyte e richiedere
+    qualche minuto, a seconda della connessione.
+  </p>
+
+  <section aria-labelledby="models-whisper-heading">
+    <h2 id="models-whisper-heading" class="section-title">Whisper</h2>
+    <div id="models-whisper-status" class="history__status" role="alert" hidden></div>
+    <div class="table-wrap">
+      <table class="table models-table">
+        <thead>
+          <tr>
+            <th scope="col">Modello</th>
+            <th scope="col">Dimensione</th>
+            <th scope="col">Stato</th>
+            <th scope="col">Azione</th>
+          </tr>
+        </thead>
+        <tbody id="models-whisper-tbody">
+          <tr><td colspan="4"><div class="skeleton-row"></div></td></tr>
+          <tr><td colspan="4"><div class="skeleton-row"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="models__ollama" aria-labelledby="models-ollama-heading">
+    <h2 id="models-ollama-heading" class="section-title">Ollama</h2>
+    <div id="models-ollama-banner" class="banner-region"></div>
+    <div id="models-ollama-list" class="models__ollama-list"></div>
+
+    <form id="ollama-download-form" class="models__ollama-form" novalidate>
+      <div class="field">
+        <label class="field__label" for="ollama-download-name">Scarica per nome</label>
+        <input
+          id="ollama-download-name"
+          class="text-input"
+          type="text"
+          placeholder="Es. qwen3.5:9b"
+          autocomplete="off"
+        />
+        <p id="ollama-download-error" class="field__error" hidden></p>
+      </div>
+      <button type="submit" class="btn btn--secondary">Scarica</button>
+    </form>
+    <div id="ollama-download-progress"></div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/modelli.js" defer></script>
+{% endblock %}
