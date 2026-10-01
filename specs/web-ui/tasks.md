@@ -143,7 +143,7 @@ rilevati e segnalati (permessi admin / download lunghi gestiti dalla UI con avan
   cache) loggata in italiano e servita da `/api/v1/system`; apre il browser con `webbrowser` dopo
   che il server risponde (`--no-browser` per disattivare); porta occupata → messaggio chiaro.
   verify: test della diagnosi con boundary mockati; avvio reale apre la pagina una sola volta.
-- [ ] **T082** `avvia.bat` (Windows, doppio clic): stesso flusso con installer PowerShell di uv e
+- [x] **T082** `avvia.bat` (Windows, doppio clic; scritto, non eseguito su Windows): stesso flusso con installer PowerShell di uv e
   `where nvidia-smi`. Non verificabile qui: entra nella checklist T076.
 
 ## F4 - Lettore, audio, storico
