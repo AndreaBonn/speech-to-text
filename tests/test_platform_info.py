@@ -1,4 +1,5 @@
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -206,6 +207,7 @@ def test_detect_platform_reports_mocked_capabilities(
     monkeypatch.setattr(platform_info, "sys", SimpleNamespace(platform=system))
     monkeypatch.setattr("platform.machine", lambda: machine)
     monkeypatch.setattr("os.cpu_count", lambda: cores)
+    monkeypatch.setattr(platform_info, "CPUINFO_PATH", Path("/nonexistent/cpuinfo"))
     monkeypatch.setattr("ctranslate2.get_cuda_device_count", lambda: devices)
     monkeypatch.setattr(
         "ctranslate2.get_supported_compute_types", lambda device: {"int8", "float32"}
@@ -242,6 +244,7 @@ def test_detect_platform_missing_wheel_is_unavailable(specs: list[object]) -> No
         patch.object(platform_info, "sys", SimpleNamespace(platform="linux")),
         patch("platform.machine", return_value="x86_64"),
         patch("os.cpu_count", return_value=4),
+        patch.object(platform_info, "CPUINFO_PATH", Path("/nonexistent/cpuinfo")),
         patch("ctranslate2.get_cuda_device_count", return_value=1),
         patch("ctranslate2.get_supported_compute_types", return_value={"float32"}),
         patch("importlib.util.find_spec", side_effect=specs),
@@ -273,3 +276,55 @@ def test_request_from_settings_copies_runtime_preferences() -> None:
         whisper_model_cpu=config.whisper_model_cpu,
         cpu_threads=4,
     )
+
+
+def _cpuinfo(cores: list[tuple[int, int]]) -> str:
+    blocks = [
+        f"processor\t: {index}\nphysical id\t: {package}\ncore id\t\t: {core}\n"
+        for index, (package, core) in enumerate(cores)
+    ]
+    return "\n".join(blocks)
+
+
+def test_count_physical_cores_collapses_hyperthreads() -> None:
+    # Hybrid laptop: 6 cores with two threads each plus 4 single-thread cores.
+    cores = [(0, c) for c in range(6) for _ in range(2)] + [
+        (0, c) for c in range(8, 12)
+    ]
+    assert platform_info.count_physical_cores(_cpuinfo(cores)) == 10
+
+
+def test_count_physical_cores_counts_cores_per_package() -> None:
+    cores = [(package, core) for package in (0, 1) for core in range(4)]
+    assert platform_info.count_physical_cores(_cpuinfo(cores)) == 8
+
+
+def test_count_physical_cores_without_core_ids_is_unknown() -> None:
+    assert (
+        platform_info.count_physical_cores("processor\t: 0\nmodel name\t: ARM\n")
+        is None
+    )
+
+
+def test_detect_platform_linux_uses_physical_cores(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cpuinfo = tmp_path / "cpuinfo"
+    cpuinfo.write_text(_cpuinfo([(0, c) for c in range(4) for _ in range(2)]))
+    monkeypatch.setattr(platform_info, "sys", SimpleNamespace(platform="linux"))
+    monkeypatch.setattr(platform_info, "CPUINFO_PATH", cpuinfo)
+    monkeypatch.setattr("os.cpu_count", lambda: 8)
+
+    assert platform_info.detect_platform().cpu_count == 4
+
+
+def test_detect_platform_linux_without_core_ids_uses_logical_count(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cpuinfo = tmp_path / "cpuinfo"
+    cpuinfo.write_text("processor\t: 0\nmodel name\t: ARM\n")
+    monkeypatch.setattr(platform_info, "sys", SimpleNamespace(platform="linux"))
+    monkeypatch.setattr(platform_info, "CPUINFO_PATH", cpuinfo)
+    monkeypatch.setattr("os.cpu_count", lambda: 6)
+
+    assert platform_info.detect_platform().cpu_count == 6
