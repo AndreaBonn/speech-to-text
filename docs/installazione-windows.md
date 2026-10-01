@@ -31,7 +31,7 @@ La finestra nera deve restare aperta mentre usi sbobina. Per chiudere tutto, chi
 
 ### Quanto ci vuole senza scheda NVIDIA
 
-Sul processore sbobina usa un modello più leggero (`large-v3-turbo`). Su un computer fisso con 16 core, 30 secondi di audio hanno richiesto 16 secondi: una lezione di un'ora e mezza richiede quindi circa tre quarti d'ora. Su un portatile può volerci di più. La pagina mostra la velocità e il tempo che manca, calcolati sulla tua lezione.
+Sul processore sbobina usa un modello più leggero (`large-v3-turbo`). Su un portatile con processore Intel Core i7 di 13ª generazione, 5 minuti di audio hanno richiesto circa un minuto e mezzo: una lezione di un'ora e mezza richiede quindi circa mezz'ora. Su un computer meno recente può volerci di più. La pagina mostra la velocità e il tempo che manca, calcolati sulla tua lezione.
 
 ## Correzione automatica con Ollama (facoltativa)
 
