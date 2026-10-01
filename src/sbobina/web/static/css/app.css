@@ -310,6 +310,12 @@ body {
   font: inherit;
 }
 
+/* The browser default placeholder grey drops to 3.8:1 on the dark surface. */
+.text-input::placeholder {
+  color: var(--color-ink-3);
+  opacity: 1;
+}
+
 .text-input:disabled,
 .select-input:disabled {
   color: var(--color-ink-3);
