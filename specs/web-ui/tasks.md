@@ -11,21 +11,21 @@ multiprocessing, niente `/proc`, `encoding="utf-8"` esplicito.
 
 **[B-1] T001-T004**
 
-- [ ] **T001** `transcribe_file(..., on_progress: ProgressCallback | None = None)`; `_collect_segments`
+- [x] **T001** `transcribe_file(..., on_progress: ProgressCallback | None = None)`; `_collect_segments`
   la chiama a ogni segmento con `(raw_segment.end, duration)`. Log ogni 300 s invariato. Plan §1.
   File: `src/sbobina/transcriber.py`, `tests/test_transcriber.py`. Rischio: basso.
   verify: test con segmenti finti registra `[(10.0, 30.0), (30.0, 30.0)]`;
   `test_transcribe_file_passes_vad_setting_to_whisper` verde senza modifiche.
-- [ ] **T002** `src/sbobina/pipeline.py`: `with_progress(corrector, total, on_done)` spostato da
+- [x] **T002** `src/sbobina/pipeline.py`: `with_progress(corrector, total, on_done)` spostato da
   `cli._with_progress`; `transcribe_to_dir(...)` e `correct_to_dir(...) -> CorrectionOutcome`
   estratti da `cmd_trascrivi`, `cmd_correggi`, `_write_correction_outputs`. Funzioni ≤ 30 righe.
   File: `src/sbobina/pipeline.py`, `tests/test_pipeline.py`. Rischio: medio (va preservata la
   scrittura degli output parziali, `src/sbobina/cli.py:143`).
   verify: `uv run pytest tests/test_pipeline.py` verde; caso "interrotto a metà" scrive gli output
   parziali come oggi.
-- [ ] **T003** `cli.py` delega a `pipeline`; `_with_progress` rimosso (orfano della modifica).
+- [x] **T003** `cli.py` delega a `pipeline`; `_with_progress` rimosso (orfano della modifica).
   Rischio: basso. verify: `uv run pytest tests/test_cli.py` verde senza toccare i test esistenti.
-- [ ] **T004** Gate di fase. verify: pytest, ruff, mypy verdi; `wc -l src/sbobina/cli.py` < 228.
+- [x] **T004** Gate di fase. verify: pytest, ruff, mypy verdi; `wc -l src/sbobina/cli.py` < 228.
 
 ## F2 - Piattaforma e CPU su Linux (indipendente dal web)
 
@@ -34,19 +34,19 @@ citare l'URL nel docstring di `resolve_runtime`.
 
 **[B-2] T005-T007**
 
-- [ ] **T005** `src/sbobina/platform_info.py`: `PlatformInfo`, `RuntimeChoice`,
+- [x] **T005** `src/sbobina/platform_info.py`: `PlatformInfo`, `RuntimeChoice`,
   `resolve_runtime(info, requested)` puro secondo la tabella di plan §10. Settings: `device="auto"`,
   `compute_type="auto"`, `cpu_threads=0`, `whisper_model_cpu="large-v3-turbo"`. Rischio: medio.
   verify: test parametrizzato su tutte le righe della tabella (linux/windows/darwin/other ×
   NVIDIA+wheel / NVIDIA senza wheel / nessuna GPU / Apple Silicon), più: cpu senza `int8` →
   `float32`; `cuda` esplicito senza GPU → errore; `cpu` esplicito con GPU → cpu. Nessun test legge
   l'OS reale (`sys.platform` mai usato nei test).
-- [ ] **T006** `detect_platform()` (unico I/O: `sys.platform`, `platform.machine()`,
+- [x] **T006** `detect_platform()` (unico I/O: `sys.platform`, `platform.machine()`,
   `ctranslate2.get_cuda_device_count()`, `get_supported_compute_types("cpu")`, `find_spec` delle
   wheel NVIDIA senza caricarle). Rischio: basso.
   verify: test con ctranslate2 e `find_spec` mockati → `PlatformInfo` atteso; esecuzione reale qui
   → `system=linux, cuda_devices=1, cuda_libs_available=True`.
-- [ ] **T007** `transcribe_file` usa `RuntimeChoice`: `preload_cuda_libraries()` solo per cuda su
+- [x] **T007** `transcribe_file` usa `RuntimeChoice`: `preload_cuda_libraries()` solo per cuda su
   Linux, `cpu_threads` solo su cpu, log INFO (OS, device, compute, modello, motivo), WARNING con
   `uv sync --extra cuda` per GPU senza wheel. Rischio: medio.
   verify: test con `WhisperModel` mockato: su cpu `preload_cuda_libraries` non chiamato e
@@ -55,12 +55,14 @@ citare l'URL nel docstring di `resolve_runtime`.
 
 **[B-3] T008-T009**
 
-- [ ] **T008** `pyproject.toml`: wheel NVIDIA in `[project.optional-dependencies] cuda` con marker
+- [x] **T008** `pyproject.toml`: wheel NVIDIA in `[project.optional-dependencies] cuda` con marker
   `sys_platform == 'linux'`; `uv.lock` rigenerato dal tool. **Richiede OK utente**. Rischio: medio.
   verify: `uv sync && uv pip list | grep -c nvidia` → 0; `uv sync --extra cuda` → wheel presenti e
   `uv run sbobina trascrivi <fixture 30 s>` di nuovo su cuda.
-- [ ] **T009** Verifica CPU reale su questa macchina. verify: `CUDA_VISIBLE_DEVICES="" uv run
+- [x] **T009** Verifica CPU reale su questa macchina. verify: `CUDA_VISIBLE_DEVICES="" uv run
   sbobina trascrivi <30 s wav>` completa, log `device=cpu compute_type=int8 model=large-v3-turbo`.
+  Misurato 2026-10-01 (senza wheel, RTX presente): WARNING `uv sync --extra cuda`, cpu/int8/
+  large-v3-turbo, 30 s di audio in 16 s su 16 core (modello già in cache).
 
 ## F3 - Server, job store, coda, SSE
 
