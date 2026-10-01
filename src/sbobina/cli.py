@@ -15,6 +15,8 @@ from sbobina.wer import compute_wer
 logger = logging.getLogger("sbobina")
 
 INPUT_FILE_ARGS = ("audio", "trascrizione", "riferimento", "ipotesi")
+# The CLI logs correction progress every N chunks; the web UI wants every one.
+CORRECTION_LOG_EVERY = 10
 MIN_PORT, MAX_PORT = 1, 65535
 
 
@@ -94,6 +96,11 @@ def cmd_wer(args: argparse.Namespace) -> int:
     return 0
 
 
+def _log_correction_progress(done: int, total: int) -> None:
+    if done % CORRECTION_LOG_EVERY == 0 or done == total:
+        logger.info("Corretti %d paragrafi su %d", done, total)
+
+
 def cmd_correggi(args: argparse.Namespace) -> int:
     json_path: Path = args.trascrizione
     config = _config_for(args)
@@ -101,9 +108,7 @@ def cmd_correggi(args: argparse.Namespace) -> int:
         json_path,
         config=config,
         subject=args.materia,
-        on_progress=lambda done, total: logger.info(
-            "Corretti %d paragrafi su %d", done, total
-        ),
+        on_progress=_log_correction_progress,
     )
     if outcome.corrected_json is not None:
         _, report_path = pipeline.corrected_paths(json_path)

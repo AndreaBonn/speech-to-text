@@ -1,9 +1,10 @@
+import logging
 from pathlib import Path
 
 import pytest
 from conftest import make_segment, make_transcript, make_word
 
-from sbobina import llm_corrector
+from sbobina import cli, llm_corrector
 from sbobina.cli import main
 from sbobina.correction import Corrector, CorrectorUnavailableError, Edit
 from sbobina.models import load_transcript, save_transcript
@@ -190,3 +191,15 @@ def test_web_port_option_reaches_server_config(
 def test_web_invalid_port_is_rejected(port: str) -> None:
     with pytest.raises(SystemExit):
         main(["web", "--port", port])
+
+
+@pytest.mark.parametrize(
+    ("done", "total", "logged"),
+    [(3, 23, False), (10, 23, True), (20, 23, True), (23, 23, True)],
+)
+def test_log_correction_progress_logs_every_ten_and_at_the_end(
+    caplog: pytest.LogCaptureFixture, done: int, total: int, logged: bool
+) -> None:
+    with caplog.at_level(logging.INFO):
+        cli._log_correction_progress(done, total)
+    assert (f"Corretti {done} paragrafi su {total}" in caplog.text) is logged

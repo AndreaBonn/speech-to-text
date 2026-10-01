@@ -6,30 +6,46 @@ import pytest
 from conftest import make_segment, make_transcript, make_word
 
 from sbobina import pipeline
-from sbobina.correction import CorrectionResult, CorrectorUnavailableError, Edit
+from sbobina.correction import (
+    CorrectionResult,
+    CorrectorUnavailableError,
+    Edit,
+    InvalidResponseError,
+)
 from sbobina.models import load_transcript, save_transcript
 from sbobina.settings import Settings
 
 
-@pytest.mark.parametrize(
-    ("total", "expected"),
-    [(20, [(10, 20), (20, 20)]), (23, [(10, 23), (20, 23), (23, 23)])],
-)
-def test_with_progress_chunk_counts_emit_filtered_notifications(
-    total: int, expected: list[tuple[int, int]]
-) -> None:
+def test_with_progress_notifies_after_every_call() -> None:
     calls: list[tuple[int, int]] = []
     edits = [Edit(original="Sennberg", corrected="Heisenberg")]
     tracked = pipeline.with_progress(
         lambda text, context: edits,
-        total=total,
+        total=3,
         on_done=lambda done, count: calls.append((done, count)),
     )
 
-    results = [tracked("Sennberg", "") for _ in range(total)]
+    results = [tracked("Sennberg", "") for _ in range(3)]
 
-    assert calls == expected
-    assert results == [edits] * total
+    assert calls == [(1, 3), (2, 3), (3, 3)]
+    assert results == [edits] * 3
+
+
+def test_with_progress_counts_failed_calls_and_reraises() -> None:
+    # A chunk with an invalid answer is kept as is by correct_transcript, so it
+    # is done all the same: skipping it would leave the bar short of total.
+    calls: list[tuple[int, int]] = []
+
+    def failing(text: str, context: str) -> list[Edit]:
+        raise InvalidResponseError("not json")
+
+    tracked = pipeline.with_progress(
+        failing, total=1, on_done=lambda done, count: calls.append((done, count))
+    )
+
+    with pytest.raises(InvalidResponseError):
+        tracked("x", "")
+    assert calls == [(1, 1)]
 
 
 def test_label_transcript_names_json_and_markdown_after_the_upload(
@@ -191,3 +207,19 @@ def test_corrected_paths_derive_from_transcript_stem() -> None:
 
     assert corrected_json == Path("out/lezione.corretto.json")
     assert report == Path("out/lezione.correzioni.md")
+
+
+def test_with_progress_does_not_count_a_call_that_stops_the_run() -> None:
+    # Ollama gone: correct_transcript stops and leaves this chunk uncorrected.
+    calls: list[tuple[int, int]] = []
+
+    def unavailable(text: str, context: str) -> list[Edit]:
+        raise CorrectorUnavailableError("down")
+
+    tracked = pipeline.with_progress(
+        unavailable, total=1, on_done=lambda done, count: calls.append((done, count))
+    )
+
+    with pytest.raises(CorrectorUnavailableError):
+        tracked("x", "")
+    assert calls == []

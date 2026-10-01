@@ -8,6 +8,7 @@ from sbobina.correction import (
     CorrectionResult,
     Corrector,
     Edit,
+    InvalidResponseError,
     chunk_segments,
     correct_transcript,
 )
@@ -16,8 +17,6 @@ from sbobina.render import RenderOptions, render_markdown
 from sbobina.report import render_corrections_report
 from sbobina.settings import Settings
 from sbobina.transcriber import ProgressCallback
-
-CORRECTION_PROGRESS_EVERY = 10
 
 
 @dataclass(frozen=True)
@@ -38,20 +37,29 @@ def with_progress(
     Parameters
     ----------
     corrector : Corrector
-        Correction callable; exceptions propagate without advancing the count.
+        Correction callable; its exceptions propagate. An invalid answer still
+        counts, since ``correct_transcript`` keeps that chunk and moves on; an
+        unavailable model does not, since the run stops there.
     total : int
         Number of expected calls.
     on_done : Callable[[int, int], None]
-        Receives completed/total counts every ten calls and at completion.
+        Receives completed/total counts after every call; throttling is up to
+        the caller.
     """
     done = 0
 
-    def tracked(text: str, context: str) -> list[Edit]:
+    def advance() -> None:
         nonlocal done
-        edits = corrector(text, context)
         done += 1
-        if done % CORRECTION_PROGRESS_EVERY == 0 or done == total:
-            on_done(done, total)
+        on_done(done, total)
+
+    def tracked(text: str, context: str) -> list[Edit]:
+        try:
+            edits = corrector(text, context)
+        except InvalidResponseError:
+            advance()
+            raise
+        advance()
         return edits
 
     return tracked
