@@ -8,7 +8,12 @@ from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from sbobina.web.errors import AppError, NotFoundError, ValidationError
+from sbobina.web.errors import (
+    AppError,
+    ConflictError,
+    NotFoundError,
+    ValidationError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +49,10 @@ async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
     if isinstance(exc, NotFoundError):
         return error_response(
             code=exc.code, message=exc.message, status_code=status.HTTP_404_NOT_FOUND
+        )
+    if isinstance(exc, ConflictError):
+        return error_response(
+            code=exc.code, message=exc.message, status_code=status.HTTP_409_CONFLICT
         )
     if isinstance(exc, ValidationError):
         return error_response(

@@ -97,13 +97,13 @@ FileResponse Range): URL citati nei commenti dove la scelta non è ovvia.
   (ok / errore / Ollama irraggiungibile). Plan §1, §3. Rischio: medio.
   verify: `run_stage()` in-process con pipeline finta → `progress.json` finale `progress == 1.0`;
   figlio reale col runner fittizio: chiusa la stdin, esce entro 2 s.
-- [ ] **T014** `web/supervisor.py`: thread, FIFO, un `Popen([sys.executable, "-m", ...],
+- [x] **T014** `web/supervisor.py`: thread, FIFO, un `Popen([sys.executable, "-m", ...],
   stdin=PIPE, start_new_session=True)` alla volta; `correct` solo se richiesto e dopo `wait()` del
   transcribe; `cancel(id)`; stop pulito nel lifespan. Plan §2, §4. Rischio: alto.
   verify: due job col runner fittizio, il secondo `queued` finché il primo è terminale; cancel su
   running → `cancelled` e `poll() is not None` entro 10 s; cancel su terminale →
   `JobNotCancellableError`.
-- [ ] **T015** Recupero al boot: `running` → `interrupted` (`SERVER_RESTARTED`), `queued` rimessi in
+- [x] **T015** Recupero al boot: `running` → `interrupted` (`SERVER_RESTARTED`), `queued` rimessi in
   coda per `created_at`. Rischio: medio.
   verify: store con 1 running + 2 queued, avvio → running `interrupted`, queued eseguiti in ordine
   di creazione (log del runner fittizio).

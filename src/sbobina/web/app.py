@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import anyio.to_thread
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
@@ -17,6 +18,7 @@ from sbobina.web.responses import (
     http_error_handler,
     request_validation_handler,
 )
+from sbobina.web.supervisor import Supervisor, SupervisorOptions
 
 # Starlette's TrustedHostMiddleware matches the Host header as parsed, which
 # keeps brackets around IPv6 literals (RFC 3986 host rule): "::1" must be
@@ -27,14 +29,29 @@ _TRUSTED_HOSTS = [f"[{host}]" if ":" in host else host for host in LOOPBACK_HOST
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    yield
+    supervisor: Supervisor = app.state.supervisor
+    try:
+        # start() first marks jobs left running by a previous server as
+        # interrupted; both calls block on disk and child processes, so they run
+        # off the event loop.
+        await anyio.to_thread.run_sync(supervisor.start)
+        yield
+    finally:
+        await anyio.to_thread.run_sync(supervisor.stop)
 
 
-def create_app(settings: Settings, data_dir: Path | None = None) -> FastAPI:
+def create_app(
+    settings: Settings,
+    data_dir: Path | None = None,
+    supervisor_options: SupervisorOptions | None = None,
+) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
     app.state.settings = settings
     app.state.job_store = JobStore(
         data_dir=data_dir if data_dir is not None else settings.data_dir
+    )
+    app.state.supervisor = Supervisor(
+        job_store=app.state.job_store, options=supervisor_options
     )
     app.add_middleware(OriginMiddleware, origin=web_origin(settings=settings))
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_TRUSTED_HOSTS)

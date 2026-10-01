@@ -71,7 +71,7 @@ class JobConfig(BaseModel):
 
 
 class JobRecord(BaseModel):
-    model_config = ConfigDict(revalidate_instances="always")
+    model_config = ConfigDict(frozen=True, revalidate_instances="always")
 
     id: UUID4
     status: JobStatus

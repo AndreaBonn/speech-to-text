@@ -6,8 +6,14 @@ from fastapi.testclient import TestClient
 from sbobina import platform_info
 from sbobina.settings import Settings
 from sbobina.web.app import create_app
-from sbobina.web.errors import AppError, NotFoundError, ValidationError
-from sbobina.web.job_models import JobConfig
+from sbobina.web.errors import (
+    AppError,
+    JobNotCancellableError,
+    NotFoundError,
+    ValidationError,
+)
+from sbobina.web.job_models import JobConfig, JobStatus
+from sbobina.web.job_store import JobStore
 
 BASE_URL = "http://127.0.0.1:8765"
 
@@ -110,6 +116,7 @@ def test_request_validation_returns_all_field_details(tmp_path: Path) -> None:
         (NotFoundError(entity="Job", id="missing"), 404, "NOT_FOUND"),
         (ValidationError(message="Valore non valido"), 422, "VALIDATION_ERROR"),
         (AppError(message="Internal path /secret"), 500, "INTERNAL_ERROR"),
+        (JobNotCancellableError(job_id="abc"), 409, "JOB_NOT_CANCELLABLE"),
     ],
 )
 def test_domain_errors_use_envelope(
@@ -149,3 +156,19 @@ def test_http_errors_use_envelope(
     assert response.status_code == status_code
     assert response.json()["error"]["code"] == code
     assert "detail" not in response.json()
+
+
+def test_lifespan_recovers_jobs_and_stops_supervisor(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    running = store.create(config=JobConfig())
+    store.update(record=running.model_copy(update={"status": JobStatus.RUNNING}))
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+
+    with TestClient(app, base_url=BASE_URL):
+        supervisor = app.state.supervisor
+        assert supervisor.is_running()
+        recovered = store.get(job_id=str(running.id))
+
+    assert recovered.status == JobStatus.INTERRUPTED
+    assert recovered.error == {"code": "SERVER_RESTARTED"}
+    assert not supervisor.is_running()

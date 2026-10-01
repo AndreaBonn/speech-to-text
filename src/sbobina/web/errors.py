@@ -13,3 +13,14 @@ class NotFoundError(AppError):
 class ValidationError(AppError):
     def __init__(self, message: str) -> None:
         super().__init__(message=message, code="VALIDATION_ERROR")
+
+
+class ConflictError(AppError):
+    """The request clashes with the current state of the resource (HTTP 409)."""
+
+
+class JobNotCancellableError(ConflictError):
+    def __init__(self, job_id: str) -> None:
+        super().__init__(
+            message=f"Job {job_id} non annullabile", code="JOB_NOT_CANCELLABLE"
+        )
