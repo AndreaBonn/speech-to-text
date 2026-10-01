@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -29,6 +30,22 @@ def test_with_progress_chunk_counts_emit_filtered_notifications(
 
     assert calls == expected
     assert results == [edits] * total
+
+
+def test_label_transcript_names_json_and_markdown_after_the_upload(
+    tmp_path: Path,
+) -> None:
+    json_path = tmp_path / "audio.json"
+    transcript = make_transcript([make_segment([make_word(" ciao", 0.0, 0.5)])])
+    save_transcript(replace(transcript, source=str(tmp_path / "audio.m4a")), json_path)
+
+    pipeline.label_transcript(
+        json_path=json_path, source_name="Lezione 3.m4a", config=Settings()
+    )
+
+    assert load_transcript(json_path).source == "Lezione 3.m4a"
+    heading = json_path.with_suffix(".md").read_text(encoding="utf-8").splitlines()[0]
+    assert heading == "# Sbobinatura: Lezione 3.m4a"
 
 
 def test_transcribe_to_dir_writes_outputs_and_forwards_callback(tmp_path: Path) -> None:

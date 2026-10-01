@@ -26,6 +26,7 @@ AUDIO_MEDIA_TYPES = {
     ".aac": "audio/aac",
 }
 FileKind = Literal["md", "json", "corrected_md", "corrected_json", "report"]
+AUDIO_STEM = "audio"
 FILE_NAMES: dict[str, str] = {
     "md": "audio.md",
     "json": "audio.json",
@@ -67,12 +68,24 @@ def get_audio(request: Request, job_id: str) -> FileResponse:
 
 @router.get("/{job_id}/files/{kind}")
 def get_file(request: Request, job_id: str, kind: FileKind) -> FileResponse:
-    """Download one output of the job under its on-disk name."""
-    _, directory = _job(request=request, job_id=job_id)
+    """Download one output of the job, named after the uploaded audio."""
+    record, directory = _job(request=request, job_id=job_id)
     name = FILE_NAMES[kind]
     path = _existing(directory=directory, name=name)
     media_type = "application/json" if name.endswith(".json") else "text/markdown"
-    return FileResponse(path=path, media_type=media_type, filename=name)
+    return FileResponse(
+        path=path,
+        media_type=media_type,
+        filename=_download_name(source_name=record.source_name, name=name),
+    )
+
+
+def _download_name(source_name: str, name: str) -> str:
+    # "audio.corretto.md" + "Lezione 3.m4a" -> "Lezione 3.corretto.md", so
+    # several lessons downloaded to one folder do not collide.
+    if not source_name:
+        return name
+    return Path(source_name).stem + name.removeprefix(AUDIO_STEM)
 
 
 @router.get("/{job_id}/transcript")

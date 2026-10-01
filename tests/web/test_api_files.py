@@ -2,6 +2,7 @@ from collections.abc import Iterator
 from dataclasses import replace
 from pathlib import Path
 from typing import cast
+from urllib.parse import quote
 
 import pytest
 from conftest import make_segment, make_transcript, make_word
@@ -45,6 +46,30 @@ def job_dir(client: TestClient) -> Path:
     directory = store.jobs_dir / str(record.id)
     (directory / "audio.wav").write_bytes(AUDIO)
     return directory
+
+
+@pytest.mark.parametrize(
+    ("kind", "filename", "download"),
+    [
+        ("md", "audio.md", "Lezione 3.md"),
+        ("corrected_json", "audio.corretto.json", "Lezione 3.corretto.json"),
+        ("report", "audio.correzioni.md", "Lezione 3.correzioni.md"),
+    ],
+)
+def test_get_file_is_named_after_the_uploaded_audio(
+    client: TestClient, kind: str, filename: str, download: str
+) -> None:
+    store: JobStore = cast(FastAPI, client.app).state.job_store
+    record = store.create(config=JobConfig(), source_name="Lezione 3.m4a")
+    (store.jobs_dir / str(record.id) / filename).write_text("x", encoding="utf-8")
+
+    response = client.get(url=f"/api/v1/jobs/{record.id}/files/{kind}")
+
+    assert response.status_code == 200
+    # Starlette sends names with spaces in the RFC 5987 form.
+    assert response.headers["content-disposition"] == (
+        f"attachment; filename*=utf-8''{quote(download)}"
+    )
 
 
 def test_get_audio_range_returns_partial_content(

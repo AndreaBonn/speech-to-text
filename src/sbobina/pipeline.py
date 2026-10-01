@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from sbobina import llm_corrector
@@ -76,6 +76,13 @@ def write_markdown(transcript: Transcript, json_path: Path, config: Settings) ->
     markdown_path = json_path.with_suffix(".md")
     markdown_path.write_text(render_markdown(transcript, options), encoding="utf-8")
     return markdown_path
+
+
+def label_transcript(json_path: Path, source_name: str, config: Settings) -> None:
+    """Show ``source_name`` instead of the on-disk audio name in JSON and markdown."""
+    transcript = replace(load_transcript(json_path), source=source_name)
+    save_transcript(transcript, json_path)
+    write_markdown(transcript, json_path=json_path, config=config)
 
 
 def transcribe_to_dir(

@@ -2,6 +2,7 @@ import logging
 import subprocess
 import sys
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,6 +11,7 @@ from conftest import make_segment, make_transcript, make_word
 
 from sbobina import transcriber
 from sbobina.correction import CorrectionResult, CorrectorUnavailableError
+from sbobina.models import load_transcript, save_transcript
 from sbobina.pipeline import CorrectionOutcome
 from sbobina.settings import Settings, settings
 from sbobina.web import stage_runner
@@ -349,3 +351,30 @@ def test_run_stage_user_notice_from_pipeline_reaches_progress(job_dir: Path) -> 
     )
 
     assert store.read_progress(job_id=job_dir.name)["notice"] == "GPU non utilizzabile"
+
+
+def test_run_stage_transcribe_labels_output_with_uploaded_name(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig(), source_name="Lezione 3.m4a")
+    directory = store.jobs_dir / str(record.id)
+    (directory / "audio.m4a").write_bytes(b"x")
+
+    def transcribe(
+        audio_path: Path,
+        output_dir: Path,
+        config: Settings,
+        on_progress: Callable[[float, float], None],
+    ) -> Path:
+        json_path = output_dir / "audio.json"
+        transcript = make_transcript([make_segment([make_word(" ciao", 0.0, 0.5)])])
+        save_transcript(replace(transcript, source=str(audio_path)), json_path)
+        return json_path
+
+    result = stage_runner.run_stage(
+        stage="transcribe", job_dir=directory, pipeline=transcribe
+    )
+
+    assert result == 0
+    assert load_transcript(directory / "audio.json").source == "Lezione 3.m4a"
+    heading = (directory / "audio.md").read_text(encoding="utf-8").splitlines()[0]
+    assert heading == "# Sbobinatura: Lezione 3.m4a"

@@ -9,10 +9,15 @@ from pathlib import Path
 from threading import Thread
 
 from sbobina.correction import CorrectorUnavailableError
-from sbobina.pipeline import CorrectionOutcome, correct_to_dir, transcribe_to_dir
+from sbobina.pipeline import (
+    CorrectionOutcome,
+    correct_to_dir,
+    label_transcript,
+    transcribe_to_dir,
+)
 from sbobina.settings import Settings, settings
 from sbobina.transcriber import USER_NOTICE
-from sbobina.web.job_models import JobStage
+from sbobina.web.job_models import JobRecord, JobStage
 from sbobina.web.job_store import JobStore
 
 logger = logging.getLogger("sbobina")
@@ -99,28 +104,33 @@ def _find_audio(job_dir: Path) -> Path:
 
 def _prepare_stage(
     job_dir: Path, progress: _Progress
-) -> tuple[Path, Settings, str | None]:
+) -> tuple[Path, Settings, JobRecord]:
     record = progress.store.get(job_id=progress.job_id)
     config = Settings.model_validate(
         {**settings.model_dump(), **record.config.model_dump()}
     )
     audio_path = _find_audio(job_dir=job_dir)
     logger.info("Avvio stage %s per il job %s", progress.stage, progress.job_id)
-    return audio_path, config, record.config.subject
+    return audio_path, config, record
 
 
 def _execute_stage(
     job_dir: Path, pipeline: StagePipeline | None, progress: _Progress
 ) -> None:
-    audio_path, config, subject = _prepare_stage(job_dir=job_dir, progress=progress)
+    audio_path, config, record = _prepare_stage(job_dir=job_dir, progress=progress)
     if progress.stage == JobStage.TRANSCRIBING:
         transcribe = pipeline if pipeline is not None else transcribe_to_dir
-        transcribe(
+        json_path = transcribe(
             audio_path=audio_path,
             output_dir=job_dir,
             config=config,
             on_progress=progress,
         )
+        # Downloads and headings carry the uploaded name, not audio.<ext>.
+        if record.source_name and isinstance(json_path, Path):
+            label_transcript(
+                json_path=json_path, source_name=record.source_name, config=config
+            )
         return
     json_path = audio_path.with_suffix(".json")
     if not json_path.is_file():
@@ -129,7 +139,7 @@ def _execute_stage(
     outcome = correct(
         json_path=json_path,
         config=config,
-        subject=subject,
+        subject=record.config.subject,
         on_progress=progress,
     )
     _check_outcome(outcome=outcome)
