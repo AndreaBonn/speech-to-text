@@ -184,3 +184,12 @@ def test_reader_page_returns_404_for_missing_job(tmp_path: Path) -> None:
 
     assert response.status_code == 404
     assert "/storico" in response.text
+
+
+def test_pages_show_the_transcriber_brand(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/").text
+
+    assert '<div class="rail__brand">Transcriber</div>' in body
+    assert "<title>Nuova trascrizione · Transcriber</title>" in body
