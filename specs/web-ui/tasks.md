@@ -91,7 +91,7 @@ FileResponse Range): URL citati nei commenti dove la scelta non è ovvia.
 
 **[B-5] T013-T015**
 
-- [ ] **T013** `web/stage_runner.py` (`python -m sbobina.web.stage_runner transcribe|correct
+- [x] **T013** `web/stage_runner.py` (`python -m sbobina.web.stage_runner transcribe|correct
   <job_dir>`): Settings validati dagli override, chiama `pipeline`, `progress.json` al più ogni 1 s
   con `{stage, progress, audio_s, elapsed_s}`, watchdog stdin (EOF → `os._exit`), exit 0/1/2
   (ok / errore / Ollama irraggiungibile). Plan §1, §3. Rischio: medio.
