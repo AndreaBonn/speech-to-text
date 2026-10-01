@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -98,6 +99,46 @@ def test_failed_atomic_update_preserves_previous_json(tmp_path: Path) -> None:
     assert list((tmp_path / "jobs" / str(job.id)).iterdir()) == [
         tmp_path / "jobs" / str(job.id) / "job.json"
     ]
+
+
+def test_atomic_write_retries_permission_error_then_succeeds(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    job = store.create(config=JobConfig())
+    changed = job.model_copy(update={"status": JobStatus.DONE})
+    real_replace = os.replace
+    attempts: list[int] = []
+
+    def flaky_replace(source: Path, destination: Path) -> None:
+        attempts.append(1)
+        if len(attempts) < 3:
+            raise PermissionError("locked")
+        real_replace(source, destination)
+
+    with (
+        patch("sbobina.web.job_store.os.replace", side_effect=flaky_replace) as replace,
+        patch("sbobina.web.job_store.time.sleep") as sleep,
+    ):
+        store.update(record=changed)
+    assert replace.call_count == 3
+    assert sleep.call_count == 2
+    assert store.get(job_id=str(job.id)).status == JobStatus.DONE
+
+
+def test_atomic_write_gives_up_after_max_permission_errors(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    job = store.create(config=JobConfig())
+    changed = job.model_copy(update={"status": JobStatus.DONE})
+    with (
+        patch(
+            "sbobina.web.job_store.os.replace",
+            side_effect=PermissionError("locked"),
+        ) as replace,
+        patch("sbobina.web.job_store.time.sleep"),
+        pytest.raises(PermissionError),
+    ):
+        store.update(record=changed)
+    assert replace.call_count == 3
+    assert store.get(job_id=str(job.id)) == job
 
 
 def test_update_preserves_creation_time_and_validates_record(tmp_path: Path) -> None:

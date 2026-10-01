@@ -1,4 +1,5 @@
 import logging
+import os
 import subprocess
 import sys
 from collections import deque
@@ -16,6 +17,7 @@ DEFAULT_COMMAND = (sys.executable, "-m", "sbobina.web.stage_runner")
 TERMINATE_TIMEOUT_S = 5.0
 RECOVERY_PAGE_SIZE = 100
 OLLAMA_UNAVAILABLE_EXIT = 2
+CHILD_LOG_NAME = "child.log"
 
 
 @dataclass(frozen=True)
@@ -24,14 +26,37 @@ class SupervisorOptions:
     terminate_timeout_s: float = TERMINATE_TIMEOUT_S
 
 
-def _spawn(command: list[str]) -> subprocess.Popen[bytes]:
+def _child_env() -> dict[str, str]:
+    # Force UTF-8 I/O in the child: a Windows pipe/file otherwise uses the
+    # system codepage and raises UnicodeEncodeError on accented log text
+    # (BASIS: inferred).
+    env = dict(os.environ)
     if sys.platform == "win32":
+        env["PYTHONUTF8"] = "1"
+    return env
+
+
+def _spawn(command: list[str], log_path: Path) -> subprocess.Popen[bytes]:
+    # Redirected to a file, never piped: a pipe nobody drains blocks the
+    # child once its OS buffer fills.
+    with log_path.open("a", encoding="utf-8") as log_file:
+        if sys.platform == "win32":
+            return subprocess.Popen(
+                args=command,
+                stdin=subprocess.PIPE,
+                stdout=log_file,
+                stderr=log_file,
+                env=_child_env(),
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            )
         return subprocess.Popen(
             args=command,
             stdin=subprocess.PIPE,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            stdout=log_file,
+            stderr=log_file,
+            env=_child_env(),
+            start_new_session=True,
         )
-    return subprocess.Popen(args=command, stdin=subprocess.PIPE, start_new_session=True)
 
 
 def _reap(process: subprocess.Popen[bytes], timeout_s: float, graceful: bool) -> None:
@@ -238,7 +263,10 @@ class Supervisor:
     def _launch(self, record: JobRecord, stage: JobStage) -> subprocess.Popen[bytes]:
         name = "transcribe" if stage == JobStage.TRANSCRIBING else "correct"
         directory: Path = self._store.jobs_dir / str(record.id)
-        process = _spawn(command=[*self._options.command, name, str(directory)])
+        process = _spawn(
+            command=[*self._options.command, name, str(directory)],
+            log_path=directory / CHILD_LOG_NAME,
+        )
         self._process = process
         self._store.update(
             record=record.model_copy(update={"stage": stage, "pid": process.pid})

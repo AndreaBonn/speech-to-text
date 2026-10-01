@@ -7,6 +7,7 @@ from threading import Event
 
 import pytest
 
+from sbobina.web import supervisor
 from sbobina.web.errors import JobNotCancellableError
 from sbobina.web.job_models import JobConfig, JobRecord, JobStage, JobStatus
 from sbobina.web.job_store import JobStore
@@ -276,3 +277,15 @@ def test_job_deleted_while_queued_is_skipped_and_queue_continues(
         f"{busy}:transcribe",
         f"{kept}:transcribe",
     ]
+
+
+def test_child_env_forces_utf8_on_windows(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.delenv("PYTHONUTF8", raising=False)
+    assert supervisor._child_env()["PYTHONUTF8"] == "1"
+
+
+def test_child_env_leaves_utf8_unset_elsewhere(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.delenv("PYTHONUTF8", raising=False)
+    assert "PYTHONUTF8" not in supervisor._child_env()

@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -13,6 +14,10 @@ from sbobina.web.errors import NotFoundError, ValidationError
 from sbobina.web.job_models import JobConfig, JobRecord, JobStage, JobStatus
 
 PROGRESS_ADAPTER = TypeAdapter(dict[str, JsonValue])
+# Windows rejects renaming onto a path a reader still has open; a short retry
+# rides out that window instead of failing the whole write (BASIS: inferred).
+REPLACE_MAX_ATTEMPTS = 3
+REPLACE_RETRY_DELAY_S = 0.05
 
 
 @dataclass(frozen=True)
@@ -24,6 +29,17 @@ class JobPage:
     total_pages: int
 
 
+def _replace_with_retry(source: Path, destination: Path) -> None:
+    for attempt in range(1, REPLACE_MAX_ATTEMPTS + 1):
+        try:
+            os.replace(source, destination)
+            return
+        except PermissionError:
+            if attempt == REPLACE_MAX_ATTEMPTS:
+                raise
+            time.sleep(REPLACE_RETRY_DELAY_S)
+
+
 def _atomic_write(path: Path, content: str) -> None:
     with NamedTemporaryFile(
         mode="w", encoding="utf-8", dir=path.parent, suffix=".tmp", delete=False
@@ -32,7 +48,7 @@ def _atomic_write(path: Path, content: str) -> None:
         try:
             temporary.write(content)
             temporary.close()
-            os.replace(temporary_path, path)
+            _replace_with_retry(source=temporary_path, destination=path)
         finally:
             temporary_path.unlink(missing_ok=True)
 
