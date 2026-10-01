@@ -24,6 +24,11 @@ def _cached_model_size(name: str) -> int | None:
     return sum(path.stat().st_size for path in directory.rglob("*") if path.is_file())
 
 
+def is_whisper_model_cached(name: str) -> bool:
+    """True when ``name`` is already in the local Hugging Face cache."""
+    return _cached_model_size(name=name) is not None
+
+
 def list_whisper_models(settings: Settings) -> list[dict[str, JsonValue]]:
     """List repository-deduplicated Whisper models with local cache sizes in bytes."""
     repositories: dict[str, list[str]] = {}

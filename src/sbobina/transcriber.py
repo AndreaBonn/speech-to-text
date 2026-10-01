@@ -59,23 +59,12 @@ def _collect_segments(
     return tuple(segments)
 
 
-def _runtime_request(config: Settings) -> platform_info.RuntimeRequest:
-    return platform_info.RuntimeRequest(
-        device=config.device,
-        compute_type=config.compute_type,
-        whisper_model=config.whisper_model,
-        whisper_model_gpu=config.whisper_model_gpu,
-        whisper_model_cpu=config.whisper_model_cpu,
-        cpu_threads=config.cpu_threads,
-    )
-
-
 def _load_model(
     info: platform_info.PlatformInfo, choice: platform_info.RuntimeChoice
 ) -> "WhisperModel":
     if info.cuda_devices > 0 and not info.cuda_libs_available:
         logger.warning(
-            "GPU NVIDIA rilevata ma wheel CUDA mancanti: esegui uv sync --extra cuda"
+            "GPU NVIDIA rilevata ma librerie CUDA non installate: avvia con ./avvia.sh oppure uv sync --extra cuda"
         )
     if choice.device == "cuda" and info.system == "linux":
         preload_cuda_libraries()
@@ -104,10 +93,7 @@ def transcribe_file(
     audio_path: Path, config: Settings, on_progress: ProgressCallback | None = None
 ) -> Transcript:
     """Run Whisper on ``audio_path`` with word timestamps; VAD per ``config``."""
-    detected = platform_info.detect_platform()
-    choice = platform_info.resolve_runtime(
-        info=detected, requested=_runtime_request(config)
-    )
+    detected, choice = platform_info.resolve_for_settings(config=config)
     model = _load_model(info=detected, choice=choice)
     raw_segments, info = model.transcribe(
         str(audio_path),

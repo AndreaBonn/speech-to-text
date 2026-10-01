@@ -10,8 +10,19 @@ import pytest
 import uvicorn
 from fastapi.testclient import TestClient
 
+from sbobina.platform_info import PlatformInfo, RuntimeChoice
 from sbobina.settings import Settings
 from sbobina.web import launcher
+
+
+REAL_STARTUP_REPORT = launcher.startup_report
+
+
+@pytest.fixture(autouse=True)
+def quiet_startup_report(monkeypatch: pytest.MonkeyPatch) -> None:
+    # No test may probe the GPU or call a real Ollama server through
+    # run_server; the startup report has its own test via REAL_STARTUP_REPORT.
+    monkeypatch.setattr(launcher, "startup_report", lambda config: [])
 
 
 @pytest.fixture
@@ -146,3 +157,50 @@ def test_run_server_custom_port_accepts_same_port_origin(
 
     assert same.status_code == 405  # reached routing: origin accepted
     assert other.status_code == 403
+
+
+def _fake_runtime(device: str) -> tuple[PlatformInfo, RuntimeChoice]:
+    info = PlatformInfo(
+        system="linux",
+        machine="x86_64",
+        is_apple_silicon=False,
+        cuda_devices=1 if device == "cuda" else 0,
+        cuda_libs_available=True,
+        cpu_compute_types=frozenset({"int8"}),
+        cpu_count=8,
+    )
+    choice = RuntimeChoice(
+        device=device,
+        compute_type="float16" if device == "cuda" else "int8",
+        whisper_model="large-v3" if device == "cuda" else "large-v3-turbo",
+        cpu_threads=None if device == "cuda" else 8,
+        reason="motivo di prova",
+    )
+    return info, choice
+
+
+@pytest.mark.parametrize(
+    ("device", "cached", "expected"),
+    [
+        ("cuda", True, ["GPU NVIDIA", "large-v3 già scaricato", "Ollama pronto"]),
+        ("cpu", False, ["processore", "motivo di prova", "non è ancora scaricato"]),
+    ],
+)
+def test_startup_report_describes_runtime_model_and_ollama(
+    monkeypatch: pytest.MonkeyPatch, device: str, cached: bool, expected: list[str]
+) -> None:
+    monkeypatch.setattr(
+        launcher, "resolve_for_settings", lambda config: _fake_runtime(device)
+    )
+    monkeypatch.setattr(launcher, "is_whisper_model_cached", lambda name: cached)
+    monkeypatch.setattr(
+        launcher,
+        "ollama_status",
+        lambda host: {"status": "ready", "message": "Ollama pronto."},
+    )
+
+    report = "\n".join(REAL_STARTUP_REPORT(config=Settings()))
+
+    for fragment in expected:
+        assert fragment in report
+    assert ("GPU NVIDIA" in report) == (device == "cuda")

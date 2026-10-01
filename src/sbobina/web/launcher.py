@@ -7,8 +7,10 @@ import webbrowser
 import httpx
 import uvicorn
 
+from sbobina.platform_info import PlatformInfo, RuntimeChoice, resolve_for_settings
 from sbobina.settings import Settings
 from sbobina.web.app import create_app
+from sbobina.web.model_service import is_whisper_model_cached, ollama_status
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,32 @@ def open_browser_when_ready(url: str) -> None:
     logger.warning("Il server non risponde: apri a mano %s", url)
 
 
+def _runtime_line(info: PlatformInfo, choice: RuntimeChoice) -> str:
+    if choice.device == "cuda":
+        where = f"GPU NVIDIA ({choice.compute_type})"
+    else:
+        where = f"processore ({choice.compute_type}, {choice.cpu_threads} thread)"
+    return (
+        f"Sistema {info.system}: trascrivo con {where}, modello "
+        f"{choice.whisper_model}. Motivo: {choice.reason}."
+    )
+
+
+def startup_report(config: Settings) -> list[str]:
+    """Plain-Italian lines on what this machine will use, logged at startup."""
+    info, choice = resolve_for_settings(config)
+    model = choice.whisper_model
+    if is_whisper_model_cached(name=model):
+        model_line = f"Modello {model} già scaricato."
+    else:
+        model_line = (
+            f"Il modello {model} non è ancora scaricato: scaricalo dalla pagina "
+            "Modelli, oppure verrà scaricato alla prima trascrizione."
+        )
+    ollama = ollama_status(host=config.ollama_host)
+    return [_runtime_line(info=info, choice=choice), model_line, str(ollama["message"])]
+
+
 def run_server(config: Settings, open_browser: bool) -> int:
     """Serve the web UI on ``config.web_host:web_port``; return the exit code.
 
@@ -62,6 +90,8 @@ def run_server(config: Settings, open_browser: bool) -> int:
         )
         return 1
     url = base_url(host=host, port=port)
+    for line in startup_report(config=config):
+        logger.info(line)
     logger.info("Interfaccia su %s", url)
     if open_browser:
         threading.Thread(

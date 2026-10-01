@@ -5,6 +5,8 @@ import sys
 from dataclasses import dataclass
 from typing import Literal
 
+from sbobina.settings import Settings
+
 SystemName = Literal["linux", "windows", "darwin", "other"]
 CUDA_LIBRARY_MODULES = ("nvidia.cublas.lib", "nvidia.cudnn.lib")
 
@@ -81,8 +83,8 @@ def _resolve_device(info: PlatformInfo, requested: RuntimeRequest) -> tuple[str,
         return requested.device, f"Device richiesto esplicitamente: {requested.device}"
     if info.system == "linux" and info.cuda_devices > 0:
         if info.cuda_libs_available:
-            return "cuda", "GPU NVIDIA e wheel CUDA disponibili su Linux"
-        return "cpu", "Wheel CUDA mancanti su Linux"
+            return "cuda", "GPU NVIDIA e librerie CUDA disponibili su Linux"
+        return "cpu", "GPU NVIDIA presente ma librerie CUDA non installate"
     if info.system == "windows":
         return "cpu", "Supporto DLL CUDA su Windows non ancora abilitato"
     if info.system == "darwin":
@@ -139,3 +141,21 @@ def resolve_runtime(info: PlatformInfo, requested: RuntimeRequest) -> RuntimeCho
         cpu_threads=cpu_threads if device == "cpu" else None,
         reason=reason,
     )
+
+
+def request_from_settings(config: Settings) -> RuntimeRequest:
+    """The runtime preferences carried by ``config`` (CLI, job or server)."""
+    return RuntimeRequest(
+        device=config.device,
+        compute_type=config.compute_type,
+        whisper_model=config.whisper_model,
+        whisper_model_gpu=config.whisper_model_gpu,
+        whisper_model_cpu=config.whisper_model_cpu,
+        cpu_threads=config.cpu_threads,
+    )
+
+
+def resolve_for_settings(config: Settings) -> tuple[PlatformInfo, RuntimeChoice]:
+    """Detect this machine and resolve ``config`` against it."""
+    info = detect_platform()
+    return info, resolve_runtime(info=info, requested=request_from_settings(config))

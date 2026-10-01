@@ -256,3 +256,20 @@ def test_detect_platform_missing_wheel_is_unavailable(specs: list[object]) -> No
         cpu_compute_types=frozenset({"float32"}),
         cpu_count=4,
     )
+
+
+def test_request_from_settings_copies_runtime_preferences() -> None:
+    config = Settings(
+        device="cpu", compute_type="int8", whisper_model="small", cpu_threads=4
+    )
+
+    request = platform_info.request_from_settings(config=config)
+
+    assert request == RuntimeRequest(
+        device="cpu",
+        compute_type="int8",
+        whisper_model="small",
+        whisper_model_gpu=config.whisper_model_gpu,
+        whisper_model_cpu=config.whisper_model_cpu,
+        cpu_threads=4,
+    )

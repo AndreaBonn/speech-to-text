@@ -134,12 +134,12 @@ rilevati e segnalati (permessi admin / download lunghi gestiti dalla UI con avan
 
 **[B-3b] T080-T082**
 
-- [ ] **T080** `avvia.sh` (Linux principale, macOS): installa uv se manca (installer ufficiale
+- [x] **T080** `avvia.sh` (Linux principale, macOS): installa uv se manca (installer ufficiale
   astral, verificato sulla doc al momento della scrittura), `nvidia-smi` presente su Linux →
   `uv sync --extra cuda`, altrimenti `uv sync`; poi `exec uv run sbobina web`. Idempotente.
   verify: su questa macchina, da clone pulito, `./avvia.sh` → browser aperto su `/`;
   secondo lancio senza reinstallazioni; `shellcheck avvia.sh` pulito.
-- [ ] **T081** `sbobina web` all'avvio: diagnosi (`platform_info`, stato Ollama, modello Whisper in
+- [x] **T081** `sbobina web` all'avvio: diagnosi (`platform_info`, stato Ollama, modello Whisper in
   cache) loggata in italiano e servita da `/api/v1/system`; apre il browser con `webbrowser` dopo
   che il server risponde (`--no-browser` per disattivare); porta occupata → messaggio chiaro.
   verify: test della diagnosi con boundary mockati; avvio reale apre la pagina una sola volta.

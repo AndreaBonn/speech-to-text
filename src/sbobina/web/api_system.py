@@ -11,16 +11,7 @@ def create_system_router(settings: Settings) -> APIRouter:
 
     @router.get("/system")
     def system_info() -> dict[str, dict[str, JsonValue]]:
-        info = platform_info.detect_platform()
-        requested = platform_info.RuntimeRequest(
-            device=settings.device,
-            compute_type=settings.compute_type,
-            whisper_model=settings.whisper_model,
-            whisper_model_gpu=settings.whisper_model_gpu,
-            whisper_model_cpu=settings.whisper_model_cpu,
-            cpu_threads=settings.cpu_threads,
-        )
-        runtime = platform_info.resolve_runtime(info=info, requested=requested)
+        info, runtime = platform_info.resolve_for_settings(config=settings)
         return {
             "data": {
                 "os": info.system,
