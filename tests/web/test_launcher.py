@@ -14,7 +14,6 @@ from sbobina.platform_info import PlatformInfo, RuntimeChoice
 from sbobina.settings import Settings
 from sbobina.web import launcher
 
-
 REAL_STARTUP_REPORT = launcher.startup_report
 
 
