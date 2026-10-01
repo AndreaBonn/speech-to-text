@@ -1,5 +1,7 @@
 from pathlib import Path
+from unittest.mock import patch
 
+import ollama
 import pytest
 from fastapi.testclient import TestClient
 
@@ -33,7 +35,12 @@ def test_system_returns_resolved_runtime(
     monkeypatch.setattr(platform_info, "detect_platform", lambda: info)
     config = Settings(device="auto", whisper_model="auto", compute_type="auto")
     app = create_app(settings=config, data_dir=tmp_path)
-    with TestClient(app, base_url=BASE_URL) as client:
+    with (
+        patch.object(
+            ollama.Client, "list", return_value=ollama.ListResponse(models=[])
+        ),
+        TestClient(app, base_url=BASE_URL) as client,
+    ):
         response = client.get("/api/v1/system")
     assert response.status_code == 200
     assert response.json() == {
@@ -44,6 +51,11 @@ def test_system_returns_resolved_runtime(
             "whisper_model": config.whisper_model_cpu,
             "reason": "Nessun percorso CUDA automatico disponibile",
             "cuda_libs_available": False,
+            "ollama": {
+                "status": "ready",
+                "message": "Ollama è pronto.",
+                "models": [],
+            },
         }
     }
     assert app.state.job_store.jobs_dir == tmp_path / "jobs"

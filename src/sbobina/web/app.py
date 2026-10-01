@@ -11,6 +11,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from sbobina.settings import LOOPBACK_HOSTS, Settings
 from sbobina.web.api_jobs import router as jobs_router
+from sbobina.web.api_models import create_models_router
 from sbobina.web.api_system import create_system_router
 from sbobina.web.errors import AppError
 from sbobina.web.gpu_release import unload_ollama_models
@@ -71,6 +72,7 @@ def create_app(
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(HTTPException, http_error_handler)
     app.include_router(create_system_router(settings=settings))
+    app.include_router(create_models_router(settings=settings))
     app.include_router(jobs_router)
     app.include_router(events_router)
     return app

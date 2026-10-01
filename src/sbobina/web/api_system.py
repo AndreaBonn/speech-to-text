@@ -3,6 +3,7 @@ from pydantic import JsonValue
 
 from sbobina import platform_info
 from sbobina.settings import Settings
+from sbobina.web.model_service import ollama_status
 
 
 def create_system_router(settings: Settings) -> APIRouter:
@@ -28,6 +29,7 @@ def create_system_router(settings: Settings) -> APIRouter:
                 "whisper_model": runtime.whisper_model,
                 "reason": runtime.reason,
                 "cuda_libs_available": info.cuda_libs_available,
+                "ollama": ollama_status(host=settings.ollama_host),
             }
         }
 
