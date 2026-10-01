@@ -238,25 +238,25 @@ rilevati e segnalati (permessi admin / download lunghi gestiti dalla UI con avan
 
 **[B-12] T070-T072**
 
-- [ ] **T070** `cuda_libs` ramo Windows (`os.add_dll_directory` sulle cartelle delle wheel NVIDIA),
+- [x] **T070** `cuda_libs` ramo Windows (`os.add_dll_directory` sulle cartelle delle wheel NVIDIA),
   `detect_platform` imposta `cuda_libs_available` di conseguenza; extra `cuda` esteso a
   `sys_platform == 'win32'` (**OK utente**). Plan §13. Rischio: alto (non osservabile qui).
   verify: test con `sys.platform` iniettato e `os.add_dll_directory` mockato; su Linux nessun
   cambiamento (test esistenti verdi). Verifica reale solo in T075/T076.
-- [ ] **T071** Ripiego a runtime cuda → cpu quando `WhisperModel(device="cuda")` solleva per
+- [x] **T071** Ripiego a runtime cuda → cpu quando `WhisperModel(device="cuda")` solleva per
   librerie mancanti: WARNING e nota nel `job.json`. Rischio: medio. verify: `WhisperModel` mockato
   che solleva al primo tentativo → secondo tentativo con `device="cpu"`, nota presente.
-- [ ] **T072** Processi e file su Windows: `creationflags=CREATE_NEW_PROCESS_GROUP` su win32,
+- [x] **T072** Processi e file su Windows: `creationflags=CREATE_NEW_PROCESS_GROUP` su win32,
   env `PYTHONUTF8=1`, log del figlio su file UTF-8, retry di `os.replace` su `PermissionError`.
   Rischio: medio. verify: test con piattaforma iniettata controlla gli argomenti di `Popen`; test
   del retry con `os.replace` finto che fallisce due volte.
 
 **[B-13] T073-T074**
 
-- [ ] **T073** Messaggi Ollama per OS in `/api/v1/system` e in UI (Windows/macOS: installer
+- [x] **T073** Messaggi Ollama per OS in `/api/v1/system` e in UI (Windows/macOS: installer
   ollama.com e avvio dall'app; Linux: script e `ollama serve`). Rischio: basso.
   verify: test per i tre OS × tre stati.
-- [ ] **T074** `docs/installazione-windows.md` (italiano, per non tecnici, via `doc-writer` +
+- [x] **T074** `docs/installazione-windows.md` (italiano, per non tecnici, via `doc-writer` +
   `scrivi-italiano`) e `avvia-sbobina.bat`: installare uv (comando PowerShell ufficiale verificato
   sulla doc astral al momento della scrittura), scaricare il progetto, `uv sync`, installare e
   avviare Ollama, `ollama pull`, doppio clic sul lanciatore (browser aperto da solo), tempi su CPU,
@@ -272,6 +272,6 @@ rilevati e segnalati (permessi admin / download lunghi gestiti dalla UI con avan
   m4a con `av`. `permissions: contents: read`, `persist-credentials: false`, action pinnate a SHA.
   **Dipende dalla scelta dell'utente di creare un remote GitHub** (oggi assente); push all'utente.
   Rischio: medio. verify: run verde sui tre OS in Actions.
-- [ ] **T076** Checklist per un collega Windows (e macOS se disponibile): guida T074, pytest, job da
+- [x] **T076** Checklist (scritta: `docs/checklist-windows-macos.md`; esiti da raccogliere) per un collega Windows (e macOS se disponibile): guida T074, pytest, job da
   30 s su CPU, lettore con m4a, cancellazione, stati Ollama. Ripiego se T075 non è possibile.
   verify: esiti per OS riportati; finché mancano T075 e T076, Windows/macOS non verificati.
