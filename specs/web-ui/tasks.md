@@ -232,9 +232,14 @@ rilevati e segnalati (permessi admin / download lunghi gestiti dalla UI con avan
   insieme in VRAM (campioni ogni 15 s). "Identici" non è raggiungibile: su GPU due run differiscono
   (finestre da 30 s identiche: CLI-CLI 169/170, web-CLI 165/170, un'altra run web 145/170), quindi
   il percorso web non introduce differenze sistematiche. Correzione: 147 applicate contro 149 della CLI.
-- [ ] **T061** Riavvio del server e cancellazione durante un job; misura CPU (`SBOBINA_DEVICE=cpu`,
+- [x] **T061** Riavvio del server e cancellazione durante un job; misura CPU (`SBOBINA_DEVICE=cpu`,
   audio da 5 min, turbo, `cpu_threads` logici vs fisici). verify: job `interrupted`, nessun figlio
   in `ps`; rapporto audio/tempo riportato e usato nel testo dell'avviso.
+  Esito 2026-10-01: annulla -> `cancelled` in 0,2 s, nessun figlio; SIGINT al gruppo del server ->
+  `interrupted`; SIGKILL al server -> il figlio esce in ~1 s, al riavvio `interrupted`
+  (`SERVER_RESTARTED`). CPU, 5 min di audio, i7-13620H (10 core, 16 thread): 102,1 s con 16 thread,
+  85,5 s con 10 (3 run ciascuno) -> default ai core fisici su Linux, rimisurato 85,1 s. Una lezione
+  da 90 min ~ mezz'ora; testo della guida Windows aggiornato.
 - [ ] **T062** (solo con OK utente) README: `sbobina web`, installazione CPU vs
   `uv sync --extra cuda`. verify: un lettore non tecnico trova il comando in 60 s.
 
