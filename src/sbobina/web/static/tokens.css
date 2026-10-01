@@ -1,0 +1,177 @@
+/* Hallmark · genre: modern-minimal (app) · macrostructure: Workbench (side-rail app shell)
+ * theme: custom (vibe: "quiet slate desk, petrol ink, reading lamp")
+ * paper oklch(97.6% 0.006 250) · accent oklch(47% 0.085 222) petrol
+ * display + UI: Inter · reading: Source Serif 4 · axes: light / grotesk-sans / cool
+ * DIAL: work tool for students reading 1-2 h transcripts · ENERGY 1 / RHYTHM 2 / MOTION 1
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Surfaces and ink: cool slate, chroma kept low so long reading stays calm. */
+  --color-paper: oklch(97.6% 0.006 250);
+  --color-paper-2: oklch(95.2% 0.008 250);
+  --color-paper-3: oklch(92.4% 0.010 250);
+  --color-surface: oklch(99.2% 0.003 250);
+  --color-rule: oklch(88.5% 0.010 250);
+  --color-rule-strong: oklch(78% 0.014 250);
+  /* Input, select and checkbox borders: 3:1 against paper (WCAG 1.4.11). */
+  --color-control-border: oklch(57% 0.016 255);
+  --color-ink: oklch(22% 0.018 255);
+  --color-ink-2: oklch(38% 0.016 255);
+  --color-ink-3: oklch(49% 0.014 255);
+
+  /* One accent. Links, active nav, primary button, progress, current word. */
+  --color-accent: oklch(47% 0.085 222);
+  --color-accent-hover: oklch(41% 0.085 222);
+  --color-accent-soft: oklch(93% 0.025 222);
+  --color-accent-ink: oklch(98.5% 0.004 222);
+  --color-focus: oklch(55% 0.13 222);
+
+  /* Reader semantics: what Whisper doubted, what the LLM changed. */
+  --color-uncertain-bg: oklch(91.5% 0.075 85);
+  --color-uncertain-ink: oklch(36% 0.07 70);
+  --color-corrected: oklch(52% 0.09 175);
+  --color-corrected-bg: oklch(94% 0.03 175);
+
+  /* Status. Always paired with an icon or a word, never colour alone. */
+  --color-success: oklch(50% 0.11 155);
+  --color-success-bg: oklch(94.5% 0.035 155);
+  --color-warning: oklch(52% 0.11 65);
+  --color-warning-bg: oklch(95% 0.045 85);
+  --color-danger: oklch(51% 0.16 27);
+  --color-danger-bg: oklch(95% 0.03 27);
+
+  --shadow-raise: 0 1px 2px oklch(22% 0.018 255 / 0.06),
+    0 4px 12px oklch(22% 0.018 255 / 0.05);
+  --shadow-overlay: 0 8px 28px oklch(22% 0.018 255 / 0.14);
+
+  /* Type. Inter is the house face; Source Serif 4 only for transcript text. */
+  --font-ui: "Inter", "InterVariable", system-ui, -apple-system, "Segoe UI",
+    Roboto, sans-serif;
+  --font-reading: "Source Serif 4", "Source Serif Pro", "Iowan Old Style",
+    Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo,
+    Consolas, monospace;
+
+  /* 1.2 minor-third scale: an app wants density, not poster sizes. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.375rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.25rem;
+  --text-reading: 1.1875rem;
+
+  --leading-tight: 1.2;
+  --leading-ui: 1.45;
+  --leading-reading: 1.7;
+  --measure-reading: 68ch;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --tracking-display: -0.02em;
+  --tracking-label: 0.01em;
+
+  /* 4-pt spacing scale. */
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  --radius-input: 6px;
+  --radius-button: 6px;
+  --radius-card: 10px;
+  --radius-mark: 3px;
+
+  --rule-hair: 1px;
+  --rule-progress: 6px;
+
+  --rail-width: 15rem;
+  --content-max: 72rem;
+  --player-height: 4.5rem;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 260ms;
+
+  /* z-index ladder from ui-ux.md */
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+}
+
+/* Dark: same hues, only lightness and chroma move. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-paper: oklch(17% 0.012 255);
+    --color-paper-2: oklch(20.5% 0.013 255);
+    --color-paper-3: oklch(24% 0.014 255);
+    --color-surface: oklch(21% 0.013 255);
+    --color-rule: oklch(30% 0.014 255);
+    --color-rule-strong: oklch(42% 0.016 255);
+    --color-control-border: oklch(58% 0.016 255);
+    --color-ink: oklch(93.5% 0.008 250);
+    --color-ink-2: oklch(80% 0.010 250);
+    --color-ink-3: oklch(70% 0.012 250);
+    --color-accent: oklch(74% 0.09 222);
+    --color-accent-hover: oklch(80% 0.08 222);
+    --color-accent-soft: oklch(30% 0.04 222);
+    --color-accent-ink: oklch(18% 0.02 222);
+    --color-focus: oklch(76% 0.11 222);
+    --color-uncertain-bg: oklch(36% 0.06 75);
+    --color-uncertain-ink: oklch(92% 0.06 85);
+    --color-corrected: oklch(76% 0.09 175);
+    --color-corrected-bg: oklch(29% 0.04 175);
+    --color-success: oklch(75% 0.12 155);
+    --color-success-bg: oklch(28% 0.04 155);
+    --color-warning: oklch(80% 0.11 75);
+    --color-warning-bg: oklch(30% 0.05 75);
+    --color-danger: oklch(74% 0.14 27);
+    --color-danger-bg: oklch(29% 0.05 27);
+    --shadow-raise: 0 1px 2px oklch(5% 0.01 255 / 0.4);
+    --shadow-overlay: 0 8px 28px oklch(5% 0.01 255 / 0.55);
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-paper: oklch(17% 0.012 255);
+  --color-paper-2: oklch(20.5% 0.013 255);
+  --color-paper-3: oklch(24% 0.014 255);
+  --color-surface: oklch(21% 0.013 255);
+  --color-rule: oklch(30% 0.014 255);
+  --color-rule-strong: oklch(42% 0.016 255);
+  --color-control-border: oklch(58% 0.016 255);
+  --color-ink: oklch(93.5% 0.008 250);
+  --color-ink-2: oklch(80% 0.010 250);
+  --color-ink-3: oklch(70% 0.012 250);
+  --color-accent: oklch(74% 0.09 222);
+  --color-accent-hover: oklch(80% 0.08 222);
+  --color-accent-soft: oklch(30% 0.04 222);
+  --color-accent-ink: oklch(18% 0.02 222);
+  --color-focus: oklch(76% 0.11 222);
+  --color-uncertain-bg: oklch(36% 0.06 75);
+  --color-uncertain-ink: oklch(92% 0.06 85);
+  --color-corrected: oklch(76% 0.09 175);
+  --color-corrected-bg: oklch(29% 0.04 175);
+  --color-success: oklch(75% 0.12 155);
+  --color-success-bg: oklch(28% 0.04 155);
+  --color-warning: oklch(80% 0.11 75);
+  --color-warning-bg: oklch(30% 0.05 75);
+  --color-danger: oklch(74% 0.14 27);
+  --color-danger-bg: oklch(29% 0.05 27);
+  --shadow-raise: 0 1px 2px oklch(5% 0.01 255 / 0.4);
+  --shadow-overlay: 0 8px 28px oklch(5% 0.01 255 / 0.55);
+}
