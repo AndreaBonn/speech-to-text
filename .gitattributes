@@ -1,0 +1,3 @@
+# cmd.exe misreads batch files with LF line endings.
+*.bat text eol=crlf
+*.sh text eol=lf
