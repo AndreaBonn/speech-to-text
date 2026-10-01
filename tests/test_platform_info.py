@@ -68,7 +68,7 @@ def test_resolve_runtime_auto_platform_matrix(
         cpu_count=8,
     )
     choice = resolve_runtime(info, requested=requested)
-    uses_cuda = system == "linux" and hardware == (1, True)
+    uses_cuda = system in ("linux", "windows") and hardware == (1, True)
     assert (
         choice.device,
         choice.compute_type,

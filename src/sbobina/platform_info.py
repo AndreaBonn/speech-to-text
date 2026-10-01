@@ -76,17 +76,18 @@ def detect_platform() -> PlatformInfo:
     )
 
 
+_CUDA_AUTO_SYSTEMS: frozenset[SystemName] = frozenset({"linux", "windows"})
+
+
 def _resolve_device(info: PlatformInfo, requested: RuntimeRequest) -> tuple[str, str]:
     if requested.device == "cuda" and info.cuda_devices == 0:
         raise ValueError("CUDA requested but no NVIDIA GPU is available")
     if requested.device != "auto":
         return requested.device, f"Device richiesto esplicitamente: {requested.device}"
-    if info.system == "linux" and info.cuda_devices > 0:
+    if info.system in _CUDA_AUTO_SYSTEMS and info.cuda_devices > 0:
         if info.cuda_libs_available:
-            return "cuda", "GPU NVIDIA e librerie CUDA disponibili su Linux"
+            return "cuda", f"GPU NVIDIA e librerie CUDA disponibili su {info.system}"
         return "cpu", "GPU NVIDIA presente ma librerie CUDA non installate"
-    if info.system == "windows":
-        return "cpu", "Supporto DLL CUDA su Windows non ancora abilitato"
     if info.system == "darwin":
         return "cpu", "CTranslate2 su macOS usa la CPU"
     return "cpu", "Nessun percorso CUDA automatico disponibile"
