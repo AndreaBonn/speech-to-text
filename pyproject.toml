@@ -16,6 +16,7 @@ dependencies = [
     "jiwer>=4.0.0",
     "ollama>=0.6.3",
     "pydantic-settings>=2.15.0",
+    "python-docx>=1.2.0",
     "python-multipart>=0.0.32",
     "uvicorn>=0.54.0",
 ]

@@ -17,7 +17,7 @@ MIN_SIMILARITY = 0.6
 CORRECTED_PROBABILITY = 1.0
 _LEADING = re.compile(r"^\s*[\"'’“«(\[¿]*")
 _TRAILING = re.compile(r"[\"”».,;:!?)\]…]*$")
-_EDGE_PUNCTUATION = " \"'’“”«».,;:!?()[]…"
+EDGE_PUNCTUATION = " \"'’“”«».,;:!?()[]…"
 
 
 @dataclass(frozen=True)
@@ -149,13 +149,13 @@ def _plan_replacements(
 def _replacement_text(first: Word, last: Word, corrected: str) -> str:
     leading = _LEADING.match(first.text)
     trailing = _TRAILING.search(last.text)
-    body = corrected.strip(_EDGE_PUNCTUATION)
+    body = corrected.strip(EDGE_PUNCTUATION)
     return f"{leading.group() if leading else ''}{body}{trailing.group() if trailing else ''}"
 
 
-def _heard_text(span: tuple[Word, ...]) -> str:
+def heard_text(span: tuple[Word, ...]) -> str:
     """What Whisper heard over ``span``, even if some words were already corrected."""
-    heard = (w.corrected_from or w.text.strip(_EDGE_PUNCTUATION) for w in span)
+    heard = (w.corrected_from or w.text.strip(EDGE_PUNCTUATION) for w in span)
     return " ".join(part for part in heard if part)
 
 
@@ -170,7 +170,7 @@ def _substitute(
         end=words[last].end,
         text=text,
         probability=CORRECTED_PROBABILITY,
-        corrected_from=_heard_text(words[first : last + 1]),
+        corrected_from=heard_text(words[first : last + 1]),
     )
     return EditResult(
         words=(*words[:first], merged, *words[last + 1 :]),

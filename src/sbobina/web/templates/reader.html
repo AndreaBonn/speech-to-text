@@ -20,10 +20,13 @@
         <button type="button" class="segmented__option is-active" data-variant="original">Originale</button>
         <button type="button" class="segmented__option" data-variant="corrected">Corretta</button>
       </div>
+      <button type="button" id="edit-toggle" class="btn btn--secondary" aria-pressed="false" aria-controls="edit-panel">Correggi a mano</button>
       <div class="reader__downloads">
         <a class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/files/md" download>Scarica .md</a>
         <a class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/files/json" download>Scarica .json</a>
         <a id="download-corrected-md" class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/files/corrected_md" download hidden>Scarica corretta (.md)</a>
+        <a id="export-docx" class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/export/docx?variant=original" download>Scarica .docx</a>
+        <a id="export-txt" class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/export/txt?variant=original" download>Scarica .txt</a>
         <a id="download-report" class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/files/report" download hidden>Report correzioni</a>
       </div>
     </div>
@@ -40,6 +43,23 @@
     <aside id="reader-points" class="reader__points" aria-label="Punti da riascoltare"></aside>
   </div>
 </div>
+
+<form id="edit-panel" class="edit-panel" aria-labelledby="edit-panel-title" hidden>
+  <div class="edit-panel__head">
+    <h3 id="edit-panel-title" class="edit-panel__title">Correzione manuale</h3>
+    <p id="edit-selection" class="edit-panel__selection">Clicca una parola o trascina su una frase da correggere. Maiuscolo+clic estende la selezione.</p>
+  </div>
+  <div class="edit-panel__row">
+    <label class="sr-only" for="edit-input">Testo corretto</label>
+    <input id="edit-input" class="text-input edit-panel__input" type="text" maxlength="2000" autocomplete="off" spellcheck="true" lang="it" aria-describedby="edit-help edit-error" disabled />
+    <button type="submit" id="edit-save" class="btn btn--primary" disabled><span class="btn__label">Salva</span></button>
+    <button type="button" id="edit-replay" class="btn btn--ghost" disabled>Riascolta</button>
+    <button type="button" id="edit-cancel" class="btn btn--ghost" disabled>Annulla</button>
+  </div>
+  <p id="edit-help" class="edit-panel__help">Invio salva, Esc annulla. Lascia vuoto per eliminare le parole selezionate.</p>
+  <p id="edit-status" class="edit-panel__status" role="status"></p>
+  <p id="edit-error" class="edit-panel__error" role="alert"></p>
+</form>
 
 <div id="audio-bar" class="audio-bar" hidden>
   <audio
@@ -77,5 +97,6 @@
 {% block scripts %}
 {% if not not_found %}
 <script src="/static/js/reader.js" defer></script>
+<script src="/static/js/reader-edit.js" defer></script>
 {% endif %}
 {% endblock %}

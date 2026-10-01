@@ -801,6 +801,7 @@ body {
 
 .reader__downloads {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2xs);
 }
 
@@ -1359,5 +1360,110 @@ body {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---------- Reader: manual correction ---------- */
+
+.reader.is-editing {
+  padding-bottom: calc(var(--player-height) + 11rem);
+}
+
+.reader.is-editing .word {
+  cursor: text;
+}
+
+.word--selected,
+.word--selected.word--uncertain,
+.word--selected.word--current {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.edit-panel {
+  position: fixed;
+  left: var(--rail-width);
+  right: 0;
+  bottom: var(--player-height);
+  z-index: var(--z-sticky);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-surface);
+  border-top: var(--rule-hair) solid var(--color-rule);
+  box-shadow: var(--shadow-raise);
+}
+
+.edit-panel[hidden] {
+  display: none;
+}
+
+.edit-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2xs) var(--space-sm);
+}
+
+.edit-panel__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.edit-panel__selection {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.edit-panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.edit-panel__input {
+  flex: 1 1 16rem;
+  max-width: none;
+  font-family: var(--font-reading);
+}
+
+.edit-panel__help,
+.edit-panel__status,
+.edit-panel__error {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+
+.edit-panel__status {
+  color: var(--color-success);
+}
+
+.edit-panel__error {
+  color: var(--color-danger);
+}
+
+.edit-panel__status:empty,
+.edit-panel__error:empty {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .edit-panel {
+    left: 0;
+    bottom: calc(var(--player-height) * 1.4);
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .reader.is-editing {
+    padding-bottom: calc(var(--player-height) * 1.6 + 14rem);
   }
 }

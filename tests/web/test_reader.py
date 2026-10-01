@@ -23,6 +23,7 @@ def test_build_paragraphs_threshold_and_correction_preserves_word_fields() -> No
     assert paragraphs == [
         [
             WordView(
+                index=0,
                 start=0.0,
                 end=0.4,
                 text=" cloroplasto",
@@ -30,7 +31,12 @@ def test_build_paragraphs_threshold_and_correction_preserves_word_fields() -> No
                 corrected_from="clorofilla",
             ),
             WordView(
-                start=0.4, end=0.8, text=" chiaro", uncertain=False, corrected_from=None
+                index=1,
+                start=0.4,
+                end=0.8,
+                text=" chiaro",
+                uncertain=False,
+                corrected_from=None,
             ),
         ]
     ]
@@ -109,3 +115,16 @@ def test_build_paragraphs_empty_transcript_returns_empty_views() -> None:
     assert len(build_paragraphs(transcript=transcript, options=OPTIONS)) == 1
     assert build_paragraphs(transcript=empty, options=OPTIONS) == []
     assert build_review_points(transcript=empty, threshold=0.7) == []
+
+
+def test_build_paragraphs_indexes_words_across_paragraphs() -> None:
+    transcript = make_transcript(
+        [
+            make_segment([make_word(" a", 0.0), make_word(" b", 0.4)]),
+            make_segment([make_word(" c", 10.0)]),
+        ]
+    )
+
+    paragraphs = build_paragraphs(transcript=transcript, options=OPTIONS)
+
+    assert [[w.index for w in p] for p in paragraphs] == [[0, 1], [2]]

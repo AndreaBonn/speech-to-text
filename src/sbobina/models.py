@@ -40,10 +40,12 @@ class Transcript:
         return " ".join(segment.text for segment in self.segments)
 
 
+def transcript_to_json(transcript: Transcript) -> str:
+    return json.dumps(asdict(transcript), ensure_ascii=False, indent=1)
+
+
 def save_transcript(transcript: Transcript, path: Path) -> None:
-    path.write_text(
-        json.dumps(asdict(transcript), ensure_ascii=False, indent=1), encoding="utf-8"
-    )
+    path.write_text(transcript_to_json(transcript), encoding="utf-8")
 
 
 def load_transcript(path: Path) -> Transcript:

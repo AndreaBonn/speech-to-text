@@ -22,6 +22,8 @@
   var variantSwitch = document.getElementById("variant-switch");
   var downloadCorrectedMd = document.getElementById("download-corrected-md");
   var downloadReport = document.getElementById("download-report");
+  var exportDocx = document.getElementById("export-docx");
+  var exportTxt = document.getElementById("export-txt");
   var audioBar = document.getElementById("audio-bar");
   var player = document.getElementById("audio-player");
   var playButton = document.getElementById("audio-playpause");
@@ -36,6 +38,7 @@
   var SKIP_SECONDS = 10;
 
   var currentVariant = "original";
+  var currentRevision = null; // of the text on screen; edits must quote it
   var words = []; // flat, chronological: [{start, end, el}]
   var currentWordEl = null;
   var lastManualScrollAt = 0;
@@ -127,6 +130,10 @@
     span.className = wordClassName(word);
     span.dataset.start = String(word.start);
     span.dataset.end = String(word.end);
+    span.dataset.index = String(word.index);
+    // Raw text with its leading space: the edit module sends it back as the
+    // text the user saw, and textContent would include the sr-only note.
+    span.dataset.text = word.text;
     span.tabIndex = 0;
     span.textContent = displayText;
     if (word.corrected_from) {
@@ -225,16 +232,37 @@
     pointsEl.innerHTML = "";
     return fetchJSON(TRANSCRIPT_URL + "?variant=" + variant).then(function (body) {
       currentVariant = variant;
-      renderTranscript(body.data.paragraphs);
-      renderPoints(body.data.review_points);
+      setActiveVariantButton(variant);
+      updateExportLinks(variant);
+      applyPayload(body);
+      readerRoot.dispatchEvent(
+        new CustomEvent("reader:variant", { detail: { variant: variant } })
+      );
     });
+  }
+
+  function applyPayload(body) {
+    currentRevision = body.meta.revision;
+    renderTranscript(body.data.paragraphs);
+    renderPoints(body.data.review_points);
+  }
+
+  // DOCX and TXT follow the version on screen: what you read is what you get.
+  function updateExportLinks(variant) {
+    var base = "/api/v1/jobs/" + JOB_ID + "/export/";
+    exportDocx.href = base + "docx?variant=" + variant;
+    exportTxt.href = base + "txt?variant=" + variant;
+  }
+
+  function showCorrectedControls() {
+    variantSwitch.hidden = false;
+    downloadCorrectedMd.hidden = false;
   }
 
   function checkCorrectedAvailable() {
     fetchJSON(TRANSCRIPT_URL + "?variant=corrected")
       .then(function () {
-        variantSwitch.hidden = false;
-        downloadCorrectedMd.hidden = false;
+        showCorrectedControls();
         downloadReport.hidden = false;
       })
       .catch(function () {
@@ -249,14 +277,21 @@
     });
   }
 
+  function switchVariant(variant) {
+    setActiveVariantButton(variant);
+    return loadTranscript(variant).catch(function (error) {
+      showTranscriptError(error.message || "Impossibile caricare la correzione.");
+      throw error;
+    });
+  }
+
   variantSwitch.addEventListener("click", function (event) {
     var button = event.target.closest(".segmented__option");
     if (!button || button.dataset.variant === currentVariant) {
       return;
     }
-    setActiveVariantButton(button.dataset.variant);
-    loadTranscript(button.dataset.variant).catch(function (error) {
-      showTranscriptError(error.message || "Impossibile caricare la correzione.");
+    switchVariant(button.dataset.variant).catch(function () {
+      // Already shown by switchVariant.
     });
   });
 
@@ -265,6 +300,10 @@
   function clampTime(seconds) {
     var duration = isFinite(player.duration) ? player.duration : seconds;
     return Math.max(0, Math.min(seconds, duration));
+  }
+
+  function seekTo(seconds) {
+    player.currentTime = clampTime(seconds);
   }
 
   function seekAndPlay(seconds) {
@@ -395,7 +434,15 @@
 
   // ---------- word + review-point activation (event delegation) ----------
 
+  // In edit mode a click selects words: reader-edit.js owns it.
+  function isEditing() {
+    return readerRoot.classList.contains("is-editing");
+  }
+
   textEl.addEventListener("click", function (event) {
+    if (isEditing()) {
+      return;
+    }
     var span = event.target.closest(".word");
     if (span) {
       seekAndPlay(parseFloat(span.dataset.start));
@@ -403,7 +450,7 @@
   });
 
   textEl.addEventListener("keydown", function (event) {
-    if (event.key !== "Enter") {
+    if (event.key !== "Enter" || isEditing()) {
       return;
     }
     var span = event.target.closest(".word");
@@ -419,6 +466,23 @@
       seekAndPlay(parseFloat(button.dataset.start));
     }
   });
+
+  // ---------- API for reader-edit.js ----------
+
+  window.sbobinaReader = {
+    variant: function () {
+      return currentVariant;
+    },
+    revision: function () {
+      return currentRevision;
+    },
+    switchVariant: switchVariant,
+    applyPayload: applyPayload,
+    showCorrectedControls: showCorrectedControls,
+    seekTo: seekTo,
+    seekAndPlay: seekAndPlay,
+    showStatus: showStatus,
+  };
 
   // ---------- init ----------
 

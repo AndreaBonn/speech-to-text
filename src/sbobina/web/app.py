@@ -11,6 +11,7 @@ from starlette.exceptions import HTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from sbobina.settings import LOOPBACK_HOSTS, Settings
+from sbobina.web.api_corrected import router as corrected_router
 from sbobina.web.api_files import router as files_router
 from sbobina.web.api_jobs import router as jobs_router
 from sbobina.web.api_models import create_models_router
@@ -86,6 +87,7 @@ def create_app(
     app.include_router(create_models_router(settings=settings))
     app.include_router(jobs_router)
     app.include_router(files_router)
+    app.include_router(corrected_router)
     app.include_router(wer_router)
     app.include_router(events_router)
     app.include_router(pages_router)

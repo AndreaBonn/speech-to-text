@@ -40,7 +40,7 @@ def _replace_with_retry(source: Path, destination: Path) -> None:
             time.sleep(REPLACE_RETRY_DELAY_S)
 
 
-def _atomic_write(path: Path, content: str) -> None:
+def atomic_write(path: Path, content: str) -> None:
     with NamedTemporaryFile(
         mode="w", encoding="utf-8", dir=path.parent, suffix=".tmp", delete=False
     ) as temporary:
@@ -82,7 +82,7 @@ class JobStore:
         )
         path = self.jobs_dir / str(record.id)
         path.mkdir(parents=True)
-        _atomic_write(path=path / "job.json", content=record.model_dump_json())
+        atomic_write(path=path / "job.json", content=record.model_dump_json())
         return record
 
     def get(self, job_id: str) -> JobRecord:
@@ -118,7 +118,7 @@ class JobStore:
             }
         )
         path = self._job_dir(job_id=str(updated.id)) / "job.json"
-        _atomic_write(path=path, content=updated.model_dump_json())
+        atomic_write(path=path, content=updated.model_dump_json())
         return updated
 
     def delete(self, job_id: str) -> None:
@@ -132,4 +132,4 @@ class JobStore:
 
     def write_progress(self, job_id: str, progress: dict[str, JsonValue]) -> None:
         path = self._job_dir(job_id=job_id) / "progress.json"
-        _atomic_write(path=path, content=json.dumps(progress, ensure_ascii=False))
+        atomic_write(path=path, content=json.dumps(progress, ensure_ascii=False))

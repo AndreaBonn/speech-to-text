@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from sbobina.models import save_transcript
 from sbobina.settings import Settings
+from sbobina.web.api_files import transcript_revision
 from sbobina.web.app import create_app
 from sbobina.web.job_models import JobConfig
 from sbobina.web.job_store import JobStore
@@ -155,6 +156,7 @@ def test_get_transcript_variant_returns_reader_then_not_found(
     url = f"/api/v1/jobs/{job_dir.name}/transcript?variant={variant}"
 
     response = client.get(url=url)
+    revision = transcript_revision((job_dir / filename).read_text(encoding="utf-8"))
     (job_dir / filename).unlink()
     missing = client.get(url=url)
 
@@ -164,6 +166,7 @@ def test_get_transcript_variant_returns_reader_then_not_found(
             "paragraphs": [
                 [
                     {
+                        "index": 0,
                         "start": 0.0,
                         "end": 0.4,
                         "text": " cloroplasto",
@@ -173,6 +176,7 @@ def test_get_transcript_variant_returns_reader_then_not_found(
                 ],
                 [
                     {
+                        "index": 1,
                         "start": 1.0,
                         "end": 1.4,
                         "text": " dopo",
@@ -185,7 +189,7 @@ def test_get_transcript_variant_returns_reader_then_not_found(
                 {"start": 0.0, "before": "", "text": "cloroplasto", "after": "dopo"}
             ],
         },
-        "meta": {},
+        "meta": {"revision": revision},
     }
     assert missing.status_code == 404
     assert missing.json()["error"]["code"] == "NOT_FOUND"

@@ -12,6 +12,8 @@ Local-only lecture transcription (Italian). Audio must never leave the machine; 
 ## Layout
 - `models.py` domain dataclasses + JSON I/O; `render.py` and `wer.py` pure logic; `transcriber.py` the only faster-whisper boundary; `cli.py` entry point
 - `edits.py` applies LLM edits behind guards (substitutions only, ≤3 words, difflib ≥0.6); `correction.py` chunks and orchestrates; `llm_corrector.py` the only Ollama boundary; `cleanup.py` drops isolated "Grazie." hallucinations; `report.py` the corrections report
+- `book.py` (pure) and `docx_export.py` (the only python-docx boundary) export the reading copy as TXT/DOCX: book layout, no timestamps or review marks
+- `manual_edit.py` replaces a word span typed by the user in the reader; `web/api_corrected.py` serves exports and edits. Edits quote the file `revision` (hash of the saved JSON): word indices shift after an edit, and repeated words make a text-only check unsafe
 - Prompts are versioned files in `src/sbobina/prompts/`
 
 ## Roadmap
