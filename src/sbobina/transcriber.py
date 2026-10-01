@@ -1,12 +1,16 @@
 import logging
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from sbobina import platform_info
 from sbobina.cuda_libs import preload_cuda_libraries
 from sbobina.models import Segment, Transcript, Word
 from sbobina.render import format_timestamp
 from sbobina.settings import Settings
+
+if TYPE_CHECKING:
+    from faster_whisper import WhisperModel
 
 logger = logging.getLogger(__name__)
 
@@ -55,17 +59,56 @@ def _collect_segments(
     return tuple(segments)
 
 
+def _runtime_request(config: Settings) -> platform_info.RuntimeRequest:
+    return platform_info.RuntimeRequest(
+        device=config.device,
+        compute_type=config.compute_type,
+        whisper_model=config.whisper_model,
+        whisper_model_gpu=config.whisper_model_gpu,
+        whisper_model_cpu=config.whisper_model_cpu,
+        cpu_threads=config.cpu_threads,
+    )
+
+
+def _load_model(
+    info: platform_info.PlatformInfo, choice: platform_info.RuntimeChoice
+) -> "WhisperModel":
+    if info.cuda_devices > 0 and not info.cuda_libs_available:
+        logger.warning(
+            "GPU NVIDIA rilevata ma wheel CUDA mancanti: esegui uv sync --extra cuda"
+        )
+    if choice.device == "cuda" and info.system == "linux":
+        preload_cuda_libraries()
+    from faster_whisper import WhisperModel  # after preload: ctranslate2 needs cuDNN
+
+    logger.info(
+        "Runtime: OS=%s device=%s compute_type=%s modello=%s motivo=%s",
+        info.system,
+        choice.device,
+        choice.compute_type,
+        choice.whisper_model,
+        choice.reason,
+    )
+    cpu_kwargs = (
+        {"cpu_threads": choice.cpu_threads} if choice.cpu_threads is not None else {}
+    )
+    return WhisperModel(
+        choice.whisper_model,
+        device=choice.device,
+        compute_type=choice.compute_type,
+        **cpu_kwargs,
+    )
+
+
 def transcribe_file(
     audio_path: Path, config: Settings, on_progress: ProgressCallback | None = None
 ) -> Transcript:
     """Run Whisper on ``audio_path`` with word timestamps; VAD per ``config``."""
-    preload_cuda_libraries()
-    from faster_whisper import WhisperModel  # after preload: ctranslate2 needs cuDNN
-
-    logger.info("Carico il modello %s su %s", config.whisper_model, config.device)
-    model = WhisperModel(
-        config.whisper_model, device=config.device, compute_type=config.compute_type
+    detected = platform_info.detect_platform()
+    choice = platform_info.resolve_runtime(
+        info=detected, requested=_runtime_request(config)
     )
+    model = _load_model(info=detected, choice=choice)
     raw_segments, info = model.transcribe(
         str(audio_path),
         language=config.language,
@@ -76,7 +119,7 @@ def transcribe_file(
     )
     return Transcript(
         source=str(audio_path),
-        model=config.whisper_model,
+        model=choice.whisper_model,
         language=config.language,
         duration=float(info.duration),
         segments=_collect_segments(

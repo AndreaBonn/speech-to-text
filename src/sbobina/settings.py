@@ -1,5 +1,20 @@
+from typing import Literal
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# CTranslate2 quantization types: https://opennmt.net/CTranslate2/quantization.html
+ComputeType = Literal[
+    "auto",
+    "float32",
+    "float16",
+    "bfloat16",
+    "int16",
+    "int8",
+    "int8_float32",
+    "int8_float16",
+    "int8_bfloat16",
+]
 
 
 class Settings(BaseSettings):
@@ -9,9 +24,13 @@ class Settings(BaseSettings):
         env_prefix="SBOBINA_", env_file=".env", extra="ignore"
     )
 
-    whisper_model: str = "large-v3"
-    device: str = "cuda"
-    compute_type: str = "float16"
+    # "auto" picks whisper_model_gpu on CUDA and whisper_model_cpu on CPU.
+    whisper_model: str = "auto"
+    whisper_model_gpu: str = "large-v3"
+    whisper_model_cpu: str = "large-v3-turbo"
+    device: Literal["auto", "cuda", "cpu"] = "auto"
+    compute_type: ComputeType = "auto"
+    cpu_threads: int = Field(default=0, ge=0)
     language: str = "it"
     beam_size: int = Field(default=5, ge=1)
     # Off by default: on hour-long audio, conditioning on previous text is the
