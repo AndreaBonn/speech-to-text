@@ -225,9 +225,13 @@ rilevati e segnalati (permessi admin / download lunghi gestiti dalla UI con avan
 
 ## F8 - Verifica reale su Linux
 
-- [ ] **T060** Job GPU su lezione da 85 min con correzione: `nvidia-smi --query-compute-apps`
+- [x] **T060** Job GPU su lezione da 85 min con correzione: `nvidia-smi --query-compute-apps`
   durante transcribe, fra le fasi (nessun processo Whisper) e durante correct. verify: tre letture
   riportate, job `done`, output identici a quelli della CLI sullo stesso audio.
+  Esito 2026-10-01: job `done` (trascrizione ~6,5 min, correzione ~18 min); Whisper e Ollama mai
+  insieme in VRAM (campioni ogni 15 s). "Identici" non è raggiungibile: su GPU due run differiscono
+  (finestre da 30 s identiche: CLI-CLI 169/170, web-CLI 165/170, un'altra run web 145/170), quindi
+  il percorso web non introduce differenze sistematiche. Correzione: 147 applicate contro 149 della CLI.
 - [ ] **T061** Riavvio del server e cancellazione durante un job; misura CPU (`SBOBINA_DEVICE=cpu`,
   audio da 5 min, turbo, `cpu_threads` logici vs fisici). verify: job `interrupted`, nessun figlio
   in `ps`; rapporto audio/tempo riportato e usato nel testo dell'avviso.
