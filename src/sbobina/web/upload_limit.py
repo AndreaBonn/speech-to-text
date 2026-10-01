@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -21,10 +23,10 @@ class UploadLimitMiddleware:
     request without it is refused instead of being trusted.
     """
 
-    def __init__(self, app: ASGIApp, path: str, max_bytes: int) -> None:
+    def __init__(self, app: ASGIApp, limits: Mapping[str, int]) -> None:
         self.app = app
-        self.path = path
-        self.max_bytes = max_bytes
+        # Every multipart endpoint needs its own cap: path -> max request bytes.
+        self.limits = dict(limits)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         rejection = self._rejection(scope=scope)
@@ -34,12 +36,10 @@ class UploadLimitMiddleware:
         await rejection(scope, receive, send)
 
     def _rejection(self, scope: Scope) -> JSONResponse | None:
-        is_upload = (
-            scope["type"] == "http"
-            and scope["method"] == LIMITED_METHOD
-            and scope["path"].rstrip("/") == self.path
-        )
-        if not is_upload:
+        if scope["type"] != "http" or scope["method"] != LIMITED_METHOD:
+            return None
+        max_bytes = self.limits.get(scope["path"].rstrip("/"))
+        if max_bytes is None:
             return None
         headers = dict(scope["headers"])
         length = headers.get(b"content-length", b"").decode("latin-1")
@@ -49,7 +49,7 @@ class UploadLimitMiddleware:
                 code="LENGTH_REQUIRED",
                 message="Dimensione del file non dichiarata dal browser",
             )
-        if int(length) > self.max_bytes:
+        if int(length) > max_bytes:
             return _error(
                 status_code=413,
                 code="PAYLOAD_TOO_LARGE",

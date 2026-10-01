@@ -81,3 +81,5 @@ class JobRecord(BaseModel):
     updated_at: datetime
     pid: int | None = None
     error: dict[str, JsonValue] | None = None
+    # Name of the uploaded file as the user knows it; empty for older jobs.
+    source_name: str = ""

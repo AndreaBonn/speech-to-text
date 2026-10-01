@@ -53,13 +53,14 @@ class JobStore:
             raise NotFoundError(entity="Job", id=job_id)
         return path
 
-    def create(self, config: JobConfig) -> JobRecord:
+    def create(self, config: JobConfig, source_name: str = "") -> JobRecord:
         now = datetime.now(tz=UTC)
         record = JobRecord(
             id=uuid4(),
             status=JobStatus.QUEUED,
             stage=JobStage.QUEUED,
             config=config,
+            source_name=source_name,
             created_at=now,
             updated_at=now,
         )

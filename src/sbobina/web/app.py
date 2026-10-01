@@ -10,9 +10,12 @@ from starlette.exceptions import HTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from sbobina.settings import LOOPBACK_HOSTS, Settings
+from sbobina.web.api_files import router as files_router
 from sbobina.web.api_jobs import router as jobs_router
 from sbobina.web.api_models import create_models_router
 from sbobina.web.api_system import create_system_router
+from sbobina.web.api_wer import WER_REQUEST_LIMIT_BYTES
+from sbobina.web.api_wer import router as wer_router
 from sbobina.web.errors import AppError
 from sbobina.web.gpu_release import unload_ollama_models
 from sbobina.web.job_store import JobStore
@@ -65,8 +68,12 @@ def create_app(
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_TRUSTED_HOSTS)
     app.add_middleware(
         UploadLimitMiddleware,
-        path="/api/v1/jobs",
-        max_bytes=upload_limit_bytes(max_upload_mb=settings.web_max_upload_mb),
+        limits={
+            "/api/v1/jobs": upload_limit_bytes(
+                max_upload_mb=settings.web_max_upload_mb
+            ),
+            "/api/v1/wer": WER_REQUEST_LIMIT_BYTES,
+        },
     )
     app.add_exception_handler(RequestValidationError, request_validation_handler)
     app.add_exception_handler(AppError, app_error_handler)
@@ -74,5 +81,7 @@ def create_app(
     app.include_router(create_system_router(settings=settings))
     app.include_router(create_models_router(settings=settings))
     app.include_router(jobs_router)
+    app.include_router(files_router)
+    app.include_router(wer_router)
     app.include_router(events_router)
     return app

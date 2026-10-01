@@ -10,6 +10,7 @@ from starlette.testclient import TestClient
 from sbobina.web.upload_limit import UploadLimitMiddleware
 
 LIMIT_BYTES = 1000
+SMALL_LIMIT_BYTES = 100
 
 
 @pytest.fixture
@@ -24,9 +25,15 @@ def client(reached: list[str]) -> TestClient:
         reached.append(request.method)
         return PlainTextResponse("ok")
 
-    inner = Starlette(routes=[Route("/api/v1/jobs", endpoint, methods=["GET", "POST"])])
+    inner = Starlette(
+        routes=[
+            Route("/api/v1/jobs", endpoint, methods=["GET", "POST"]),
+            Route("/api/v1/wer", endpoint, methods=["POST"]),
+        ]
+    )
     inner.add_middleware(
-        UploadLimitMiddleware, path="/api/v1/jobs", max_bytes=LIMIT_BYTES
+        UploadLimitMiddleware,
+        limits={"/api/v1/jobs": LIMIT_BYTES, "/api/v1/wer": SMALL_LIMIT_BYTES},
     )
     return TestClient(inner)
 
@@ -68,3 +75,12 @@ def test_other_methods_are_not_limited(client: TestClient, reached: list[str]) -
 
     assert response.status_code == 200
     assert reached == ["GET"]
+
+
+def test_each_path_has_its_own_limit(client: TestClient, reached: list[str]) -> None:
+    rejected = client.post("/api/v1/wer", content=b"x" * (SMALL_LIMIT_BYTES + 1))
+    accepted = client.post("/api/v1/wer", content=b"x" * SMALL_LIMIT_BYTES)
+
+    assert rejected.status_code == 413
+    assert accepted.status_code == 200
+    assert reached == ["POST"]

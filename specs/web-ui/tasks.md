@@ -150,11 +150,11 @@ rilevati e segnalati (permessi admin / download lunghi gestiti dalla UI con avan
 
 **[B-7] T020-T022**
 
-- [ ] **T020** `web/reader.py` puro: `Transcript` + soglia → paragrafi (`render.group_paragraphs`)
+- [x] **T020** `web/reader.py` puro: `Transcript` + soglia → paragrafi (`render.group_paragraphs`)
   di `WordView(start, end, text, uncertain, corrected_from)`. Rischio: basso.
   verify: probability 0.5 con soglia 0.7 → `uncertain=True`; `corrected_from="clorofilla"` →
   prima/dopo; stessi confini di paragrafo di `render_markdown`.
-- [ ] **T021** `GET /api/v1/jobs/{id}/audio` (test Range per primo, fallback plan §6) e
+- [x] **T021** `GET /api/v1/jobs/{id}/audio` (test Range per primo, fallback plan §6) e
   `GET /jobs/{id}/files/{kind}` (md, json, corrected_md, corrected_json, report). Rischio: medio.
   verify: `Range: bytes=0-1023` → 206, `Content-Range: bytes 0-1023/<size>`, 1024 byte; kind ignoto
   → 422; file non prodotto → 404.
@@ -202,7 +202,7 @@ rilevati e segnalati (permessi admin / download lunghi gestiti dalla UI con avan
 
 **[B-11] T040-T041**
 
-- [ ] **T040** `POST /api/v1/wer`: riferimento `.txt` + `job_id`/`variant` (original|corrected) o
+- [x] **T040** `POST /api/v1/wer`: riferimento `.txt` + `job_id`/`variant` (original|corrected) o
   ipotesi `.txt`; `compute_wer`. Rischio: basso. verify: stessi valori di `uv run sbobina wer` sulle
   stesse fixture; variant corrected senza correzione → 404.
 - [ ] **T041** `templates/wer.html`. verify: manuale, numero identico alla CLI.

@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from sbobina.settings import Settings
+from sbobina.web.api_jobs import source_name
 from sbobina.web.app import create_app
 from sbobina.web.job_models import JobConfig, JobStatus
 from sbobina.web.job_store import JobStore
@@ -62,6 +63,7 @@ def test_upload_valid_audio_creates_queued_job(
     assert record["config"]["subject"] == "Lezione"
     assert record["config"]["correct"] is True
     assert record["config"]["vad_filter"] is True
+    assert record["source_name"] == "VOICE.WAV"
     directory = tmp_path / "jobs" / record["id"]
     assert _find_audio(job_dir=directory) == directory / "audio.wav"
     assert (directory / "audio.wav").read_bytes() == audio
@@ -169,3 +171,26 @@ def test_delete_job_protects_active_jobs_and_removes_terminal_jobs(
     active = status in (JobStatus.RUNNING, JobStatus.QUEUED)
     assert response.status_code == (409 if active else 204)
     assert directory.exists() == active
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected"),
+    [
+        ("C:\\Users\\anna\\Lezione 3 - Diritto.m4a", "Lezione 3 - Diritto.m4a"),
+        ("lezioni/2026/" + "a" * 300 + ".mp3", "a" * 196 + ".mp3"),
+        ("lez\u202eione 3.m4a", "lezione 3.m4a"),
+    ],
+)
+def test_upload_keeps_readable_source_name(
+    client: TestClient, audio: bytes, filename: str, expected: str
+) -> None:
+    response = client.post(url=JOBS_URL, files={"file": (filename, audio, "audio/wav")})
+
+    assert response.status_code == 201
+    assert response.json()["data"]["source_name"] == expected
+
+
+def test_source_name_drops_control_and_format_characters() -> None:
+    # Browsers percent-encode newlines and NUL in multipart file names, so these
+    # reach the function only through other clients: check it directly.
+    assert source_name(filename="lez\u202eione\n3\x00\t.m4a") == "lezione3.m4a"

@@ -1,6 +1,7 @@
+import unicodedata
 from dataclasses import dataclass
 from functools import partial
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Annotated, Any
 
 import anyio
@@ -19,6 +20,7 @@ from sbobina.web.upload_limit import BYTES_PER_MB
 
 router = APIRouter(prefix="/api/v1/jobs")
 CHUNK_SIZE = 1024 * 1024
+MAX_SOURCE_NAME = 200
 ALLOWED_EXTENSIONS = frozenset(
     {".m4a", ".mp3", ".wav", ".ogg", ".opus", ".flac", ".webm", ".aac"}
 )
@@ -89,11 +91,29 @@ async def _write_upload(file: UploadFile, path: Path, limit: int) -> None:
     await anyio.to_thread.run_sync(partial(_validate_audio, path=path))
 
 
+def source_name(filename: str) -> str:
+    """Keep only the file's own name (POSIX or Windows path), at most 200 chars."""
+    name = PureWindowsPath(PurePosixPath(filename).name).name
+    # Drop control and format characters (newlines, NUL, bidi overrides such as
+    # U+202E) so the name cannot reorder or break the line it is shown in.
+    name = "".join(
+        char for char in name if not unicodedata.category(char).startswith("C")
+    ).strip()
+    if len(name) <= MAX_SOURCE_NAME:
+        return name
+    suffix = Path(name).suffix
+    return name[: MAX_SOURCE_NAME - len(suffix)] + suffix
+
+
 async def _save_upload(
     file: UploadFile, config: JobConfig, services: JobServices, extension: str
 ) -> JobRecord:
     record = await anyio.to_thread.run_sync(
-        partial(services.store.create, config=config)
+        partial(
+            services.store.create,
+            config=config,
+            source_name=source_name(filename=file.filename or ""),
+        )
     )
     directory = services.store.jobs_dir / str(record.id)
     path = directory / f"audio{extension}.part"
