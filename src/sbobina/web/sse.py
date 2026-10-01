@@ -21,7 +21,7 @@ TERMINAL_STATUSES = (
     JobStatus.CANCELLED,
     JobStatus.INTERRUPTED,
 )
-CHANGE_FIELDS = ("status", "stage", "progress", "elapsed_s")
+CHANGE_FIELDS = ("status", "stage", "progress", "elapsed_s", "notice")
 DELETED_END: dict[str, JsonValue] = {"status": "deleted", "stage": None}
 
 
@@ -53,6 +53,7 @@ def _progress_payload(
         "elapsed_s": elapsed,
         "speed": speed,
         "eta_s": eta,
+        "notice": progress.get("notice"),
     }
 
 

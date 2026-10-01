@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Callable, Iterable
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -16,6 +17,18 @@ logger = logging.getLogger(__name__)
 
 PROGRESS_EVERY_S = 300.0
 ProgressCallback = Callable[[float, float], None]
+# Emitted verbatim when a CUDA load fails and the stage falls back to CPU;
+# Log records carrying this attribute are meant for the person using the app,
+# not only for the log: the web stage runner copies them into progress.json.
+USER_NOTICE = "user_notice"
+GPU_FALLBACK_NOTICE = "GPU non utilizzabile, trascrizione sul processore"
+_CUDA_PRELOAD_SYSTEMS = ("linux", "windows")
+# Substrings of ctranslate2 errors raised by the CUDA runtime or its libraries.
+# Anything else (missing model.bin, bad model name) is a real error, not a
+# reason to fall back to the CPU.
+# Missing libraries surface as "Library <name> is not found or cannot be
+# loaded", matched through the cublas/cudnn file name.
+_CUDA_ERROR_MARKERS = ("cuda", "cudnn", "cublas")
 
 
 def to_segment(raw_segment: Any) -> Segment | None:
@@ -59,17 +72,23 @@ def _collect_segments(
     return tuple(segments)
 
 
-def _load_model(
-    info: platform_info.PlatformInfo, choice: platform_info.RuntimeChoice
+def _instantiate(
+    model_cls: "type[WhisperModel]", choice: platform_info.RuntimeChoice
 ) -> "WhisperModel":
-    if info.cuda_devices > 0 and not info.cuda_libs_available:
-        logger.warning(
-            "GPU NVIDIA rilevata ma librerie CUDA non installate: avvia con ./avvia.sh oppure uv sync --extra cuda"
-        )
-    if choice.device == "cuda" and info.system == "linux":
-        preload_cuda_libraries()
-    from faster_whisper import WhisperModel  # after preload: ctranslate2 needs cuDNN
+    cpu_kwargs = (
+        {"cpu_threads": choice.cpu_threads} if choice.cpu_threads is not None else {}
+    )
+    return model_cls(
+        choice.whisper_model,
+        device=choice.device,
+        compute_type=choice.compute_type,
+        **cpu_kwargs,
+    )
 
+
+def _log_runtime(
+    info: platform_info.PlatformInfo, choice: platform_info.RuntimeChoice
+) -> None:
     logger.info(
         "Runtime: OS=%s device=%s compute_type=%s modello=%s motivo=%s",
         info.system,
@@ -78,15 +97,74 @@ def _load_model(
         choice.whisper_model,
         choice.reason,
     )
-    cpu_kwargs = (
-        {"cpu_threads": choice.cpu_threads} if choice.cpu_threads is not None else {}
+
+
+def _cpu_fallback_choice(
+    info: platform_info.PlatformInfo,
+    choice: platform_info.RuntimeChoice,
+    config: Settings,
+) -> platform_info.RuntimeChoice:
+    """Same job, same requested model, but forced onto the CPU after CUDA fails."""
+    compute_type = "int8" if "int8" in info.cpu_compute_types else "float32"
+    model = (
+        config.whisper_model_cpu
+        if config.whisper_model == "auto"
+        else choice.whisper_model
     )
-    return WhisperModel(
-        choice.whisper_model,
-        device=choice.device,
-        compute_type=choice.compute_type,
-        **cpu_kwargs,
+    return replace(
+        choice,
+        device="cpu",
+        compute_type=compute_type,
+        whisper_model=model,
+        cpu_threads=config.cpu_threads or info.cpu_count,
+        reason="Ripiego su CPU: CUDA non utilizzabile (driver o librerie mancanti)",
     )
+
+
+def _is_cuda_failure(error: RuntimeError) -> bool:
+    message = str(error).lower()
+    return any(marker in message for marker in _CUDA_ERROR_MARKERS)
+
+
+def _preload_cuda_if_needed(
+    info: platform_info.PlatformInfo, choice: platform_info.RuntimeChoice
+) -> bool:
+    """Preload the NVIDIA wheels when CUDA is chosen; ``False`` if that fails."""
+    if choice.device != "cuda" or info.system not in _CUDA_PRELOAD_SYSTEMS:
+        return True
+    try:
+        preload_cuda_libraries()
+    except OSError:
+        # Only NVIDIA libraries are loaded here, so any dlopen failure is a
+        # CUDA failure (wrong ABI, missing system dependency).
+        logger.exception("Caricamento delle librerie CUDA fallito")
+        return False
+    return True
+
+
+def _load_model(
+    info: platform_info.PlatformInfo,
+    choice: platform_info.RuntimeChoice,
+    config: Settings,
+) -> tuple["WhisperModel", platform_info.RuntimeChoice]:
+    if info.cuda_devices > 0 and not info.cuda_libs_available:
+        logger.warning(
+            "GPU NVIDIA rilevata ma librerie CUDA non installate: avvia con ./avvia.sh oppure uv sync --extra cuda"
+        )
+    preload_failed = not _preload_cuda_if_needed(info=info, choice=choice)
+    from faster_whisper import WhisperModel  # after preload: ctranslate2 needs cuDNN
+
+    if not preload_failed:
+        _log_runtime(info=info, choice=choice)
+        try:
+            return _instantiate(WhisperModel, choice), choice
+        except RuntimeError as error:
+            if choice.device != "cuda" or not _is_cuda_failure(error):
+                raise
+    logger.warning(GPU_FALLBACK_NOTICE, extra={USER_NOTICE: True})
+    fallback = _cpu_fallback_choice(info=info, choice=choice, config=config)
+    _log_runtime(info=info, choice=fallback)
+    return _instantiate(WhisperModel, fallback), fallback
 
 
 def transcribe_file(
@@ -94,7 +172,7 @@ def transcribe_file(
 ) -> Transcript:
     """Run Whisper on ``audio_path`` with word timestamps; VAD per ``config``."""
     detected, choice = platform_info.resolve_for_settings(config=config)
-    model = _load_model(info=detected, choice=choice)
+    model, choice = _load_model(info=detected, choice=choice, config=config)
     raw_segments, info = model.transcribe(
         str(audio_path),
         language=config.language,

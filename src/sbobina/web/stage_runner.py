@@ -11,6 +11,7 @@ from threading import Thread
 from sbobina.correction import CorrectorUnavailableError
 from sbobina.pipeline import CorrectionOutcome, correct_to_dir, transcribe_to_dir
 from sbobina.settings import Settings, settings
+from sbobina.transcriber import USER_NOTICE
 from sbobina.web.job_models import JobStage
 from sbobina.web.job_store import JobStore
 
@@ -30,6 +31,8 @@ class _Progress:
     started: float = field(init=False)
     last_write: float | None = field(default=None, init=False)
     audio_s: float = field(default=0.0, init=False)
+    notice: str | None = field(default=None, init=False)
+    fraction: float = field(default=0.0, init=False)
 
     def __post_init__(self) -> None:
         self.started = self.now()
@@ -49,7 +52,12 @@ class _Progress:
     def finish(self) -> None:
         self._write(fraction=1.0, timestamp=self.now())
 
+    def finish_write(self) -> None:
+        """Write now, keeping the last fraction: a notice must not wait 1 s."""
+        self._write(fraction=self.fraction, timestamp=self.now())
+
     def _write(self, fraction: float, timestamp: float) -> None:
+        self.fraction = fraction
         self.store.write_progress(
             job_id=self.job_id,
             progress={
@@ -57,9 +65,23 @@ class _Progress:
                 "progress": float(fraction),
                 "audio_s": self.audio_s,
                 "elapsed_s": max(0.0, timestamp - self.started),
+                "notice": self.notice,
             },
         )
         self.last_write = timestamp
+
+
+class _NoticeHandler(logging.Handler):
+    """Copies log records marked as user notices into the job's progress."""
+
+    def __init__(self, progress: _Progress) -> None:
+        super().__init__(level=logging.INFO)
+        self.progress = progress
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if getattr(record, USER_NOTICE, False):
+            self.progress.notice = record.getMessage()
+            self.progress.finish_write()
 
 
 def _find_audio(job_dir: Path) -> Path:
@@ -113,6 +135,18 @@ def _execute_stage(
     _check_outcome(outcome=outcome)
 
 
+def _execute_with_notices(
+    job_dir: Path, pipeline: StagePipeline | None, progress: _Progress
+) -> None:
+    app_logger = logging.getLogger("sbobina")
+    handler = _NoticeHandler(progress=progress)
+    app_logger.addHandler(handler)
+    try:
+        _execute_stage(job_dir=job_dir, pipeline=pipeline, progress=progress)
+    finally:
+        app_logger.removeHandler(handler)
+
+
 def _check_outcome(outcome: Path | CorrectionOutcome) -> None:
     if not isinstance(outcome, CorrectionOutcome):
         raise TypeError("Risultato della pipeline di correzione non valido")
@@ -151,7 +185,7 @@ def run_stage(
             stage=STAGES[stage],
             now=now,
         )
-        _execute_stage(job_dir=job_dir, pipeline=pipeline, progress=progress)
+        _execute_with_notices(job_dir=job_dir, pipeline=pipeline, progress=progress)
         progress.finish()
         return 0
     except CorrectorUnavailableError:

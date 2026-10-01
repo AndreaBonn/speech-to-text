@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import sys
 from collections.abc import Callable
@@ -7,6 +8,7 @@ from unittest.mock import patch
 import pytest
 from conftest import make_segment, make_transcript, make_word
 
+from sbobina import transcriber
 from sbobina.correction import CorrectionResult, CorrectorUnavailableError
 from sbobina.pipeline import CorrectionOutcome
 from sbobina.settings import Settings, settings
@@ -324,3 +326,26 @@ def test_module_entrypoint_runs_stage_and_reports_failure(job_dir: Path) -> None
         JobStore(data_dir=job_dir.parent.parent).read_progress(job_id=job_dir.name)
         == {}
     )
+
+
+def test_run_stage_user_notice_from_pipeline_reaches_progress(job_dir: Path) -> None:
+    store = JobStore(data_dir=job_dir.parent.parent)
+
+    def transcribe(
+        audio_path: Path,
+        output_dir: Path,
+        config: Settings,
+        on_progress: Callable[[float, float], None],
+    ) -> Path:
+        logging.getLogger("sbobina.transcriber").warning(
+            "GPU non utilizzabile", extra={transcriber.USER_NOTICE: True}
+        )
+        logging.getLogger("sbobina.transcriber").warning("solo per il log")
+        return output_dir / "audio.json"
+
+    assert (
+        stage_runner.run_stage(stage="transcribe", job_dir=job_dir, pipeline=transcribe)
+        == 0
+    )
+
+    assert store.read_progress(job_id=job_dir.name)["notice"] == "GPU non utilizzabile"

@@ -125,6 +125,7 @@ def test_events_progress_updates_emit_increasing_values(
                 "elapsed_s": None,
                 "speed": None,
                 "eta_s": None,
+                "notice": None,
             },
         )
         values = []
@@ -341,3 +342,17 @@ def test_events_job_deleted_mid_stream_ends_cleanly(
         "status": "deleted",
         "stage": None,
     }
+
+
+def test_progress_payload_forwards_notice(job_app: tuple[FastAPI, JobRecord]) -> None:
+    _, job = job_app
+    record = job.model_copy(update={"stage": JobStage.TRANSCRIBING})
+    progress: dict[str, JsonValue] = {"stage": "transcribing", "progress": 0.1}
+
+    with_notice = sse._progress_payload(
+        record=record, progress={**progress, "notice": "GPU non utilizzabile"}
+    )
+    without = sse._progress_payload(record=record, progress=progress)
+
+    assert with_notice["notice"] == "GPU non utilizzabile"
+    assert without["notice"] is None

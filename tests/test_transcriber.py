@@ -168,7 +168,7 @@ def test_transcribe_file_cpu_arguments_and_runtime_log(
 
 
 @pytest.mark.parametrize("system", ["linux", "windows"])
-def test_transcribe_file_cuda_preloads_only_on_linux(
+def test_transcribe_file_cuda_preloads_on_linux_and_windows(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     cpu_platform: PlatformInfo,
@@ -187,8 +187,128 @@ def test_transcribe_file_cuda_preloads_only_on_linux(
             tmp_path / "a.m4a", config=Settings(device="cuda", cpu_threads=3)
         )
     model.assert_called_once_with("large-v3", device="cuda", compute_type="float16")
-    assert preload.call_count == (1 if system == "linux" else 0)
+    assert preload.call_count == 1
     assert result.model == "large-v3"
+
+
+@pytest.mark.parametrize(
+    "whisper_model,expected_model", [("auto", "large-v3-turbo"), ("small", "small")]
+)
+def test_transcribe_file_cuda_runtime_error_falls_back_to_cpu(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cpu_platform: PlatformInfo,
+    caplog: pytest.LogCaptureFixture,
+    whisper_model: str,
+    expected_model: str,
+) -> None:
+    info = replace(cpu_platform, cuda_devices=1, cuda_libs_available=True)
+    monkeypatch.setattr(platform_info, "detect_platform", lambda: info)
+    with (
+        patch("faster_whisper.WhisperModel") as model,
+        caplog.at_level(logging.WARNING),
+    ):
+        model.return_value.transcribe.return_value = ([], SimpleNamespace(duration=0.0))
+        model.side_effect = [
+            RuntimeError("no CUDA-capable device is detected"),
+            model.return_value,
+        ]
+        result = transcriber.transcribe_file(
+            tmp_path / "a.m4a",
+            config=Settings(device="cuda", whisper_model=whisper_model),
+        )
+    assert result.model == expected_model
+    assert model.call_count == 2
+    second_call = model.call_args_list[1]
+    assert second_call.kwargs["device"] == "cpu"
+    assert second_call.kwargs["compute_type"] == "int8"
+    assert transcriber.GPU_FALLBACK_NOTICE in caplog.text
+    notices = [r for r in caplog.records if getattr(r, transcriber.USER_NOTICE, False)]
+    assert [record.getMessage() for record in notices] == [
+        transcriber.GPU_FALLBACK_NOTICE
+    ]
+
+
+def test_transcribe_file_cuda_runtime_error_on_explicit_cpu_reraises(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cpu_platform: PlatformInfo,
+) -> None:
+    monkeypatch.setattr(platform_info, "detect_platform", lambda: cpu_platform)
+    with (
+        patch("faster_whisper.WhisperModel", side_effect=RuntimeError("boom")),
+        pytest.raises(RuntimeError, match="boom"),
+    ):
+        transcriber.transcribe_file(tmp_path / "a.m4a", config=Settings(device="cpu"))
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Library libcublas.so.12 is not found or cannot be loaded",
+        "Library cudnn64_9.dll is not found or cannot be loaded",
+        "CUDA failed with error out of memory",
+    ],
+)
+def test_transcribe_file_cuda_library_errors_fall_back(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cpu_platform: PlatformInfo,
+    message: str,
+) -> None:
+    info = replace(cpu_platform, cuda_devices=1, cuda_libs_available=True)
+    monkeypatch.setattr(platform_info, "detect_platform", lambda: info)
+    with patch("faster_whisper.WhisperModel") as model:
+        model.return_value.transcribe.return_value = ([], SimpleNamespace(duration=0.0))
+        model.side_effect = [RuntimeError(message), model.return_value]
+        transcriber.transcribe_file(tmp_path / "a.m4a", config=Settings(device="cuda"))
+    assert model.call_args_list[1].kwargs["device"] == "cpu"
+
+
+def test_transcribe_file_cuda_preload_oserror_falls_back_to_cpu(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cpu_platform: PlatformInfo,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # ctypes.CDLL raises OSError when a wheel .so exists but cannot be dlopen()ed.
+    info = replace(cpu_platform, cuda_devices=1, cuda_libs_available=True)
+    monkeypatch.setattr(platform_info, "detect_platform", lambda: info)
+
+    def broken_preload() -> list[Path]:
+        raise OSError("libcudnn_ops.so.9: undefined symbol")
+
+    monkeypatch.setattr(transcriber, "preload_cuda_libraries", broken_preload)
+    with (
+        patch("faster_whisper.WhisperModel") as model,
+        caplog.at_level(logging.WARNING),
+    ):
+        model.return_value.transcribe.return_value = ([], SimpleNamespace(duration=0.0))
+        transcriber.transcribe_file(tmp_path / "a.m4a", config=Settings(device="cuda"))
+    assert model.call_count == 1
+    assert model.call_args.kwargs["device"] == "cpu"
+    assert transcriber.GPU_FALLBACK_NOTICE in caplog.text
+
+
+def test_transcribe_file_cuda_non_gpu_error_reraises_without_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cpu_platform: PlatformInfo,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    info = replace(cpu_platform, cuda_devices=1, cuda_libs_available=True)
+    monkeypatch.setattr(platform_info, "detect_platform", lambda: info)
+    missing = "Unable to open file 'model.bin' in model '/models/large-v3'"
+    with (
+        patch(
+            "faster_whisper.WhisperModel", side_effect=RuntimeError(missing)
+        ) as model,
+        caplog.at_level(logging.WARNING),
+        pytest.raises(RuntimeError, match="model.bin"),
+    ):
+        transcriber.transcribe_file(tmp_path / "a.m4a", config=Settings(device="cuda"))
+    assert model.call_count == 1
+    assert transcriber.GPU_FALLBACK_NOTICE not in caplog.text
 
 
 def test_transcribe_file_gpu_without_wheels_warns_and_uses_cpu(
