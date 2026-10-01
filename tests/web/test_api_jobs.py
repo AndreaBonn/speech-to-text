@@ -1,0 +1,171 @@
+import io
+import wave
+from collections.abc import Iterator
+from pathlib import Path
+from typing import cast
+from unittest.mock import Mock
+
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from sbobina.settings import Settings
+from sbobina.web.app import create_app
+from sbobina.web.job_models import JobConfig, JobStatus
+from sbobina.web.job_store import JobStore
+from sbobina.web.stage_runner import _find_audio
+
+BASE_URL = "http://127.0.0.1:8765"
+JOBS_URL = "/api/v1/jobs"
+MIB = 1024 * 1024
+
+
+@pytest.fixture
+def audio() -> bytes:
+    buffer = io.BytesIO()
+    with wave.open(f=buffer, mode="wb") as output:
+        output.setnchannels(nchannels=1)
+        output.setsampwidth(sampwidth=2)
+        output.setframerate(framerate=8000)
+        output.writeframes(data=b"\x00\x00" * 800)
+    return buffer.getvalue()
+
+
+@pytest.fixture
+def client(tmp_path: Path) -> Iterator[TestClient]:
+    app = create_app(
+        settings=Settings(web_max_upload_mb=1, beam_size=7), data_dir=tmp_path
+    )
+    app.state.supervisor.submit = Mock()
+    # Without lifespan, no worker can start real transcription stages.
+    transport = TestClient(app=app, base_url=BASE_URL, headers={"Origin": BASE_URL})
+    yield transport
+    transport.close()
+
+
+def test_upload_valid_audio_creates_queued_job(
+    client: TestClient, tmp_path: Path, audio: bytes
+) -> None:
+    response = client.post(
+        url=JOBS_URL,
+        files={"file": ("../../VOICE.WAV", audio, "audio/wav")},
+        data={"subject": "Lezione", "correct": "true", "vad_filter": "true"},
+    )
+
+    assert response.status_code == 201
+    record = response.json()["data"]
+    cast(FastAPI, client.app).state.supervisor.submit.assert_called_once_with(
+        job_id=record["id"]
+    )
+    assert record["status"] == "queued"
+    assert record["config"]["beam_size"] == 7
+    assert record["config"]["subject"] == "Lezione"
+    assert record["config"]["correct"] is True
+    assert record["config"]["vad_filter"] is True
+    directory = tmp_path / "jobs" / record["id"]
+    assert _find_audio(job_dir=directory) == directory / "audio.wav"
+    assert (directory / "audio.wav").read_bytes() == audio
+    assert sorted(path.name for path in directory.iterdir()) == [
+        "audio.wav",
+        "job.json",
+    ]
+    assert client.get(url=f"{JOBS_URL}/{record['id']}").json()["data"] == record
+
+
+@pytest.mark.parametrize("filename", ["document.pdf", "fake.mp3", "empty.wav"])
+def test_upload_invalid_file_returns_field_error_and_no_residue(
+    client: TestClient, tmp_path: Path, filename: str
+) -> None:
+    response = client.post(
+        url=JOBS_URL, files={"file": (filename, b"not audio", "audio/mpeg")}
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["details"][0]["field"] == "file"
+    assert list((tmp_path / "jobs").glob("*")) == []
+
+
+@pytest.mark.parametrize("content_length", [str(2 * MIB), "0"])
+def test_upload_over_limit_removes_attempt_directory(
+    client: TestClient, tmp_path: Path, content_length: str
+) -> None:
+    response = client.post(
+        url=JOBS_URL,
+        files={"file": ("large.wav", b"x" * (2 * MIB), "audio/wav")},
+        headers={"Content-Length": content_length},
+    )
+
+    assert response.status_code == 413
+    assert response.json()["error"]["message"] == "Il file supera il limite consentito"
+    assert list((tmp_path / "jobs").glob("*")) == []
+
+
+def test_upload_invalid_config_returns_422_without_creating_job(
+    client: TestClient, tmp_path: Path, audio: bytes
+) -> None:
+    response = client.post(
+        url=JOBS_URL, files={"file": ("a.wav", audio)}, data={"beam_size": "0"}
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["details"][0]["field"] == "body.beam_size"
+    assert list((tmp_path / "jobs").glob("*")) == []
+
+
+def test_list_jobs_pagination_returns_correct_meta(
+    client: TestClient, tmp_path: Path
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    records = [store.create(config=JobConfig()) for _ in range(3)]
+
+    response = client.get(url=JOBS_URL, params={"page": 2, "per_page": 2})
+
+    assert response.status_code == 200
+    assert response.json()["meta"] == {
+        "page": 2,
+        "per_page": 2,
+        "total": 3,
+        "total_pages": 2,
+    }
+    assert [item["id"] for item in response.json()["data"]] == [str(records[0].id)]
+    assert client.get(url=JOBS_URL).json()["meta"]["per_page"] == 20
+    assert client.get(url=JOBS_URL, params={"page": 0}).status_code == 422
+
+
+def test_get_job_missing_id_returns_404(client: TestClient) -> None:
+    response = client.get(url=f"{JOBS_URL}/missing")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
+@pytest.mark.parametrize("status", [JobStatus.DONE, JobStatus.QUEUED])
+def test_cancel_job_returns_conflict_or_cancelled(
+    client: TestClient, tmp_path: Path, status: JobStatus
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig())
+    store.update(record=record.model_copy(update={"status": status}))
+
+    response = client.post(url=f"{JOBS_URL}/{record.id}/cancel")
+
+    assert response.status_code == (409 if status == JobStatus.DONE else 200)
+    if status == JobStatus.QUEUED:
+        assert response.json()["data"]["status"] == "cancelled"
+        assert store.get(job_id=str(record.id)).status == JobStatus.CANCELLED
+
+
+@pytest.mark.parametrize("status", list(JobStatus))
+def test_delete_job_protects_active_jobs_and_removes_terminal_jobs(
+    client: TestClient, tmp_path: Path, status: JobStatus
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig())
+    store.update(record=record.model_copy(update={"status": status}))
+    directory = store.jobs_dir / str(record.id)
+    (directory / "audio.wav").write_bytes(data=b"audio")
+
+    response = client.delete(url=f"{JOBS_URL}/{record.id}")
+
+    active = status in (JobStatus.RUNNING, JobStatus.QUEUED)
+    assert response.status_code == (409 if active else 204)
+    assert directory.exists() == active

@@ -110,11 +110,11 @@ FileResponse Range): URL citati nei commenti dove la scelta non è ovvia.
 
 **[B-6] T016-T019**
 
-- [ ] **T016** `web/gpu_release.py`: `unload_ollama_models(host)` (`ps()` + `generate(model,
+- [x] **T016** `web/gpu_release.py`: `unload_ollama_models(host)` (`ps()` + `generate(model,
   keep_alive=0)`), chiamato prima di ogni stage transcribe; Ollama giù → WARNING. Plan §2.
   Rischio: medio. verify: client finto registra `generate(model="qwen3.5:9b", keep_alive=0)`;
   manuale: dopo `sbobina correggi`, la funzione rende `ollama ps` vuoto.
-- [ ] **T017** `web/api_jobs.py`: `POST /api/v1/jobs` (multipart, streaming su disco plan §5),
+- [x] **T017** `web/api_jobs.py`: `POST /api/v1/jobs` (multipart, streaming su disco plan §5),
   `GET /api/v1/jobs` paginato, `GET /jobs/{id}`, `POST /jobs/{id}/cancel`, `DELETE /jobs/{id}`.
   Rischio: medio. verify: wav fixture → 201 queued; `.pdf` → 422 `field=file`; testo rinominato
   `.mp3` → 422; limite 1 MB e upload da 2 MB → 413 senza cartella residua; DELETE su running → 409.

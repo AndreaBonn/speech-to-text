@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from functools import partial
 from pathlib import Path
 
 import anyio.to_thread
@@ -9,8 +10,10 @@ from starlette.exceptions import HTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from sbobina.settings import LOOPBACK_HOSTS, Settings
+from sbobina.web.api_jobs import router as jobs_router
 from sbobina.web.api_system import create_system_router
 from sbobina.web.errors import AppError
+from sbobina.web.gpu_release import unload_ollama_models
 from sbobina.web.job_store import JobStore
 from sbobina.web.middleware import OriginMiddleware, web_origin
 from sbobina.web.responses import (
@@ -19,6 +22,7 @@ from sbobina.web.responses import (
     request_validation_handler,
 )
 from sbobina.web.supervisor import Supervisor, SupervisorOptions
+from sbobina.web.upload_limit import UploadLimitMiddleware, upload_limit_bytes
 
 # Starlette's TrustedHostMiddleware matches the Host header as parsed, which
 # keeps brackets around IPv6 literals (RFC 3986 host rule): "::1" must be
@@ -51,12 +55,20 @@ def create_app(
         data_dir=data_dir if data_dir is not None else settings.data_dir
     )
     app.state.supervisor = Supervisor(
-        job_store=app.state.job_store, options=supervisor_options
+        job_store=app.state.job_store,
+        before_transcribe=partial(unload_ollama_models, host=settings.ollama_host),
+        options=supervisor_options,
     )
     app.add_middleware(OriginMiddleware, origin=web_origin(settings=settings))
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_TRUSTED_HOSTS)
+    app.add_middleware(
+        UploadLimitMiddleware,
+        path="/api/v1/jobs",
+        max_bytes=upload_limit_bytes(max_upload_mb=settings.web_max_upload_mb),
+    )
     app.add_exception_handler(RequestValidationError, request_validation_handler)
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(HTTPException, http_error_handler)
     app.include_router(create_system_router(settings=settings))
+    app.include_router(jobs_router)
     return app
