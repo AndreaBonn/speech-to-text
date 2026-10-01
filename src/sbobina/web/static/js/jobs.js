@@ -29,7 +29,11 @@
   var dropzoneFileSize = document.getElementById("dropzone-file-size");
   var fileError = document.getElementById("file-error");
   var correctCheckbox = document.getElementById("correct");
-  var ollamaModelInput = document.getElementById("ollama_model");
+  var ollamaModelSelect = document.getElementById("ollama_model");
+  var ollamaModelOther = document.getElementById("ollama_model_other");
+  var whisperModelSelect = document.getElementById("whisper_model");
+  // Must match model_catalog.OTHER_OLLAMA_VALUE.
+  var OTHER_OLLAMA_VALUE = "__altro__";
   var submitButton = document.getElementById("submit-button");
   var formError = document.getElementById("form-error");
   var queueEl = document.getElementById("queue");
@@ -112,6 +116,10 @@
       return;
     }
     var input = document.getElementById(bare);
+    // The free-text Ollama name, not the select, holds the rejected value.
+    if (bare === "ollama_model" && isOtherOllamaModel()) {
+      input = ollamaModelOther;
+    }
     if (input) {
       input.classList.add("is-invalid");
     }
@@ -205,13 +213,49 @@
     dropzone.classList.remove("dropzone--invalid");
   });
 
-  // ---------- correct <-> ollama_model ----------
+  // ---------- model selects: profile + free Ollama name ----------
+
+  function showModelProfile(select) {
+    var container = document.getElementById(select.id + "-profile");
+    Array.prototype.forEach.call(
+      container.querySelectorAll("[data-profile-for]"),
+      function (item) {
+        item.hidden = item.getAttribute("data-profile-for") !== select.value;
+      }
+    );
+  }
+
+  function isOtherOllamaModel() {
+    return ollamaModelSelect.value === OTHER_OLLAMA_VALUE;
+  }
 
   function syncOllamaModelDisabled() {
-    ollamaModelInput.disabled = !correctCheckbox.checked;
+    ollamaModelSelect.disabled = !correctCheckbox.checked;
+    ollamaModelOther.hidden = !isOtherOllamaModel();
+    ollamaModelOther.disabled = !correctCheckbox.checked || !isOtherOllamaModel();
+  }
+
+  function selectedOllamaModel() {
+    return isOtherOllamaModel()
+      ? ollamaModelOther.value.trim()
+      : ollamaModelSelect.value;
   }
 
   correctCheckbox.addEventListener("change", syncOllamaModelDisabled);
+  ollamaModelSelect.addEventListener("change", function () {
+    showModelProfile(ollamaModelSelect);
+    syncOllamaModelDisabled();
+    if (isOtherOllamaModel()) {
+      ollamaModelOther.focus();
+    }
+  });
+  ollamaModelOther.addEventListener("input", function () {
+    document.getElementById("ollama_model-error").hidden = true;
+    ollamaModelOther.classList.remove("is-invalid");
+  });
+  whisperModelSelect.addEventListener("change", function () {
+    showModelProfile(whisperModelSelect);
+  });
   syncOllamaModelDisabled();
 
   // ---------- submit ----------
@@ -241,8 +285,8 @@
       data.append("subject", subject);
     }
     data.append("correct", String(correctCheckbox.checked));
-    data.append("ollama_model", ollamaModelInput.value.trim());
-    data.append("whisper_model", document.getElementById("whisper_model").value);
+    data.append("ollama_model", selectedOllamaModel());
+    data.append("whisper_model", whisperModelSelect.value);
     data.append("beam_size", document.getElementById("beam_size").value);
     data.append(
       "vad_filter",

@@ -68,5 +68,5 @@ def test_endpoints_share_ollama_payload(tmp_path: Path, path: str) -> None:
     assert response.json()["data"]["ollama"] == {
         "status": "ready",
         "message": "Ollama è pronto.",
-        "models": [{"model": "qwen3.5:9b", "size": 1024}],
+        "models": [{"model": "qwen3.5:9b", "size": 1024, "parameter_size": None}],
     }

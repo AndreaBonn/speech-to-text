@@ -1,8 +1,12 @@
 from pathlib import Path
+from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
+from pydantic import JsonValue
 
 from sbobina.settings import Settings
+from sbobina.web import pages
 from sbobina.web.app import create_app
 from sbobina.web.job_models import JobConfig
 from sbobina.web.job_store import JobStore
@@ -19,6 +23,72 @@ FORM_FIELD_NAMES = (
     'name="condition_on_previous_text"',
     'name="uncertain_threshold"',
 )
+
+
+OLLAMA_READY: dict[str, JsonValue] = {
+    "status": "ready",
+    "message": "Ollama è pronto.",
+    "models": [{"model": "qwen3.5:2b", "size": 1, "parameter_size": "2B"}],
+}
+WHISPER_MODELS: list[dict[str, JsonValue]] = [
+    {
+        "name": "large-v3-turbo",
+        "downloaded": True,
+        "recommended_gpu": False,
+        "recommended_cpu": True,
+    },
+    {
+        "name": "medium",
+        "downloaded": False,
+        "recommended_gpu": False,
+        "recommended_cpu": False,
+    },
+]
+
+
+@pytest.fixture(autouse=True)
+def _models() -> object:
+    """Keep the index page off the real Ollama server and Hugging Face cache."""
+    with (
+        patch.object(pages, "ollama_status", return_value=OLLAMA_READY),
+        patch.object(pages, "list_whisper_models", return_value=WHISPER_MODELS),
+    ):
+        yield
+
+
+def test_index_lists_models_with_state_and_profile(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(ollama_model="qwen3.5:9b"), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/").text
+
+    assert ">large-v3-turbo · scaricato · consigliato</option>" in body
+    assert ">medium · da scaricare, 1,5 GB</option>" in body
+    assert (
+        '<option value="qwen3.5:9b" selected>qwen3.5:9b · da scaricare all&#39;avvio'
+        in body
+    )
+    assert ">qwen3.5:2b · installato</option>" in body
+    assert '<option value="__altro__">Altro modello…</option>' in body
+    assert "Precisione: bassa · Velocità: alta" in body
+    assert 'data-profile-for="auto">' in body
+    assert 'data-profile-for="medium" hidden>' in body
+
+
+def test_index_tells_why_ollama_models_are_missing(tmp_path: Path) -> None:
+    down: dict[str, JsonValue] = {
+        "status": "not_running",
+        "message": "Ollama non è disponibile. Avvia ollama serve.",
+        "models": [],
+    }
+    app = create_app(settings=Settings(ollama_model="qwen3.5:9b"), data_dir=tmp_path)
+    with (
+        patch.object(pages, "ollama_status", return_value=down),
+        TestClient(app=app, base_url=BASE_URL) as client,
+    ):
+        body = client.get("/").text
+
+    assert "Ollama non è disponibile. Avvia ollama serve." in body
+    assert '<option value="qwen3.5:9b" selected>qwen3.5:9b</option>' in body
 
 
 def test_index_returns_form_with_expected_fields(tmp_path: Path) -> None:

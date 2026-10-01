@@ -291,6 +291,30 @@ body {
   color: var(--color-ink-3);
 }
 
+.model-other {
+  display: block;
+  margin-top: var(--space-xs);
+}
+
+.model-other[hidden] {
+  display: none;
+}
+
+.model-profile__item {
+  max-width: 28rem;
+  margin: var(--space-xs) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+.model-profile__line {
+  display: block;
+}
+
+.model-profile__line:first-child {
+  font-weight: var(--weight-medium);
+}
+
 .field__error {
   margin: var(--space-2xs) 0 0;
   font-size: var(--text-sm);

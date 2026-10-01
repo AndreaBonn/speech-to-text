@@ -5,11 +5,13 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from faster_whisper.utils import available_models
+from pydantic import JsonValue
 
+from sbobina.model_catalog import ollama_options, whisper_options
 from sbobina.web.errors import NotFoundError
 from sbobina.web.job_models import JobRecord, JobStatus
 from sbobina.web.job_store import JobStore
+from sbobina.web.model_service import list_whisper_models, ollama_status
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -102,10 +104,20 @@ def _reader_title(record: JobRecord) -> str:
     return f"Lezione del {record.created_at.strftime('%d/%m/%Y')}"
 
 
+def _installed_ollama_models(
+    status: dict[str, JsonValue],
+) -> list[dict[str, JsonValue]]:
+    models = status["models"]
+    if not isinstance(models, list):
+        return []
+    return [model for model in models if isinstance(model, dict)]
+
+
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request, store: JobStoreDep) -> HTMLResponse:
     """Upload form plus the live queue of queued and running jobs."""
     settings = request.app.state.settings
+    ollama = ollama_status(host=settings.ollama_host)
     defaults = {
         "correct": False,
         "ollama_model": settings.ollama_model,
@@ -123,7 +135,17 @@ def index(request: Request, store: JobStoreDep) -> HTMLResponse:
         store=store,
         page_title="Nuova trascrizione",
         defaults=defaults,
-        whisper_models=available_models(),
+        whisper_options=whisper_options(
+            models=list_whisper_models(settings=settings),
+            gpu_model=settings.whisper_model_gpu,
+            cpu_model=settings.whisper_model_cpu,
+        ),
+        ollama_options=ollama_options(
+            installed=_installed_ollama_models(status=ollama),
+            default_model=settings.ollama_model,
+            is_ready=ollama["status"] == "ready",
+        ),
+        ollama_message=None if ollama["status"] == "ready" else ollama["message"],
     )
 
 

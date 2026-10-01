@@ -1,5 +1,17 @@
 {% extends "base.html" %}
 
+{% macro model_profiles(field_id, options, selected) %}
+<div id="{{ field_id }}-profile" class="model-profile" data-profiles-for="{{ field_id }}">
+  {% for option in options %}
+  <p class="model-profile__item" data-profile-for="{{ option.value }}"{% if option.value != selected %} hidden{% endif %}>
+    {% for line in option.lines %}
+    <span class="model-profile__line">{{ line }}</span>
+    {% endfor %}
+  </p>
+  {% endfor %}
+</div>
+{% endmacro %}
+
 {% block content %}
 <div class="nuova-layout">
 <section class="upload-card" aria-label="Carica una lezione">
@@ -36,14 +48,32 @@
 
     <div class="field">
       <label class="field__label" for="ollama_model">Modello Ollama</label>
-      <input
+      <select
         id="ollama_model"
-        class="text-input"
-        type="text"
+        class="select-input"
         name="ollama_model"
-        value="{{ defaults.ollama_model }}"
+        aria-describedby="ollama_model-profile"
+        disabled
+      >
+        {% for option in ollama_options %}
+        <option value="{{ option.value }}"{% if option.value == defaults.ollama_model %} selected{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+      </select>
+      <input
+        id="ollama_model_other"
+        class="text-input model-other"
+        type="text"
+        aria-label="Nome del modello Ollama"
+        placeholder="Es. qwen3.5:4b"
+        autocomplete="off"
+        spellcheck="false"
+        hidden
         disabled
       />
+      {{ model_profiles(field_id="ollama_model", options=ollama_options, selected=defaults.ollama_model) }}
+      {% if ollama_message %}
+      <p class="field__helper">{{ ollama_message }}</p>
+      {% endif %}
       <p class="field__helper">Usato solo se la correzione è attiva.</p>
       <p id="ollama_model-error" class="field__error" hidden></p>
     </div>
@@ -66,12 +96,17 @@
       <div class="disclosure__body">
         <div class="field">
           <label class="field__label" for="whisper_model">Modello Whisper</label>
-          <select id="whisper_model" class="select-input" name="whisper_model">
-            <option value="auto" selected>Automatico</option>
-            {% for model in whisper_models %}
-            <option value="{{ model }}">{{ model }}</option>
+          <select
+            id="whisper_model"
+            class="select-input"
+            name="whisper_model"
+            aria-describedby="whisper_model-profile"
+          >
+            {% for option in whisper_options %}
+            <option value="{{ option.value }}"{% if option.value == defaults.whisper_model %} selected{% endif %}>{{ option.label }}</option>
             {% endfor %}
           </select>
+          {{ model_profiles(field_id="whisper_model", options=whisper_options, selected=defaults.whisper_model) }}
         </div>
 
         <div class="field">

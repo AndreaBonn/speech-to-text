@@ -137,9 +137,29 @@ def test_ollama_status_ready_without_local_executable(
     assert result == {
         "status": "ready",
         "message": "Ollama è pronto.",
-        "models": models,
+        "models": [{**model, "parameter_size": None} for model in models],
     }
     factory.return_value.__exit__.assert_called_once()
+
+
+def test_ollama_status_reports_parameter_size() -> None:
+    response = ollama.ListResponse.model_validate(
+        {
+            "models": [
+                {
+                    "model": "qwen3.5:9b",
+                    "size": 1024,
+                    "details": {"parameter_size": "9.7B"},
+                }
+            ]
+        }
+    )
+    with patch.object(ollama, "Client") as factory:
+        factory.return_value.__enter__.return_value.list.return_value = response
+        result = model_service.ollama_status(host=HOST)
+    assert result["models"] == [
+        {"model": "qwen3.5:9b", "size": 1024, "parameter_size": "9.7B"}
+    ]
 
 
 @pytest.mark.parametrize(

@@ -82,5 +82,14 @@ def ollama_status(host: str) -> dict[str, JsonValue]:
     return {
         "status": "ready",
         "message": "Ollama è pronto.",
-        "models": [{"model": model.model, "size": model.size} for model in models],
+        "models": [
+            {
+                "model": model.model,
+                "size": model.size,
+                "parameter_size": model.details.parameter_size
+                if model.details
+                else None,
+            }
+            for model in models
+        ],
     }
