@@ -176,22 +176,22 @@ rilevati e segnalati (permessi admin / download lunghi gestiti dalla UI con avan
 
 **[B-9] T030-T032**
 
-- [ ] **T030** `web/model_service.py` Whisper: elenco `available_models()` deduplicato per repo_id,
+- [x] **T030** `web/model_service.py` Whisper: elenco `available_models()` deduplicato per repo_id,
   stato via `download_model(name, local_files_only=True)` catturando l'eccezione specifica di hub
   (tipo da verificare). Rischio: medio. verify: hub mockato → presente True / assente False;
   `large` e `large-v3` una riga con alias.
-- [ ] **T031** Download Whisper: `snapshot_download(repo_id, allow_patterns=...)` in thread
+- [x] **T031** Download Whisper: `snapshot_download(repo_id, allow_patterns=...)` in thread
   `DownloadManager`, totale da `dry_run=True`, byte dalla cache, fallback indeterminato. Plan §8.
   Rischio: alto. verify: snapshot finto che scrive file progressivi → `completed/total` crescenti;
   manuale: download di `tiny` con barra e stato finale "scaricato".
-- [ ] **T032** Ollama: `ollama_status()` → `not_installed | not_running | ready` (anche in
+- [x] **T032** Ollama: `ollama_status()` → `not_installed | not_running | ready` (anche in
   `/api/v1/system`); `list()`; `pull(stream=True)` con progresso sommato sui digest; Ollama giù →
   stato con messaggio, non 500. Rischio: medio. verify: 3 `ProgressResponse` finte → 0.33/0.66/1.0;
   (which None, host giù) → not_installed; (which ok, host giù) → not_running; (host su) → ready.
 
 **[B-10] T033-T034**
 
-- [ ] **T033** `GET /api/v1/models`, `POST /api/v1/models/downloads`, SSE
+- [x] **T033** `GET /api/v1/models`, `POST /api/v1/models/downloads`, SSE
   `/api/v1/models/downloads/events`; download duplicato → 409. Rischio: basso.
   verify: POST due volte `tiny` → 202 poi 409.
 - [ ] **T034** `templates/models.html` + `static/models.js`: tabelle Whisper/Ollama, badge device,

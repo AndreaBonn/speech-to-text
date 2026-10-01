@@ -16,6 +16,7 @@ from sbobina.web.api_models import create_models_router
 from sbobina.web.api_system import create_system_router
 from sbobina.web.api_wer import WER_REQUEST_LIMIT_BYTES
 from sbobina.web.api_wer import router as wer_router
+from sbobina.web.downloads import DownloadManager
 from sbobina.web.errors import AppError
 from sbobina.web.gpu_release import unload_ollama_models
 from sbobina.web.job_store import JobStore
@@ -64,6 +65,7 @@ def create_app(
         before_transcribe=partial(unload_ollama_models, host=settings.ollama_host),
         options=supervisor_options,
     )
+    app.state.download_manager = DownloadManager(settings=settings)
     app.add_middleware(OriginMiddleware, origin=web_origin(settings=settings))
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_TRUSTED_HOSTS)
     app.add_middleware(
