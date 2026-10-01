@@ -7,6 +7,7 @@ from sbobina import llm_corrector
 from sbobina.cli import main
 from sbobina.correction import Corrector, CorrectorUnavailableError, Edit
 from sbobina.models import load_transcript, save_transcript
+from sbobina.settings import Settings
 
 
 @pytest.fixture
@@ -161,3 +162,31 @@ def test_correggi_interrupted_midway_saves_done_work_and_returns_error(
     report = path.with_name("lezione.correzioni.md").read_text(encoding="utf-8")
     assert "Correzione interrotta a [01:40:00]" in report
     assert len(load_transcript(path.with_name("lezione.corretto.json")).words) == 300
+
+
+@pytest.mark.parametrize(
+    ("argv", "port", "browser"),
+    [(["web"], 8765, True), (["web", "--port", "9000", "--no-browser"], 9000, False)],
+)
+def test_web_port_option_reaches_server_config(
+    monkeypatch: pytest.MonkeyPatch, argv: list[str], port: int, browser: bool
+) -> None:
+    from sbobina.web import launcher
+
+    calls: list[tuple[int, bool]] = []
+
+    def fake_run_server(config: Settings, open_browser: bool) -> int:
+        calls.append((config.web_port, open_browser))
+        return 0
+
+    monkeypatch.setattr(launcher, "run_server", fake_run_server)
+    monkeypatch.setenv("SBOBINA_WEB_PORT", "8765")
+
+    assert main(argv) == 0
+    assert calls == [(port, browser)]
+
+
+@pytest.mark.parametrize("port", ["0", "70000", "abc"])
+def test_web_invalid_port_is_rejected(port: str) -> None:
+    with pytest.raises(SystemExit):
+        main(["web", "--port", port])

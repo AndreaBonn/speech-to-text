@@ -9,11 +9,15 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "av>=17,<19",
+    "fastapi>=0.142.2",
     "faster-whisper>=1.2.1",
     "httpx>=0.28.1",
+    "jinja2>=3.1.6",
     "jiwer>=4.0.0",
     "ollama>=0.6.3",
     "pydantic-settings>=2.15.0",
+    "python-multipart>=0.0.32",
+    "uvicorn>=0.54.0",
 ]
 
 [project.scripts]

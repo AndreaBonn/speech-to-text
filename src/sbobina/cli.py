@@ -15,6 +15,20 @@ from sbobina.wer import compute_wer
 logger = logging.getLogger("sbobina")
 
 INPUT_FILE_ARGS = ("audio", "trascrizione", "riferimento", "ipotesi")
+MIN_PORT, MAX_PORT = 1, 65535
+
+
+def parse_port(value: str) -> int:
+    """Argparse type for ``--port``: a TCP port in ``[1, 65535]``."""
+    try:
+        port = int(value)
+    except ValueError as err:
+        raise argparse.ArgumentTypeError(f"non è un numero: {value}") from err
+    if not MIN_PORT <= port <= MAX_PORT:
+        raise argparse.ArgumentTypeError(
+            f"deve essere fra {MIN_PORT} e {MAX_PORT}: {value}"
+        )
+    return port
 
 
 def parse_threshold(value: str) -> float:
@@ -108,6 +122,15 @@ def cmd_correggi(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_web(args: argparse.Namespace) -> int:
+    from sbobina.web.launcher import run_server  # lazy: other commands skip FastAPI
+
+    config = settings
+    if args.port is not None:
+        config = settings.model_copy(update={"web_port": args.port})
+    return run_server(config=config, open_browser=not args.no_browser)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sbobina", description="Sbobinature di lezioni"
@@ -138,7 +161,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     wer.set_defaults(handler=cmd_wer)
     _add_correggi_parser(commands)
+    _add_web_parser(commands)
     return parser
+
+
+def _add_web_parser(
+    commands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    web = commands.add_parser("web", help="Avvia l'interfaccia web locale")
+    web.add_argument("--port", type=parse_port, default=None, help="Porta del server")
+    web.add_argument("--no-browser", action="store_true", help="Non aprire il browser")
+    web.set_defaults(handler=cmd_web)
 
 
 def _add_correggi_parser(

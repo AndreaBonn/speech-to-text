@@ -1,7 +1,11 @@
+from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+Device = Literal["auto", "cuda", "cpu"]
+LOOPBACK_HOSTS = ("127.0.0.1", "::1", "localhost")
 
 # CTranslate2 quantization types: https://opennmt.net/CTranslate2/quantization.html
 ComputeType = Literal[
@@ -28,7 +32,7 @@ class Settings(BaseSettings):
     whisper_model: str = "auto"
     whisper_model_gpu: str = "large-v3"
     whisper_model_cpu: str = "large-v3-turbo"
-    device: Literal["auto", "cuda", "cpu"] = "auto"
+    device: Device = "auto"
     compute_type: ComputeType = "auto"
     cpu_threads: int = Field(default=0, ge=0)
     language: str = "it"
@@ -45,6 +49,17 @@ class Settings(BaseSettings):
     uncertain_threshold: float = Field(default=0.7, gt=0.0, le=1.0)
     paragraph_gap_s: float = Field(default=2.0, gt=0.0)
     paragraph_max_s: float = Field(default=120.0, gt=0.0)
+    web_host: str = "127.0.0.1"
+    web_port: int = 8765
+    data_dir: Path = Path("data")
+    web_max_upload_mb: int = 1024
+
+    @field_validator("web_host")
+    @classmethod
+    def validate_web_host(cls, value: str) -> str:
+        if value not in LOOPBACK_HOSTS:
+            raise ValueError("L'host web deve essere 127.0.0.1, ::1 o localhost")
+        return value
 
 
 settings = Settings()

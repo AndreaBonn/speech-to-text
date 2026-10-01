@@ -72,16 +72,16 @@ FileResponse Range): URL citati nei commenti dove la scelta non è ovvia.
 
 **[B-4] T010-T012**
 
-- [ ] **T010** Settings web (`web_host` validato loopback, `web_port=8765`, `data_dir=Path("data")`,
+- [x] **T010** Settings web (`web_host` validato loopback, `web_port=8765`, `data_dir=Path("data")`,
   `web_max_upload_mb=1024`) + `web/job_models.py` (`JobStatus`: queued, running, done, failed,
   cancelled, interrupted; `JobStage`; `JobConfig` plan §12; `JobRecord`). Rischio: basso.
   verify: `Settings(web_host="0.0.0.0")` → ValidationError; `JobConfig(beam_size=0,
   uncertain_threshold=1.5, whisper_model="xl")` → 3 errori con `loc` per campo.
-- [ ] **T011** `web/job_store.py`: create (uuid4), get, list paginato (`created_at` desc), update
+- [x] **T011** `web/job_store.py`: create (uuid4), get, list paginato (`created_at` desc), update
   atomico (tmp + `os.replace`), delete, `read_progress`/`write_progress`. Rischio: basso.
   verify: 25 job su `tmp_path`, `list(page=3, per_page=10)` → 5 elementi, total 25, total_pages 3;
   id non-uuid → `NotFoundError` senza accesso al filesystem.
-- [ ] **T012** `web/app.py` `create_app(...)`, `web/responses.py` (envelope, 422 con
+- [x] **T012** `web/app.py` `create_app(...)`, `web/responses.py` (envelope, 422 con
   `details[{field,message}]`), middleware host/origin plan §9, `web/api_system.py`
   (`GET /api/v1/system` da `detect_platform` + `resolve_runtime`), sottocomando
   `sbobina web [--port] [--no-browser]` plan §11. Rischio: medio.
