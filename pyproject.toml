@@ -3,6 +3,8 @@ name = "sbobina"
 version = "0.1.0"
 description = "Sbobinature fedeli di lezioni registrate, tutto in locale"
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 authors = [
     { name = "AndreaBonn", email = "andreabonacci95@protonmail.com" }
 ]
