@@ -1,15 +1,19 @@
 import json
+import logging
 
 import ollama
 import pytest
 
 from sbobina.correction import CorrectorUnavailableError, Edit, InvalidResponseError
 from sbobina.llm_corrector import (
+    ModelDownloadError,
     build_system_prompt,
     build_user_message,
+    ensure_model,
     make_ollama_corrector,
     parse_response,
 )
+from sbobina.notices import USER_NOTICE
 
 
 def test_parse_response_maps_italian_keys_to_edits() -> None:
@@ -93,3 +97,85 @@ def test_ollama_corrector_truncated_body_is_an_invalid_response(
 
     with pytest.raises(InvalidResponseError):
         corrector("testo", "")
+
+
+class _FakeOllama:
+    """Ollama client double: ``installed`` models answer ``show``, the rest 404."""
+
+    def __init__(self, installed: set[str], pull_error: Exception | None = None):
+        self.installed = installed
+        self.pull_error = pull_error
+        self.pulled: list[str] = []
+
+    def __call__(self, host: str) -> "_FakeOllama":
+        return self
+
+    def show(self, model: str) -> object:
+        if model not in self.installed:
+            raise ollama.ResponseError(f"model '{model}' not found", status_code=404)
+        return object()
+
+    def pull(self, model: str) -> object:
+        if self.pull_error is not None:
+            raise self.pull_error
+        self.pulled.append(model)
+        self.installed.add(model)
+        return object()
+
+
+def test_ensure_model_installed_does_not_pull(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = _FakeOllama(installed={"qwen3.5:9b"})
+    monkeypatch.setattr(ollama, "Client", fake)
+
+    pulled = ensure_model(model="qwen3.5:9b", host="http://x")
+
+    assert pulled is False
+    assert fake.pulled == []
+
+
+def test_ensure_model_missing_pulls_and_tells_the_user(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    fake = _FakeOllama(installed=set())
+    monkeypatch.setattr(ollama, "Client", fake)
+
+    with caplog.at_level(logging.INFO, logger="sbobina"):
+        pulled = ensure_model(model="qwen3.5:4b", host="http://x")
+
+    assert pulled is True
+    assert fake.pulled == ["qwen3.5:4b"]
+    notices = [r for r in caplog.records if getattr(r, USER_NOTICE, False)]
+    assert [r.getMessage() for r in notices] == [
+        (
+            "Scarico il modello Ollama qwen3.5:4b: la prima volta può richiedere "
+            "diversi minuti"
+        )
+    ]
+
+
+def test_ensure_model_unreachable_server_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class DownClient:
+        def __init__(self, host: str) -> None:
+            pass
+
+        def show(self, model: str) -> object:
+            raise ConnectionError("Failed to connect to Ollama")
+
+    monkeypatch.setattr(ollama, "Client", DownClient)
+
+    with pytest.raises(CorrectorUnavailableError):
+        ensure_model(model="qwen3.5:9b", host="http://x")
+
+
+def test_ensure_model_unknown_name_raises_with_the_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = ollama.ResponseError("pull model manifest: file does not exist")
+    monkeypatch.setattr(
+        ollama, "Client", _FakeOllama(installed=set(), pull_error=error)
+    )
+
+    with pytest.raises(ModelDownloadError, match="qwnn:9b"):
+        ensure_model(model="qwnn:9b", host="http://x")

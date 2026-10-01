@@ -126,6 +126,7 @@ def _correct(
     subject: str | None,
     on_progress: Callable[[int, int], None] | None,
 ) -> CorrectionResult:
+    llm_corrector.ensure_model(model=config.ollama_model, host=config.ollama_host)
     corrector = llm_corrector.make_ollama_corrector(
         model=config.ollama_model, host=config.ollama_host, subject=subject
     )

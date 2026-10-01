@@ -109,7 +109,10 @@ def test_correct_to_dir_success_writes_cleaned_outputs_and_progress(
     transcript_json: Path,
 ) -> None:
     calls: list[tuple[int, int]] = []
-    with patch("sbobina.llm_corrector.make_ollama_corrector") as factory:
+    with (
+        patch("sbobina.llm_corrector.ensure_model") as ensure,
+        patch("sbobina.llm_corrector.make_ollama_corrector") as factory,
+    ):
         factory.return_value = lambda text, context: [
             Edit(original="Sennberg", corrected="Heisenberg")
         ]
@@ -120,6 +123,7 @@ def test_correct_to_dir_success_writes_cleaned_outputs_and_progress(
             on_progress=lambda done, total: calls.append((done, total)),
         )
 
+    ensure.assert_called_once_with(model="test-model", host="http://gpu:1")
     factory.assert_called_once_with(
         model="test-model", host="http://gpu:1", subject="fisica"
     )
@@ -151,8 +155,11 @@ def test_correct_to_dir_midway_failure_writes_partial_outputs(tmp_path: Path) ->
             raise CorrectorUnavailableError("Ollama crashed")
         return [Edit(original="w1", corrected="w11")]
 
-    with patch(
-        "sbobina.llm_corrector.make_ollama_corrector", return_value=flaky_corrector
+    with (
+        patch("sbobina.llm_corrector.ensure_model"),
+        patch(
+            "sbobina.llm_corrector.make_ollama_corrector", return_value=flaky_corrector
+        ),
     ):
         outcome = pipeline.correct_to_dir(path, config=Settings(), subject=None)
 
@@ -174,8 +181,12 @@ def test_correct_to_dir_first_chunk_failure_preserves_only_input(
     def failing_corrector(text: str, context: str) -> list[Edit]:
         raise CorrectorUnavailableError("Failed to connect to Ollama")
 
-    with patch(
-        "sbobina.llm_corrector.make_ollama_corrector", return_value=failing_corrector
+    with (
+        patch("sbobina.llm_corrector.ensure_model"),
+        patch(
+            "sbobina.llm_corrector.make_ollama_corrector",
+            return_value=failing_corrector,
+        ),
     ):
         outcome = pipeline.correct_to_dir(
             transcript_json, config=Settings(), subject=None
