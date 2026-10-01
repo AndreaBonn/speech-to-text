@@ -12,3 +12,5 @@ sbobine/
 *.m4a
 *.wav
 *.mp3
+# Browser verification output (Playwright MCP screenshots and snapshots).
+.playwright-mcp/
