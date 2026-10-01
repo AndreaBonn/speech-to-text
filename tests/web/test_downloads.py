@@ -1,5 +1,6 @@
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -16,11 +17,11 @@ HOST = "http://127.0.0.1:11434"
 
 
 def _wait_until(
-    predicate: object, timeout: float = 5.0, interval: float = 0.01
+    predicate: Callable[[], bool], timeout: float = 5.0, interval: float = 0.01
 ) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        if predicate():  # type: ignore[operator]
+        if predicate():
             return
         time.sleep(interval)
     raise AssertionError("condition not met in time")
