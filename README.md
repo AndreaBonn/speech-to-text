@@ -6,7 +6,7 @@ A local transcription tool for recorded lectures in Italian: audio and text neve
 
 ![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Python](https://img.shields.io/badge/python-3.12-3776ab)
-![Tests](https://img.shields.io/badge/tests-478%20passed-brightgreen)
+[![CI](https://github.com/AndreaBonn/speech-to-text/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AndreaBonn/speech-to-text/actions/workflows/ci.yml)
 
 You record a lecture with your phone, drop the file into a page in your browser, and get the text back, split into paragraphs with timestamps. Words the model is unsure about are highlighted, so you know which passages to listen to again.
 
