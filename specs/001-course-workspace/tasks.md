@@ -161,21 +161,21 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
 
 **[B-6] T030-T032**
 
-- [ ] **T030** `source_citations.py`: estende la validazione di `study_citations.py` a passaggi
+- [x] **T030** `source_citations.py`: estende la validazione di `study_citations.py` a passaggi
   con fonte di documento (`doc_id`, pagina) o di lezione (indice di parola → timestamp); motivi
   `PASSAGE_NOT_GIVEN`, `QUOTE_NOT_FOUND`, `QUOTE_LENGTH`. Riuso della normalizzazione, nessuna
   copia. Rischio: medio.
   verify: esempio di plan C3 con passaggio di p. 214 → tenuta con `page: 214`; testo citato
   inesistente → `QUOTE_NOT_FOUND`; passaggio non fornito → `PASSAGE_NOT_GIVEN`; test di
   `study_citations` invariati e verdi.
-- [ ] **T031** `generation_models.py`: `GenerationRequest(format: multiple_choice|open|oral|
+- [x] **T031** `generation_models.py`: `GenerationRequest(format: multiple_choice|open|oral|
   summary, count 1-20, topic ≤ 200 caratteri, sources)`; dataclass di domande, opzioni,
   soluzioni separate, riassunto a sezioni; schema pydantic della risposta LLM per formato
   (crocette: esattamente 4 opzioni, una `correct`); JSON I/O di `generations/<id>.json` (D5).
   Rischio: medio.
   verify: crocette con 3 opzioni o due corrette → rifiutate dallo schema; `count` 0 o 21 → 422 a
   livello API (T034); round-trip JSON identico.
-- [ ] **T032** Prompt `compito-v1.md` (un file con sezioni per formato o un file per formato,
+- [x] **T032** Prompt `compito-v1.md` (un file con sezioni per formato o un file per formato,
   scelto in `prompt-master`) e `riassunto-v1.md`: passaggi numerati come dato delimitato, regola
   "usa solo i passaggi", citazione obbligatoria per soluzioni e frasi del riassunto, opzioni
   errate senza citazione, risposta vuota se il materiale non basta. Passaggio da `prompt-master`
@@ -187,7 +187,9 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
 
 - [ ] **T033** `generation_pipeline.py` + `generation_render.py`: recupero per argomento (o
   campionamento distribuito sulle fonti se l'argomento è vuoto), chiamata `chat_json`, validazione
-  citazioni, scarto per motivo, conteggio "N su M", un retry su JSON invalido; render puro di
+  citazioni, scarto per motivo (anche voce con 0 o più di 3 citazioni, crocetta con opzioni vuote o
+  duplicate: scarto della singola voce, non della risposta), conteggio "N su M", un retry su JSON
+  invalido; render puro di
   `compito.md` e `soluzioni.md` (e riassunto). Rischio: medio.
   verify: con Ollama finto: domanda con soluzione non citata → scartata e contata; argomento senza
   passaggi → `NO_MATERIAL` senza chiamare il modello; `compito.md` non contiene mai il testo delle
@@ -197,7 +199,9 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   `queued|running|done|failed|interrupted` nel file della generazione, recupero al boot come per
   `study`, cancel; `api_generations.py` POST (202, 422 per campo), GET elenco paginato e dettaglio
   con citazioni risolte (link al lettore o alla pagina, "fonte rimossa" se il documento non c'è
-  più), DELETE. Rischio: alto (coda condivisa).
+  più), DELETE. Le citazioni di lezione arrivano da T030 ancorate al segmento trovato (inizio
+  della finestra di ~250 parole, fino a ~1 minuto prima della frase): l'API risolve il timestamp
+  esatto cercando la citazione nella trascrizione (come `api_study` con `locate_quote`). Rischio: alto (coda condivisa).
   verify: runner fittizio: trascrizione A poi generazione B → mai due figli insieme; riavvio
   simulato con generazione `running` → `interrupted`; `supervisor.py` e `stage_runner.py` ≤ 300
   righe (dividere prima se serve); test esistenti della coda verdi.
