@@ -469,6 +469,11 @@ body {
 
 /* ---------- Button, 8 states ---------- */
 
+/* display:inline-flex below would otherwise beat the UA [hidden] rule. */
+.btn[hidden] {
+  display: none;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -791,6 +796,7 @@ body {
   font-size: var(--text-sm);
   color: var(--color-ink-3);
 }
+
 
 .reader__toolbar-actions {
   display: flex;
