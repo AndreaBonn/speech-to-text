@@ -12,6 +12,7 @@ from sbobina.model_catalog import ollama_options, whisper_options
 from sbobina.web.errors import NotFoundError
 from sbobina.web.job_models import JobRecord, JobStatus
 from sbobina.web.job_store import JobStore
+from sbobina.web.lecture_title import reader_title as _reader_title
 from sbobina.web.model_service import list_whisper_models, ollama_status
 
 router = APIRouter()
@@ -91,19 +92,6 @@ def _render(
         status_code=status_code,
         context={"nav_items": _nav(active=active, store=store), **context},
     )
-
-
-def _reader_title(record: JobRecord) -> str:
-    """Source file name first, then the subject, then a dated fallback.
-
-    Mirrors ``jobTitle()`` in jobs.js so the queue row and the reader page
-    never disagree on what to call the same job.
-    """
-    if record.source_name:
-        return record.source_name
-    if record.config.subject:
-        return record.config.subject
-    return f"Lezione del {record.created_at.strftime('%d/%m/%Y')}"
 
 
 def _installed_ollama_models(

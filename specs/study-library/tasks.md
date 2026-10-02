@@ -124,7 +124,7 @@ ovvia.
 
 **[B-5] T023-T024**
 
-- [ ] **T023** `src/sbobina/web/api_search.py`: `GET /api/v1/search?q=&course=&page=&per_page=`;
+- [x] **T023** `src/sbobina/web/api_search.py`: `GET /api/v1/search?q=&course=&page=&per_page=`;
   riconcilia, interroga, raggruppa per lezione, aggiunge titolo (`_reader_title`), corso, `t`,
   `variant`, href `/lettore/<id>?t=<start>&variant=<v>`. 422 su `q` vuota dopo la pulizia, 503
   `SEARCH_UNAVAILABLE`, riconciliazione anche nel `lifespan` al boot. Rischio: medio.

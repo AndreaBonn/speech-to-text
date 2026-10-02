@@ -14,6 +14,7 @@ from sbobina.web.errors import (
     NotFoundError,
     ValidationError,
 )
+from sbobina.web.search_index import SearchCorruptError, SearchUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,12 @@ async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
             code=exc.code,
             message=exc.message,
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
+    if isinstance(exc, (SearchUnavailableError, SearchCorruptError)):
+        return error_response(
+            code=exc.code,
+            message=exc.message,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     logger.error("Web application failure", exc_info=exc)
     return error_response(

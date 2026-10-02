@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import partial
@@ -11,11 +12,13 @@ from starlette.exceptions import HTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from sbobina.settings import LOOPBACK_HOSTS, Settings
+from sbobina.web import search_service
 from sbobina.web.api_corrected import router as corrected_router
 from sbobina.web.api_courses import router as courses_router
 from sbobina.web.api_files import router as files_router
 from sbobina.web.api_jobs import router as jobs_router
 from sbobina.web.api_models import create_models_router
+from sbobina.web.api_search import router as search_router
 from sbobina.web.api_system import create_system_router
 from sbobina.web.api_wer import WER_REQUEST_LIMIT_BYTES
 from sbobina.web.api_wer import router as wer_router
@@ -30,15 +33,23 @@ from sbobina.web.responses import (
     http_error_handler,
     request_validation_handler,
 )
+from sbobina.web.search_index import index_session
 from sbobina.web.sse import router as events_router
 from sbobina.web.supervisor import Supervisor, SupervisorOptions
 from sbobina.web.upload_limit import UploadLimitMiddleware, upload_limit_bytes
+
+logger = logging.getLogger(__name__)
 
 # Starlette's TrustedHostMiddleware matches the Host header as parsed, which
 # keeps brackets around IPv6 literals (RFC 3986 host rule): "::1" must be
 # "[::1]" here or a request to http://[::1]:PORT/ gets a 400 before reaching
 # OriginMiddleware. https://github.com/encode/starlette/blob/master/starlette/_utils.py
 _TRUSTED_HOSTS = [f"[{host}]" if ":" in host else host for host in LOOPBACK_HOSTS]
+
+
+def _reconcile_search_index(app: FastAPI) -> None:
+    with index_session(path=app.state.search_index_path) as index:
+        search_service.reconcile(store=app.state.job_store, index=index)
 
 
 @asynccontextmanager
@@ -49,6 +60,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # interrupted; both calls block on disk and child processes, so they run
         # off the event loop.
         await anyio.to_thread.run_sync(supervisor.start)
+        try:
+            await anyio.to_thread.run_sync(partial(_reconcile_search_index, app=app))
+        except Exception as error:
+            logger.warning(
+                "Search index reconciliation failed at startup", exc_info=error
+            )
         yield
     finally:
         await anyio.to_thread.run_sync(supervisor.stop)
@@ -64,6 +81,7 @@ def create_app(
     app.state.job_store = JobStore(
         data_dir=data_dir if data_dir is not None else settings.data_dir
     )
+    app.state.search_index_path = app.state.job_store.jobs_dir.parent / "search.sqlite3"
     app.state.supervisor = Supervisor(
         job_store=app.state.job_store,
         before_transcribe=partial(unload_ollama_models, host=settings.ollama_host),
@@ -93,6 +111,7 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(create_models_router(settings=settings))
     app.include_router(jobs_router)
     app.include_router(courses_router)
+    app.include_router(search_router)
     app.include_router(files_router)
     app.include_router(corrected_router)
     app.include_router(wer_router)
