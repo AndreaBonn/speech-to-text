@@ -87,6 +87,7 @@
     nameCell.className = "cell-name";
     nameCell.setAttribute("data-label", "Corso");
     var link = document.createElement("a");
+    link.className = "table__link";
     link.href = "/corsi?corso=" + encodeURIComponent(course.key);
     link.textContent = course.label;
     link.addEventListener("click", function (event) {
@@ -166,6 +167,7 @@
     nameCell.setAttribute("data-label", "Lezione");
     if (job.status === "done") {
       var link = document.createElement("a");
+      link.className = "table__link";
       link.href = "/lettore/" + job.id;
       link.textContent = jobTitle(job);
       nameCell.appendChild(link);
