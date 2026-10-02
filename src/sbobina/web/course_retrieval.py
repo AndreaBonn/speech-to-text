@@ -12,6 +12,7 @@ sbobina.lecture_windows.expand_lecture_windows.
 import logging
 from dataclasses import dataclass
 
+from sbobina.course_registry import find_by_key
 from sbobina.courses import course_key, effective_course
 from sbobina.lecture_windows import WINDOW_WORDS, expand_lecture_windows
 from sbobina.models import load_transcript
@@ -31,11 +32,17 @@ from sbobina.web.search_service import PREFERRED_VARIANTS
 logger = logging.getLogger(__name__)
 
 
-def course_scope(store: JobStore, course_id: str) -> RetrievalScope:
-    """Scope of one course: every lecture whose effective course matches it.
+# Matches no document row: course ids are uuids, never empty.
+NO_REGISTERED_COURSE = ""
 
-    Same mapping /courses uses (courses.effective_course + course_key), read
-    fresh from meta.json so a rename is reflected without reindexing.
+
+def course_scope(store: JobStore, key: str) -> RetrievalScope:
+    """Scope of the course with this key: its lectures and its documents.
+
+    Lectures belong by key, with the same mapping /courses uses
+    (courses.effective_course + course_key), read fresh from meta.json so a
+    rename is reflected without reindexing. Documents belong by registry id:
+    a course with lectures only has none, so its scope matches no document.
     """
     job_ids = frozenset(
         str(record.id)
@@ -46,9 +53,13 @@ def course_scope(store: JobStore, course_id: str) -> RetrievalScope:
                 subject=record.config.subject,
             )
         )
-        == course_id
+        == key
     )
-    return RetrievalScope(course_id=course_id, job_ids=job_ids)
+    course = find_by_key(courses_dir=store.courses_dir, key=key)
+    return RetrievalScope(
+        course_id=course.id if course is not None else NO_REGISTERED_COURSE,
+        job_ids=job_ids,
+    )
 
 
 def _segments_for_job(store: JobStore, job_id: str) -> list[Passage]:

@@ -1,6 +1,7 @@
 from contextlib import closing
 from pathlib import Path
 
+from sbobina.course_registry import get_or_create
 from sbobina.models import Segment, Transcript, Word, save_transcript
 from sbobina.retrieval import LectureSource, RetrievalScope
 from sbobina.search_text import Passage
@@ -18,18 +19,34 @@ def test_course_scope_collects_lectures_by_effective_course(tmp_path: Path) -> N
     fallback = store.create(config=JobConfig(subject="Analisi 1"))
     other = store.create(config=JobConfig(subject="Chimica"))
 
-    scope = course_scope(store=store, course_id="analisi 1")
+    scope = course_scope(store=store, key="analisi 1")
 
-    assert scope.course_id == "analisi 1"
     assert scope.job_ids == {str(explicit.id), str(fallback.id)}
     assert str(other.id) not in scope.job_ids
+
+
+def test_course_scope_carries_the_registry_id_for_document_search(
+    tmp_path: Path,
+) -> None:
+    # Regression: lectures were matched against the registry uuid instead of
+    # the course key, so a registered course never retrieved its lectures.
+    store = JobStore(data_dir=tmp_path)
+    lecture = store.create(config=JobConfig(subject="Diritto"))
+    course = get_or_create(
+        courses_dir=store.courses_dir, key="diritto", label="Diritto"
+    )
+
+    scope = course_scope(store=store, key="diritto")
+
+    assert scope.course_id == course.id
+    assert scope.job_ids == {str(lecture.id)}
 
 
 def test_course_scope_is_empty_for_unknown_course(tmp_path: Path) -> None:
     store = JobStore(data_dir=tmp_path)
     store.create(config=JobConfig(subject="Fisica"))
 
-    scope = course_scope(store=store, course_id="matematica")
+    scope = course_scope(store=store, key="matematica")
 
     assert scope.job_ids == frozenset()
 
