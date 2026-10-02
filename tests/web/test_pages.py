@@ -147,7 +147,9 @@ def test_corsi_page_returns_shell(tmp_path: Path) -> None:
     assert "/static/js/corsi.js" in body
     assert "/static/js/corso-dettaglio.js" in body
     assert body.index("/static/js/dom.js") < body.index("/static/js/corso-dettaglio.js")
-    assert body.index("/static/js/corso-dettaglio.js") < body.index("/static/js/corsi.js")
+    assert body.index("/static/js/corso-dettaglio.js") < body.index(
+        "/static/js/corsi.js"
+    )
     assert body.index("/static/js/corsi.js") < body.index("/static/js/search.js")
 
 
