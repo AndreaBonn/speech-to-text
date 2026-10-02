@@ -106,7 +106,7 @@ riscrivono prima di partire.
 
 **[B-4] T020-T022**
 
-- [ ] **T020** Dividere `web/search_index.py` (287): schema e connessione in
+- [x] **T020** Dividere `web/search_index.py` (287): schema e connessione in
   `web/search_schema.py`. Nessun cambio di comportamento. Rischio: basso.
   verify: test esistenti della ricerca verdi senza modifiche; `wc -l` di entrambi < 220.
 - [ ] **T021** Tabella FTS5 `doc_passages(text, course_id, doc_id, page, chunk)` (stesso
