@@ -20,6 +20,7 @@ from sbobina.document_models import (
     DocumentKind,
 )
 from sbobina.settings import Settings
+from sbobina.web.api_courses import course_label
 from sbobina.web.document_store import (
     document_dir,
     iter_documents,
@@ -30,6 +31,7 @@ from sbobina.web.document_store import (
 from sbobina.web.document_upload import discard_upload, store_upload
 from sbobina.web.errors import ConflictError, NotFoundError
 from sbobina.web.extraction_worker import ExtractionWorker
+from sbobina.web.job_store import JobStore
 from sbobina.web.upload_limit import BYTES_PER_MB
 
 router = APIRouter(prefix="/api/v1/courses")
@@ -49,15 +51,19 @@ MEDIA_TYPES: dict[DocumentKind, str] = {
 @dataclass(frozen=True)
 class DocumentServices:
     settings: Settings
-    courses_dir: Path
+    store: JobStore
     worker: ExtractionWorker
+
+    @property
+    def courses_dir(self) -> Path:
+        return self.store.courses_dir
 
 
 def _services(request: Request) -> DocumentServices:
     store = request.app.state.job_store
     return DocumentServices(
         settings=request.app.state.settings,
-        courses_dir=store.courses_dir,
+        store=store,
         worker=request.app.state.extraction_worker,
     )
 
@@ -73,7 +79,11 @@ def _course_for_upload(key: str, services: DocumentServices) -> tuple[str, bool]
     existing = find_by_key(courses_dir=services.courses_dir, key=normalized)
     if existing is not None:
         return existing.id, False
-    course = get_or_create(courses_dir=services.courses_dir, key=normalized, label=key)
+    # The URL carries the normalized key: the label comes from the lectures.
+    label = course_label(store=services.store, key=normalized) or key
+    course = get_or_create(
+        courses_dir=services.courses_dir, key=normalized, label=label
+    )
     return course.id, True
 
 

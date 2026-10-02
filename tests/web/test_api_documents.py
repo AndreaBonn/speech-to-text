@@ -5,9 +5,12 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from sbobina.course_registry import find_by_key
 from sbobina.settings import Settings
 from sbobina.web.app import create_app
 from sbobina.web.document_store import mark_failed
+from sbobina.web.job_models import JobConfig
+from sbobina.web.job_store import JobStore
 
 BASE_URL = "http://127.0.0.1:8765"
 COURSES_URL = "/api/v1/courses"
@@ -224,3 +227,15 @@ def test_rejected_upload_does_not_register_a_new_course(client: TestClient) -> N
     assert (rejected.status_code, accepted.status_code) == (415, 202)
     keys = [course["key"] for course in client.get(COURSES_URL).json()["data"]]
     assert keys == ["fisica"]
+
+
+def test_upload_registers_the_lecture_label_not_the_url_key(tmp_path: Path) -> None:
+    JobStore(data_dir=tmp_path).create(
+        config=JobConfig(subject="Diritto Privato"), source_name="lezione.m4a"
+    )
+    with make_client(tmp_path=tmp_path) as client:
+        upload(client, "diritto privato", "manuale.pdf", PDF_BYTES)
+
+    course = find_by_key(courses_dir=tmp_path / "courses", key="diritto privato")
+    assert course is not None
+    assert course.label == "Diritto Privato"

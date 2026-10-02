@@ -70,6 +70,14 @@ def _collect_courses(store: JobStore) -> list[CourseSummary]:
     )
 
 
+def course_label(store: JobStore, key: str) -> str | None:
+    """Label the lectures and registry already give the course with this key."""
+    return next(
+        (course.label for course in _collect_courses(store=store) if course.key == key),
+        None,
+    )
+
+
 @router.get("/courses")
 def list_courses(
     request: Request,
