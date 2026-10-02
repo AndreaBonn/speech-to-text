@@ -23,7 +23,7 @@ riscrivono prima di partire.
 
 **[B-1] T010-T012**
 
-- [ ] **T010** Dividere `static/js/corsi.js` (305 righe): elenco/ricerca corsi in `corsi.js`,
+- [x] **T010** Dividere `static/js/corsi.js` (305 righe): elenco/ricerca corsi in `corsi.js`,
   dettaglio corso in `corso-dettaglio.js`. Nessun cambio di comportamento. Rischio: basso.
   verify: `wc -l` di entrambi < 250; click-through di `/corsi` (ricerca, apertura corso, link al
   lettore) identico a prima, registrato.

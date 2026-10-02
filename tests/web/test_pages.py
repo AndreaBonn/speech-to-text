@@ -145,6 +145,10 @@ def test_corsi_page_returns_shell(tmp_path: Path) -> None:
     assert 'id="corsi-list"' in body
     assert 'id="corsi-detail"' in body
     assert "/static/js/corsi.js" in body
+    assert "/static/js/corso-dettaglio.js" in body
+    assert body.index("/static/js/dom.js") < body.index("/static/js/corso-dettaglio.js")
+    assert body.index("/static/js/corso-dettaglio.js") < body.index("/static/js/corsi.js")
+    assert body.index("/static/js/corsi.js") < body.index("/static/js/search.js")
 
 
 def test_corsi_page_marks_its_rail_entry_active(tmp_path: Path) -> None:
