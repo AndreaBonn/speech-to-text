@@ -8,7 +8,7 @@ from typing import Literal
 from sbobina.search_text import SnippetPart
 from sbobina.web.errors import AppError
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 Variant = Literal["original", "corrected"]
 CORRUPTION_CODES = {sqlite3.SQLITE_CORRUPT, sqlite3.SQLITE_NOTADB}
 PRIMARY_ERROR_MASK = 0xFF
@@ -83,6 +83,17 @@ def create_schema(connection: sqlite3.Connection) -> None:
         raise SearchUnavailableError(
             message="SQLite FTS5 is unavailable", code="SEARCH_UNAVAILABLE"
         ) from error
+    connection.execute(
+        "CREATE TABLE IF NOT EXISTS documents (doc_id TEXT PRIMARY KEY, "
+        "course_id TEXT NOT NULL, text_mtime_ns INTEGER NOT NULL, "
+        "text_size INTEGER NOT NULL, indexed_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS doc_passages USING fts5("
+        "text, passage_id UNINDEXED, course_id UNINDEXED, doc_id UNINDEXED, "
+        "page UNINDEXED, chunk UNINDEXED, "
+        "tokenize='unicode61 remove_diacritics 2', prefix='3')"
+    )
     connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
 

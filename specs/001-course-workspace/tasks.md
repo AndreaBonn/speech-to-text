@@ -109,7 +109,7 @@ riscrivono prima di partire.
 - [x] **T020** Dividere `web/search_index.py` (287): schema e connessione in
   `web/search_schema.py`. Nessun cambio di comportamento. Rischio: basso.
   verify: test esistenti della ricerca verdi senza modifiche; `wc -l` di entrambi < 220.
-- [ ] **T021** Tabella FTS5 `doc_passages(text, course_id, doc_id, page, chunk)` (stesso
+- [x] **T021** Tabella FTS5 `doc_passages(text, course_id, doc_id, page, chunk)` (stesso
   tokenizer) + tabella stato `documents(doc_id, mtime_ns, size)`; `SCHEMA_VERSION` +1 (il file
   vecchio si ricostruisce, comportamento già previsto); riconciliazione in `search_service.py`
   estesa a `data/courses/*/documents/*/text.json`; documenti `ready_no_text` esclusi. Passaggi da

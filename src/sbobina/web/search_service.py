@@ -5,9 +5,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 
+from sbobina.document_models import DocumentStatus
+from sbobina.document_passages import DocumentPassage, chunk_document_pages
 from sbobina.models import load_transcript
 from sbobina.search_text import Passage, passages_from_transcript
 from sbobina.web.api_files import TRANSCRIPT_FILES
+from sbobina.web.document_index import DocumentState
+from sbobina.web.document_store import (
+    DOCUMENT_FILENAME,
+    TEXT_FILENAME,
+    read_document_in,
+    read_text,
+)
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import (
     LectureHit,
@@ -97,14 +106,82 @@ def _reconcile(store: JobStore, index: SearchIndex) -> int:
     return replaced
 
 
-def reconcile(store: JobStore, index: SearchIndex) -> int:
-    """Reconcile under the shared lock and return the number of reindexed jobs."""
+def _read_document_passages(doc_dir: Path, doc_id: str) -> list[DocumentPassage] | None:
+    """Passages of one document's extracted text, or None when unreadable now.
+
+    A document mid-write (extraction still in progress) must not break the
+    search over every other document: the caller skips it until the next scan.
+    """
+    try:
+        stored = read_text(doc_dir=doc_dir)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        logger.warning("Testo documento non leggibile, salto %s: %s", doc_dir, error)
+        return None
+    return chunk_document_pages(doc_id=doc_id, pages=stored.pages)
+
+
+def _ready_document_state(document_path: Path) -> DocumentState | None:
+    """State of a READY document's text, or None when it must not be indexed."""
+    doc_dir = document_path.parent
+    try:
+        document = read_document_in(doc_dir=doc_dir)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        logger.warning("Documento non leggibile, salto %s: %s", doc_dir, error)
+        return None
+    if document.status is not DocumentStatus.READY:
+        return None
+    try:
+        text_stat = (doc_dir / TEXT_FILENAME).stat()
+    except FileNotFoundError:
+        return None
+    return DocumentState(
+        course_id=doc_dir.parent.parent.name,
+        text_mtime_ns=text_stat.st_mtime_ns,
+        text_size=text_stat.st_size,
+    )
+
+
+def _reconcile_documents(courses_dir: Path, index: SearchIndex) -> int:
+    indexed = index.indexed_documents()
+    present: set[str] = set()
+    replaced = 0
+    for document_path in courses_dir.glob(f"*/documents/*/{DOCUMENT_FILENAME}"):
+        state = _ready_document_state(document_path=document_path)
+        if state is None:
+            continue
+        doc_dir = document_path.parent
+        present.add(doc_dir.name)
+        if indexed.get(doc_dir.name) == state:
+            continue
+        passages = _read_document_passages(doc_dir=doc_dir, doc_id=doc_dir.name)
+        if passages is None:
+            continue
+        index.replace_document(doc_id=doc_dir.name, state=state, passages=passages)
+        replaced += 1
+    for doc_id in indexed.keys() - present:
+        index.remove_document(doc_id=doc_id)
+    return replaced
+
+
+def reconcile(
+    store: JobStore, index: SearchIndex, courses_dir: Path | None = None
+) -> int:
+    """Reconcile under the shared lock and return the number of reindexed items.
+
+    courses_dir is optional so existing boot-time callers keep working
+    unchanged; without it, document passages are left untouched.
+    """
     with _SEARCH_LOCK:
-        return _reconcile(store=store, index=index)
+        replaced = _reconcile(store=store, index=index)
+        if courses_dir is not None:
+            replaced += _reconcile_documents(courses_dir=courses_dir, index=index)
+        return replaced
 
 
 @contextmanager
-def search_session(store: JobStore, path: Path) -> Iterator[SearchIndex]:
+def search_session(
+    store: JobStore, path: Path, courses_dir: Path | None = None
+) -> Iterator[SearchIndex]:
     """Keep one lock and one connection through reconciliation and all queries.
 
     Corruption discards the index and raises SearchCorruptError. Use search()
@@ -112,6 +189,8 @@ def search_session(store: JobStore, path: Path) -> Iterator[SearchIndex]:
     """
     with _SEARCH_LOCK, index_session(path=path) as index:
         _reconcile(store=store, index=index)
+        if courses_dir is not None:
+            _reconcile_documents(courses_dir=courses_dir, index=index)
         yield index
 
 

@@ -1,0 +1,82 @@
+from collections.abc import Iterator
+from contextlib import closing
+from pathlib import Path
+
+import pytest
+
+from sbobina.document_passages import DocumentPassage
+from sbobina.search_text import SnippetPart
+from sbobina.web.document_index import DocumentState
+from sbobina.web.search_index import SCHEMA_VERSION, SearchIndex, open_index
+
+STATE = DocumentState(course_id="course-1", text_mtime_ns=111, text_size=222)
+PASSAGE = DocumentPassage(
+    passage_id="doc1:p1:c0", page=1, chunk=0, text="la causa del contratto è illecita"
+)
+
+
+@pytest.fixture
+def index(tmp_path: Path) -> Iterator[SearchIndex]:
+    with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
+        yield index
+
+
+def test_schema_version_bumped_for_documents() -> None:
+    assert SCHEMA_VERSION == 2
+
+
+def test_search_documents_returns_page_and_chunk_with_highlight(
+    index: SearchIndex,
+) -> None:
+    index.replace_document(doc_id="doc1", state=STATE, passages=[PASSAGE])
+    page = index.search_documents(
+        match='"contratt"*', course_id="course-1", limit=10, offset=0
+    )
+    assert page.total == 1
+    hit = page.items[0]
+    assert hit.doc_id == "doc1"
+    assert hit.page == 1
+    assert hit.chunk == 0
+    assert hit.snippet == [
+        SnippetPart(text="la causa del ", match=False),
+        SnippetPart(text="contratto", match=True),
+        SnippetPart(text=" è illecita", match=False),
+    ]
+
+
+def test_search_documents_is_scoped_to_course(index: SearchIndex) -> None:
+    other = DocumentState(course_id="course-2", text_mtime_ns=1, text_size=1)
+    index.replace_document(doc_id="doc1", state=STATE, passages=[PASSAGE])
+    index.replace_document(doc_id="doc2", state=other, passages=[PASSAGE])
+    page = index.search_documents(
+        match='"causa"*', course_id="course-2", limit=10, offset=0
+    )
+    assert [hit.doc_id for hit in page.items] == ["doc2"]
+
+
+def test_replace_document_is_persistent_and_has_no_duplicates(tmp_path: Path) -> None:
+    path = tmp_path / "search.sqlite3"
+    updated = DocumentState(course_id="course-1", text_mtime_ns=999, text_size=333)
+    with closing(open_index(path=path)) as index:
+        index.replace_document(doc_id="doc1", state=STATE, passages=[PASSAGE])
+        index.replace_document(doc_id="doc1", state=updated, passages=[PASSAGE])
+    with closing(open_index(path=path)) as index:
+        assert index.indexed_documents() == {"doc1": updated}
+        page = index.search_documents(
+            match='"causa"*', course_id="course-1", limit=10, offset=0
+        )
+        assert page.total == 1
+
+
+def test_remove_document_deletes_passages_and_state(index: SearchIndex) -> None:
+    index.replace_document(doc_id="doc1", state=STATE, passages=[PASSAGE])
+    index.remove_document(doc_id="doc1")
+    assert index.indexed_documents() == {}
+    page = index.search_documents(
+        match='"causa"*', course_id="course-1", limit=10, offset=0
+    )
+    assert page.total == 0
+
+
+def test_indexed_documents_empty_on_fresh_index(index: SearchIndex) -> None:
+    assert index.indexed_documents() == {}
