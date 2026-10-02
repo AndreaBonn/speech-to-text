@@ -91,8 +91,34 @@ body {
   gap: var(--space-2xs);
 }
 
-.rail__indicator {
+/* Foot of the rail, right above the device indicator. Two classes beat
+   .btn below. */
+.btn.rail__theme {
   margin-top: auto;
+  font-size: var(--text-sm);
+}
+
+/* Desktop rail stays in view: without it the foot (theme switch, device
+   indicator) scrolls away on long pages such as the history or the reader. */
+@media (min-width: 769px) {
+  .rail {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  /* Only the links scroll when the window is short: brand, theme switch
+     and indicator stay put. */
+  .rail__scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+.rail__indicator {
+  margin-top: var(--space-xs);
+  text-align: center;
   padding: var(--space-sm) var(--space-sm) 0;
   font-size: var(--text-sm);
   color: var(--color-ink-3);
@@ -201,6 +227,17 @@ body {
     display: none;
   }
 
+  .btn.rail__theme {
+    flex: none;
+    margin-top: 0;
+    margin-left: var(--space-xs);
+    min-height: 44px;
+  }
+
+  .rail__theme-prefix {
+    display: none;
+  }
+
   .app-shell__main {
     padding: var(--space-md);
   }
@@ -283,6 +320,78 @@ body {
   display: block;
   font-weight: var(--weight-medium);
   margin-bottom: var(--space-2xs);
+}
+
+/* ---------- Toggletip: label help on hover, focus and tap ---------- */
+
+.field__label-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-2xs);
+}
+
+.field__label-row .field__label {
+  margin-bottom: 0;
+}
+
+.toggletip__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: var(--rule-hair) solid var(--color-control-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-ink-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  cursor: help;
+}
+
+.toggletip__button:hover {
+  border-color: var(--color-accent);
+  color: var(--color-ink);
+}
+
+/* Anchored to the label row, not the button, so it never runs off a
+   375px screen; touching the row keeps it hoverable (WCAG 1.4.13). */
+.toggletip__bubble {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: var(--z-tooltip);
+  width: min(22rem, 100%);
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--rule-hair) solid var(--color-rule-strong);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: normal;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--dur-fast) var(--ease-out),
+    visibility var(--dur-fast) var(--ease-out);
+}
+
+.toggletip:hover .toggletip__bubble,
+.toggletip:focus-within .toggletip__bubble {
+  opacity: 1;
+  visibility: visible;
+}
+
+.toggletip--dismissed .toggletip__bubble,
+.toggletip--dismissed:hover .toggletip__bubble,
+.toggletip--dismissed:focus-within .toggletip__bubble {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .field__helper {

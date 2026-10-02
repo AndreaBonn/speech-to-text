@@ -146,7 +146,12 @@
   }
 }
 
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --color-paper: oklch(17% 0.012 255);
   --color-paper-2: oklch(20.5% 0.013 255);
   --color-paper-3: oklch(24% 0.014 255);

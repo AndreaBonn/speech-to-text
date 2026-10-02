@@ -110,7 +110,23 @@
         </div>
 
         <div class="field">
-          <label class="field__label" for="beam_size">Beam size (1-10)</label>
+          <div class="field__label-row">
+            <label class="field__label" for="beam_size">Beam size (1-10)</label>
+            <span class="toggletip">
+              <button
+                type="button"
+                class="toggletip__button"
+                aria-label="Cos'è il beam size"
+                aria-describedby="beam_size-tip"
+              >?</button>
+              <span id="beam_size-tip" class="toggletip__bubble" role="tooltip">
+                Quante ipotesi di frase Whisper tiene aperte in parallelo mentre
+                decide la parola successiva. Più alto è un po' più preciso ma più
+                lento; 1 sceglie sempre la parola più probabile ed è il più veloce.
+                Consigliato: 5. Oltre 5 il guadagno è minimo.
+              </span>
+            </span>
+          </div>
           <input
             id="beam_size"
             class="text-input"

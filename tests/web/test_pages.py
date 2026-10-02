@@ -291,3 +291,42 @@ def test_corsi_page_has_the_search_form(tmp_path: Path) -> None:
     assert 'id="search-course"' in body
     assert 'id="search-results"' in body
     assert body.index("/static/js/dom.js") < body.index("/static/js/search.js")
+
+
+def test_pages_apply_the_saved_theme_before_the_stylesheets(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/").text
+
+    head = body.split("</head>")[0]
+    assert '<script src="/static/js/theme.js"></script>' in head
+    assert head.index("theme.js") < head.index("tokens.css")
+
+
+def test_rail_has_the_theme_toggle_button(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/storico").text
+
+    assert 'id="theme-toggle"' in body
+    assert 'type="button"' in body.split('id="theme-toggle"')[1].split(">")[0]
+
+
+def test_static_theme_script_is_served(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        response = client.get("/static/js/theme.js")
+
+    assert response.status_code == 200
+    assert "data-theme" in response.text or "dataset.theme" in response.text
+
+
+def test_index_explains_beam_size_with_the_recommended_value(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/").text
+
+    help_button = body.split('class="toggletip__button"')[1].split(">")[0]
+    assert 'aria-describedby="beam_size-tip"' in help_button
+    tip = body.split('id="beam_size-tip"')[1].split("</span>")[0]
+    assert "Consigliato: 5" in tip
