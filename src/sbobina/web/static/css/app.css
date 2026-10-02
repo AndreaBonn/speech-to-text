@@ -1595,3 +1595,7 @@ body {
   color: inherit;
   border-radius: var(--radius-mark);
 }
+
+.search .history__status {
+  margin-top: var(--space-sm);
+}
