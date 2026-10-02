@@ -98,7 +98,7 @@ riscrivono prima di partire.
   `<img onerror>` → elenco e lettore documento non eseguono nulla. Rischio: basso.
   verify: test Playwright o DOM che conta zero nodi `script`/`img` iniettati e zero dialog.
 
-- [ ] **T019** Gate F1. verify: suite, ruff, format, mypy; `wc -l` ≤ 300 sui file toccati;
+- [x] **T019** Gate F1. verify: suite, ruff, format, mypy; `wc -l` ≤ 300 sui file toccati;
   `security-reviewer` sul diff di F1 senza finding bloccanti; `git status` pulito dopo un upload
   (dati sotto `data/`); commit atomici.
 

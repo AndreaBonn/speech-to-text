@@ -239,3 +239,20 @@ def test_upload_registers_the_lecture_label_not_the_url_key(tmp_path: Path) -> N
     course = find_by_key(courses_dir=tmp_path / "courses", key="diritto privato")
     assert course is not None
     assert course.label == "Diritto Privato"
+
+
+@pytest.mark.parametrize("doc_id", ["..", "..%2F..", "not-a-uuid"])
+def test_document_routes_reject_ids_that_are_not_generated_ids(
+    client: TestClient, tmp_path: Path, doc_id: str
+) -> None:
+    upload(client, "fisica", "manuale.pdf", PDF_BYTES)
+    base = f"{COURSES_URL}/fisica/documents/{doc_id}"
+
+    statuses = {
+        client.get(base).status_code,
+        client.get(f"{base}/file").status_code,
+        client.delete(base).status_code,
+    }
+
+    assert statuses <= {404, 405}
+    assert list((tmp_path / "courses").glob("*/course.json")) != []
