@@ -146,13 +146,18 @@ riscrivono prima di partire.
   verify: tabella dei tentativi e riga `SPEDITO:`; se recall@8 < 0,7 la decisione D2 torna
   all'architect con i numeri prima di F3.
 
-- [ ] **T029** Gate F2. verify: suite, ruff, format, mypy, `wc -l`; ricerca su lezioni invariata
+- [x] **T029** Gate F2. verify: suite, ruff, format, mypy, `wc -l`; ricerca su lezioni invariata
   (test esistenti verdi); `a11y-gate` sulla pagina risultati se cambiata.
 
 ## F3 - Compiti d'esame e riassunti (plan C3)
 
 Prerequisiti: T045 di `specs/study-library/tasks.md` verde, numeri di T034 disponibili, T024 sopra
 soglia (o D2 rivista).
+
+Decisione del 2026-10-03 (implementazione continua chiesta dall'utente): T024 sopra soglia (0,90).
+T034/T045 di study-library restano aperti; ciò che proteggevano lo verificano qui T036 (fedeltà
+misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull'azione
+`generation` accodata dietro una trascrizione).
 
 **[B-6] T030-T032**
 
