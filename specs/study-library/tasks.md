@@ -146,10 +146,19 @@ ovvia.
   stati loading/empty con eco della query/error con query preservata/503. Rischio: medio.
   verify: test con trascrizione che contiene `<script>alert(1)</script>` → nessuna esecuzione
   (Playwright, nessun dialog); click su un risultato apre il lettore al tempo giusto.
-- [ ] **T026** Gate di fase e misura su dati reali (`data/jobs` di questa macchina). verify: tempo
+- [x] **T026** Gate di fase e misura su dati reali (`data/jobs` di questa macchina). verify: tempo
   di ricostruzione da indice vuoto e latenza di `GET /search` con indice allineato riportati
   (3 run, mediana); scenario "dove ha spiegato X?" su una lezione reale annotato con tempo trovato
   vs tempo ascoltato; `a11y-gate` verde, render 375/1280, click-through; suite, ruff, format, mypy.
+  Esito 2026-10-02 (BASIS: measured; in `data/jobs` non c'erano job web, quindi archivio di misura
+  con la lezione reale da 85 min, 5971 parole e 605 segmenti, replicata x1 e x100: testo identico
+  fra le copie, misura di scala e non di varietà):
+  ricostruzione da indice vuoto, mediana su 3 run: x1 0,02 s, x100 2,83 s; `search_lectures` con
+  indice allineato, mediana su 3: x1 2 ms, x100 9-33 ms (33 ms su "contratto", 11 passaggi per lezione).
+  "Dove ha spiegato l'interesse legittimo?" → 1:21, inizio del segmento (precisione Q4, a segmento);
+  il riscontro all'ascolto spetta all'utente. axe chiaro/scuro 0 violazioni, responsive ok; il gate
+  states non legge oklch() (inconcludente), sostituito da `contrast.py` sui colori renderizzati:
+  minimo 6,17:1 sui testi, 4,15:1 sui bordi. Click-through ricerca 11/11, corsi 9/9.
 
 ## F4 - Motore dei materiali di studio e CLI (D5, prima metà)
 
