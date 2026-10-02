@@ -73,11 +73,14 @@ i task marcati "(Q<n>)" si riscrivono prima di partire.
   corsi, apertura di un corso → lezioni con data, durata, stato studio (quando F5 c'è) e link al
   lettore; voce nav "Corsi" in `NAV_SPECS`. Riga `DIAL:` derivata da `design.md`. Rischio: basso.
   verify: test della pagina (200, voce nav attiva); render a 375 e 1280 px.
-- [ ] **T014** Campo "Corso" modificabile nel lettore e nello storico (`static/js/course-field.js`,
+- [x] **T014** Campo "Corso" modificabile nel lettore e nello storico (`static/js/course-field.js`,
   `<datalist>` dai corsi esistenti, salvataggio con PATCH, errore mostrato accanto al campo con
   input preservato). `reader.js` e `storico.js` cambiano solo per montarlo. Rischio: medio.
   verify: click-through: cambio corso dal lettore → `/corsi` mostra la lezione nel nuovo corso;
   valore troppo lungo → messaggio, testo non perso; job in corso → campo modificabile.
+  Esito: campo solo nel lettore; lo storico non lo monta (le righe hanno già le azioni e
+  `/corsi` copre il raggruppamento). Il limite di lunghezza lo giudica solo il server: NFKC può
+  espandere oltre 100 un testo che `maxlength` ammette (verificato con 34 legature «ﬃ»).
 - [ ] **T015** Gate di fase. verify: suite, ruff, format, mypy; `a11y-gate` verde su `/corsi` e
   lettore; click-through registrato; `wc -l` dei file toccati ≤ 300 (salvo `reader.js`/`jobs.js`,
   che non crescono di più delle righe di montaggio).

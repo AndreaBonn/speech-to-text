@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import JsonValue
 
+from sbobina.courses import MAX_COURSE_LABEL_LENGTH, effective_course
 from sbobina.model_catalog import ollama_options, whisper_options
 from sbobina.web.errors import NotFoundError
 from sbobina.web.job_models import JobRecord, JobStatus
@@ -200,11 +201,7 @@ def confronto(request: Request, store: JobStoreDep) -> HTMLResponse:
 
 @router.get("/lettore/{job_id}", response_class=HTMLResponse)
 def lettore(request: Request, store: JobStoreDep, job_id: str) -> HTMLResponse:
-    """Synchronised reader: word-level transcript plus a sticky audio bar.
-
-    The page itself only needs to know the job exists; the transcript, the
-    audio and the re-listen points are fetched client-side by reader.js.
-    """
+    """Synchronised reader; transcript, audio and re-listen points load client-side."""
     try:
         record = store.get(job_id=job_id)
     except NotFoundError:
@@ -228,4 +225,13 @@ def lettore(request: Request, store: JobStoreDep, job_id: str) -> HTMLResponse:
         job_id=job_id,
         title=_reader_title(record),
         created_at=record.created_at.strftime("%d/%m/%Y"),
+        course=_reader_course(store=store, record=record),
+        course_max_length=MAX_COURSE_LABEL_LENGTH,
+        subject=record.config.subject or "",
     )
+
+
+def _reader_course(store: JobStore, record: JobRecord) -> str:
+    """The course shown in the reader field: the user's choice, else the subject."""
+    meta = store.read_meta(job_id=str(record.id))
+    return effective_course(course=meta.course, subject=record.config.subject) or ""

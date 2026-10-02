@@ -14,6 +14,18 @@
     <div class="reader__toolbar-title">
       <h2 class="reader__title">{{ title }}</h2>
       <p class="reader__subtitle">Caricata il {{ created_at }}</p>
+      <form id="course-form" class="course-field" data-subject="{{ subject }}" novalidate>
+        <label class="field__label" for="course-input">Corso</label>
+        <div class="course-field__row">
+          <input id="course-input" class="text-input course-field__input" name="course" type="text"
+                 value="{{ course }}" maxlength="{{ course_max_length }}" list="course-options"
+                 autocomplete="off" aria-describedby="course-error course-status">
+          <button type="submit" class="btn btn--secondary">Salva corso</button>
+        </div>
+        <datalist id="course-options"></datalist>
+        <p id="course-error" class="field__error" hidden></p>
+        <p id="course-status" class="field__helper" aria-live="polite"></p>
+      </form>
     </div>
     <div class="reader__toolbar-actions">
       <div id="variant-switch" class="segmented" role="group" aria-label="Versione del testo" hidden>
@@ -98,5 +110,6 @@
 {% if not not_found %}
 <script src="/static/js/reader.js" defer></script>
 <script src="/static/js/reader-edit.js" defer></script>
+<script src="/static/js/course-field.js" defer></script>
 {% endif %}
 {% endblock %}

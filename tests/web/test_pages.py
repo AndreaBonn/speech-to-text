@@ -8,7 +8,7 @@ from pydantic import JsonValue
 from sbobina.settings import Settings
 from sbobina.web import pages
 from sbobina.web.app import create_app
-from sbobina.web.job_models import JobConfig, JobStatus
+from sbobina.web.job_models import JobConfig, JobStatus, LectureMeta
 from sbobina.web.job_store import JobStore
 
 BASE_URL = "http://127.0.0.1:8765"
@@ -196,6 +196,31 @@ def test_reader_page_returns_shell_for_an_existing_job(tmp_path: Path) -> None:
     assert f"/api/v1/jobs/{record.id}/audio" in body
     assert f"/api/v1/jobs/{record.id}/files/md" in body
     assert "/static/js/reader.js" in body
+
+
+def test_reader_course_field_falls_back_to_subject(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig(subject="Fisica"), source_name="a.m4a")
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get(f"/lettore/{record.id}").text
+
+    assert 'id="course-input"' in body
+    assert 'value="Fisica"' in body
+    assert 'maxlength="100"' in body
+    assert "/static/js/course-field.js" in body
+
+
+def test_reader_course_field_prefers_meta_and_escapes_it(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig(subject="Fisica"), source_name="a.m4a")
+    store.write_meta(job_id=str(record.id), meta=LectureMeta(course='Analisi "1" <b>'))
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get(f"/lettore/{record.id}").text
+
+    assert 'value="Analisi &#34;1&#34; &lt;b&gt;"' in body
+    assert 'value="Fisica"' not in body
 
 
 def test_reader_page_returns_404_for_missing_job(tmp_path: Path) -> None:

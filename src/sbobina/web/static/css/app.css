@@ -797,6 +797,21 @@ body {
   color: var(--color-ink-3);
 }
 
+.course-field {
+  margin-top: var(--space-sm);
+  max-width: 28rem;
+}
+
+.course-field__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+
+.course-field__input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
 
 .reader__toolbar-actions {
   display: flex;
