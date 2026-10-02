@@ -32,3 +32,27 @@ Mancati: "caratteri del fenomeno aziendale" (rank 15), "negozio di abbigliamento
 | Dopo il fix | 27/30 = 0,90 | tenuto | Sopra soglia; nessuna iterazione della query necessaria (BUDGET di 3 non usato) |
 
 SPEDITO: query BM25 di T023 invariata, finestre di lezione di T025.
+
+## T050 - OCR dei PDF scansionati con qwen2.5vl:7b (2026-10-03)
+
+Pagina 31 del manuale scansionato `librib` (che ha già un livello di testo OCR, usato come
+riferimento), renderizzata con pypdfium2 e passata a `qwen2.5vl:7b` via Ollama 0.18.
+
+| Impostazione | Tempo per pagina | Dove gira | Esito |
+|---|---|---|---|
+| scala 2,0, num_ctx 8192 | oltre 600 s, interrotto | 100% CPU, 13 GB stimati | nessuna pagina completata |
+| scala 1,0, num_ctx 4096 | 171,6 s (+31,8 s di caricamento) | 100% CPU, 13 GB stimati, GPU a 26 MiB | 434 parole contro 441 |
+
+Qualità (scala 1,0): WER 0,17 contro il livello di testo del PDF. Oltre a sillabazioni e
+punteggiatura, **un errore che cambia il significato**: il PDF dice "i piccoli redditi erano
+cresciuti meno dei grandi", l'OCR "i piccoli redditi erano crescenti nel grado di incremento".
+Il modello visivo riscrive invece di trascrivere.
+
+Conseguenze per F5:
+- Un manuale di 246 pagine costerebbe circa 12 ore di CPU: l'OCR va lanciato per documento, con
+  avanzamento e annullabile, mai automatico.
+- Il testo OCR va marcato nel lettore e nelle citazioni come "testo riconosciuto automaticamente,
+  può contenere errori anche di significato": una citazione verbatim di un testo riscritto non
+  prova niente.
+- Perché il modello non usa la GPU: BASIS inferred, la stima di 13 GB supera gli 8 GB e Ollama non
+  divide il modello visivo; da verificare nei log di Ollama.

@@ -291,7 +291,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
 
 ## F5 - OCR dei PDF scansionati (U1 = OCR)
 
-- [ ] **T050** Misura (non delegabile): 5 pagine scansionate con `qwen2.5vl:7b`, tempo per pagina,
+- [x] **T050** Misura (non delegabile): 5 pagine scansionate con `qwen2.5vl:7b`, tempo per pagina,
   VRAM, qualità del testo a vista. verify: tabella in `adr.md`; decisione su risoluzione e prompt.
 - [ ] **T051** Azione di coda `ocr` (GPU, come lo studio): pagine renderizzate a immagine
   (`pypdfium2` o equivalente da T001c), una chiamata per pagina, testo in `text.json` con
