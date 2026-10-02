@@ -189,7 +189,7 @@ Usabile da sola: `sbobina studio <json>` produce materiali validati senza il web
 
 **[B-8] T032-T033**
 
-- [ ] **T032** `src/sbobina/study_blocks.py` puro (blocchi da ~`study_block_words`=1200 parole
+- [x] **T032** `src/sbobina/study_blocks.py` puro (blocchi da ~`study_block_words`=1200 parole
   tagliati sulla pausa più lunga nell'ultimo 20% del blocco; testo `[S<i>] mm:ss testo`),
   `src/sbobina/prompts/studio-v1.md` (contesto, compito, formato, vincoli: citare copiando
   carattere per carattere, una voce senza appoggio nel testo non si scrive, lista vuota ammessa;
@@ -201,7 +201,7 @@ Usabile da sola: `sbobina studio <json>` produce materiali validati senza il web
   con motivo e conteggio; JSON rotto due volte → blocco in `failed_blocks` con i tempi; `chat` che
   solleva `CorrectorUnavailableError` → eccezione propagata, nessun file scritto; ogni blocco
   sotto il budget di parole; progresso chiamato una volta per blocco.
-- [ ] **T033** `src/sbobina/study_render.py` (Markdown: capitoli, voci, citazione con `§N mm:ss` e
+- [x] **T033** `src/sbobina/study_render.py` (Markdown: capitoli, voci, citazione con `§N mm:ss` e
   testo; paragrafo da `group_paragraphs` con le `RenderOptions`), JSON I/O di
   `audio.studio.json` con rivalidazione al caricamento contro la trascrizione corrente
   (`stale_dropped`), sottocomando `sbobina studio <json> [--model]` in `cli.py` con log di

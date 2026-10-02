@@ -10,6 +10,7 @@ from sbobina import pipeline
 from sbobina.models import load_transcript
 from sbobina.render import format_timestamp
 from sbobina.settings import Settings, settings
+from sbobina.study_command import cmd_studio
 from sbobina.wer import compute_wer
 
 logger = logging.getLogger("sbobina")
@@ -166,8 +167,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     wer.set_defaults(handler=cmd_wer)
     _add_correggi_parser(commands)
+    _add_studio_parser(commands)
     _add_web_parser(commands)
     return parser
+
+
+def _add_studio_parser(
+    commands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    studio = commands.add_parser(
+        "studio", help="Genera materiali di studio con citazioni"
+    )
+    studio.add_argument(
+        "trascrizione", type=Path, help="La trascrizione JSON della lezione"
+    )
+    studio.add_argument("--model", default=None, help="Modello Ollama da usare")
+    studio.set_defaults(handler=cmd_studio)
 
 
 def _add_web_parser(
