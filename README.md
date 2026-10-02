@@ -183,3 +183,9 @@ Released under the Apache License 2.0. See [LICENSE](./LICENSE).
 ## Support the project
 
 If this project was useful to you, consider giving it a star on [GitHub](https://github.com/AndreaBonn/speech-to-text): it helps other students find it.
+
+Transcriber is free to use. If it helps you and you want to give something back, you can leave a tip via PayPal. The amount is up to you and it is entirely optional.
+
+<p align="center">
+  <a href="https://paypal.me/AndreaBonacci19"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?logo=paypal&logoColor=white&style=for-the-badge" alt="Donate with PayPal"></a>
+</p>
