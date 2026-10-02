@@ -256,3 +256,89 @@ resta visibile come "prima: ...").
 
 Complessità medio-alta: 24 file toccati tra nuova esportazione e correzione
 manuale. Stato completato e verificato su Linux.
+
+## 2026-10-02 - 12:18 | Sessione #4 [FEATURE]
+
+### Richiesta
+
+Implementare T010-T012 del blocco B-2 in `specs/study-library/tasks.md`, su
+`main`: raggruppamento per corso, metadati separati per le lezioni e API dei
+corsi. L'ADR A1-c riserva `job.json` al supervisor e `meta.json` alle modifiche
+dell'utente, così gli aggiornamenti concorrenti non si sovrascrivono.
+
+### Azioni Eseguite
+
+- T010: normalizzazione NFKC, compressione degli spazi e chiavi con casefold;
+  aggregazione con conteggio, data ed etichetta della lezione più recente.
+  Il gruppo "Senza corso" usa la chiave vuota.
+- T011: aggiunti `LectureMeta`, lettura e scrittura atomica di `meta.json`,
+  filtro del corso effettivo e iterazione dei record. Il corso effettivo usa
+  `meta.course or config.subject`. `JobRecord` resta invariato.
+- T012: aggiunti `GET /api/v1/courses` paginato, `PATCH /api/v1/jobs/<id>/meta`
+  e il parametro `course` su `GET /api/v1/jobs`, con validazione per campo e
+  protezione Origin esistente. Nessuna modifica alla UI.
+- Conservata la leggibilità delle materie preesistenti che superano 100
+  caratteri dopo NFKC: `"ﬃ" * 34` diventa una stringa di 102 caratteri.
+  Il limite di 100 resta valido per i nuovi corsi; regressione vista rossa e verde.
+- Estratta la registrazione delle rotte (`_register_routes`) per mantenere
+  `create_app` entro 30 righe dopo l'aggiunta del router corsi.
+- Verificata la coerenza del blocco B-2 con la richiesta esplicita Q1-D.
+  Aggiornati il layout in `CLAUDE.md` e le tre spunte dei task.
+
+TDD, test osservati rossi prima dell'implementazione:
+
+| Task | Test | Esito iniziale |
+|---|---|---|
+| T010 | `test_normalize_course_label_and_key` | Incluso nei 18 fallimenti iniziali |
+| T011 | `test_read_meta_missing_file_falls_back_to_subject` | `AttributeError` |
+| T012 | `test_patch_meta_preserves_job_bytes` | HTTP 404 |
+
+Verifiche eseguite dall'orchestratore (fuori dal sandbox di esecuzione, senza
+restrizioni sui socket):
+
+| Controllo | Risultato |
+|---|---|
+| Suite completa, 599 test | 599 passed |
+| `uv run ruff check .` | All checks passed |
+| `uv run ruff format --check .` | 101 files already formatted |
+| `uv run mypy src tests` | Success: no issues found in 86 source files |
+
+Nota: l'implementazione è stata delegata a Codex (flagship OpenAI) in un
+sandbox con socket TCP negati; lì la suite completa risultava 1 failed,
+2 errors solo su `test_launcher` (apertura di una porta reale), non
+riproducibile fuori sandbox. Codex aveva anche aggiunto uno stub autouse in
+`tests/test_cli.py` per "correggere" quattro test che nel suo sandbox
+contattavano Ollama: nell'ambiente reale quei quattro test erano già verdi
+senza la modifica (baseline confermata con `git stash`), quindi la modifica
+era fuori scope e non necessaria. Rimossa prima del commit.
+
+BASIS: measured - risultati dei comandi eseguiti dall'orchestratore e cicli
+rosso-verde riportati sopra, fuori dal sandbox Codex. I test esistenti
+`test_job_store.py` e `test_job_models.py` sono passati senza modifiche; il
+test PATCH controlla che `job.json` resti identico byte per byte. Nessuna
+percentuale di copertura misurata.
+
+### File Modificati
+
+| File | Tipo | Descrizione |
+|---|---|---|
+| `src/sbobina/courses.py` | Nuovo | Normalizzazione e aggregazione pura |
+| `src/sbobina/web/job_models.py`, `src/sbobina/web/job_store.py` | Modificato | Metadati separati e filtro per corso |
+| `src/sbobina/web/api_courses.py` | Nuovo | Elenco corsi e modifica metadati |
+| `src/sbobina/web/api_jobs.py`, `src/sbobina/web/app.py` | Modificato | Filtro dei job e registrazione delle rotte |
+| `tests/test_courses.py`, `tests/web/test_course_meta.py`, `tests/web/test_api_courses.py` | Nuovo | Test dei tre task |
+| `tests/web/test_api_jobs.py` | Modificato | Test del filtro `course` su `GET /jobs` |
+| `CLAUDE.md`, `specs/study-library/tasks.md` | Modificato | Layout del progetto e spunte T010-T012 |
+| `docs/REPORT_ATTIVITA.md` | Modificato | Registro della sessione |
+
+### Note per il Cliente
+
+Il servizio può associare le lezioni a un corso anche durante la trascrizione
+e restituire l'elenco dei corsi con il numero di lezioni. Queste operazioni
+sono disponibili tramite API; i comandi nell'interfaccia grafica appartengono
+ai task successivi.
+
+### Riepilogo (Complessità / Stato)
+
+Complessità media. Codice implementato, suite completa verde (599 passed),
+ruff e mypy puliti. Tre commit atomici su `main`, nessun push.

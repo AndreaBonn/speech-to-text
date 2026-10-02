@@ -12,6 +12,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from sbobina.settings import LOOPBACK_HOSTS, Settings
 from sbobina.web.api_corrected import router as corrected_router
+from sbobina.web.api_courses import router as courses_router
 from sbobina.web.api_files import router as files_router
 from sbobina.web.api_jobs import router as jobs_router
 from sbobina.web.api_models import create_models_router
@@ -80,12 +81,18 @@ def create_app(
             "/api/v1/wer": WER_REQUEST_LIMIT_BYTES,
         },
     )
+    _register_routes(app=app, settings=settings)
+    return app
+
+
+def _register_routes(app: FastAPI, settings: Settings) -> None:
     app.add_exception_handler(RequestValidationError, request_validation_handler)
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(HTTPException, http_error_handler)
     app.include_router(create_system_router(settings=settings))
     app.include_router(create_models_router(settings=settings))
     app.include_router(jobs_router)
+    app.include_router(courses_router)
     app.include_router(files_router)
     app.include_router(corrected_router)
     app.include_router(wer_router)
@@ -96,4 +103,3 @@ def create_app(
         StaticFiles(directory=Path(__file__).parent / "static"),
         name="static",
     )
-    return app

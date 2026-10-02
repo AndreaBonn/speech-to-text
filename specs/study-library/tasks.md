@@ -44,7 +44,7 @@ i task marcati "(Q<n>)" si riscrivono prima di partire.
 
 **[B-2] T010-T012**
 
-- [ ] **T010** `src/sbobina/courses.py` puro: `normalize_course_label(raw) -> str | None` (strip,
+- [x] **T010** `src/sbobina/courses.py` puro: `normalize_course_label(raw) -> str | None` (strip,
   spazi compressi, NFKC, vuoto → None, max 100), `course_key(label) -> str` (casefold della
   normalizzata), `effective_course(course, subject) -> str | None`, `group_courses(records) ->
   list[CourseSummary]` (`key, label` della lezione più recente, `lecture_count`,
@@ -52,7 +52,7 @@ i task marcati "(Q<n>)" si riscrivono prima di partire.
   verify: test parametrizzati: `"  Diritto   Privato "` → label `Diritto Privato`, key
   `diritto privato`; `""` → None; 101 caratteri → errore; due record "diritto privato" e "Diritto
   Privato" → 1 corso, count 2, label del più recente.
-- [ ] **T011** (ADR A1-c) `data/jobs/<id>/meta.json` di proprietà dell'utente, `LectureMeta(course:
+- [x] **T011** (ADR A1-c) `data/jobs/<id>/meta.json` di proprietà dell'utente, `LectureMeta(course:
   str | None)` validato con `normalize_course_label`; `job.json` resta del supervisor (nessun
   campo nuovo, nessuna race fra PATCH e `store.update` del supervisor). `JobStore.read_meta` /
   `write_meta` (atomic_write); `JobStore.list(..., course_key: str | None = None)` filtra sul corso
@@ -60,7 +60,7 @@ i task marcati "(Q<n>)" si riscrivono prima di partire.
   → corso effettivo = `subject`; `list(course_key="diritto privato")` su 5 job misti → solo i 2
   giusti con `total` 2; test: `write_meta` concorrente a `store.update` sullo stesso job → entrambi
   i dati presenti; test esistenti di `test_job_store.py` e `test_job_models.py` verdi senza modifiche.
-- [ ] **T012** `src/sbobina/web/api_courses.py`: `GET /api/v1/courses` (paginato, envelope),
+- [x] **T012** `src/sbobina/web/api_courses.py`: `GET /api/v1/courses` (paginato, envelope),
   `PATCH /api/v1/jobs/<id>/meta` con body `{course}`; `GET /api/v1/jobs` accetta `course`.
   Ammesso anche su job in corso (file separato). 422 per campo. Rischio: basso.
   verify: test API: PATCH → 200 e `meta.json` con `course`, `job.json` byte-identico; 101

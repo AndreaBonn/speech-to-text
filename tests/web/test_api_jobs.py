@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from sbobina.settings import Settings
 from sbobina.web.api_jobs import source_name
 from sbobina.web.app import create_app
-from sbobina.web.job_models import JobConfig, JobStatus
+from sbobina.web.job_models import JobConfig, JobStatus, LectureMeta
 from sbobina.web.job_store import JobStore
 from sbobina.web.stage_runner import _find_audio
 
@@ -183,6 +183,30 @@ def test_get_job_missing_id_returns_404(client: TestClient) -> None:
     response = client.get(url=f"{JOBS_URL}/missing")
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_list_jobs_filters_effective_course(client: TestClient, tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    subjects = ["Diritto Privato", "Fisica", "Altro", None, "Diritto Privato"]
+    records = [store.create(config=JobConfig(subject=subject)) for subject in subjects]
+    store.write_meta(
+        job_id=str(records[1].id), meta=LectureMeta(course="Diritto Privato")
+    )
+    store.write_meta(job_id=str(records[4].id), meta=LectureMeta(course="Fisica"))
+    response = client.get(
+        url=JOBS_URL, params={"course": "diritto privato", "per_page": 1}
+    )
+    assert response.status_code == 200
+    assert response.json()["meta"] == {
+        "page": 1,
+        "per_page": 1,
+        "total": 2,
+        "total_pages": 2,
+    }
+    assert [item["id"] for item in response.json()["data"]] == [str(records[1].id)]
+    missing = client.get(url=JOBS_URL, params={"course": ""}).json()
+    assert [item["id"] for item in missing["data"]] == [str(records[3].id)]
+    assert client.get(url=JOBS_URL).json()["meta"]["total"] == 5
 
 
 @pytest.mark.parametrize("status", [JobStatus.DONE, JobStatus.QUEUED])

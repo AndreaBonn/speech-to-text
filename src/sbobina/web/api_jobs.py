@@ -164,9 +164,10 @@ def list_jobs(
     services: Services,
     page: Annotated[int, Query(ge=1)] = 1,
     per_page: Annotated[int, Query(ge=1)] = 20,
+    course: str | None = None,
 ) -> dict[str, Any]:
     """Return jobs ordered by creation time with pagination metadata."""
-    result = services.store.list(page=page, per_page=per_page)
+    result = services.store.list(page=page, per_page=per_page, course_key=course)
     return {
         "data": [record.model_dump(mode="json") for record in result.items],
         "meta": {
