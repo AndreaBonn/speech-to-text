@@ -139,7 +139,7 @@ riscrivono prima di partire.
   citazione resta ancorata al segmento trovato. Emerso dalla review di T023. Rischio: medio.
   verify: segmento di 12 parole al centro di una lezione → passaggio di 230-270 parole che lo
   contiene; due segmenti vicini → una sola finestra; budget di parole rispettato.
-- [ ] **T024** Misura del recupero (non delegabile: giudizio). Con l'utente: 30+ domande su un
+- [x] **T024** Misura del recupero (non delegabile: giudizio). Con l'utente: 30+ domande su un
   corso reale con il passaggio atteso annotato in `specs/001-course-workspace/eval-retrieval.md`;
   `recall@8` e `recall@15`. `BUDGET: 3 iterazioni di query_builder | ranking: recall@8 > recall@15
   > numero di passaggi`. Rischio: alto (R2).
