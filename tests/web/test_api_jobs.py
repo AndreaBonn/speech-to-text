@@ -14,7 +14,13 @@ from fastapi.testclient import TestClient
 from sbobina.settings import Settings
 from sbobina.web.api_jobs import source_name
 from sbobina.web.app import create_app
-from sbobina.web.job_models import JobConfig, JobStatus, LectureMeta
+from sbobina.web.job_models import (
+    JobConfig,
+    JobStatus,
+    LectureMeta,
+    StudyRun,
+    StudyStatus,
+)
 from sbobina.web.job_store import JobStore
 from sbobina.web.stage_runner import _find_audio
 
@@ -288,3 +294,22 @@ def test_upload_size_limit_is_inclusive(
     )
 
     assert response.status_code == status
+
+
+@pytest.mark.parametrize("study_status", list(StudyStatus))
+def test_delete_job_protects_an_active_study_on_a_done_job(
+    client: TestClient, tmp_path: Path, study_status: StudyStatus
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig())
+    study = StudyRun(status=study_status, updated_at=record.updated_at)
+    store.update(
+        record=record.model_copy(update={"status": JobStatus.DONE, "study": study})
+    )
+    directory = store.jobs_dir / str(record.id)
+
+    response = client.delete(url=f"{JOBS_URL}/{record.id}")
+
+    active = study_status in (StudyStatus.QUEUED, StudyStatus.RUNNING)
+    assert response.status_code == (409 if active else 204)
+    assert directory.exists() == active

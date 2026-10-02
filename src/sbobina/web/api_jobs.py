@@ -13,7 +13,7 @@ from starlette.responses import Response
 
 from sbobina.settings import Settings
 from sbobina.web.errors import AppError, ConflictError
-from sbobina.web.job_models import JobConfig, JobRecord, JobStatus
+from sbobina.web.job_models import JobConfig, JobRecord, JobStatus, StudyStatus
 from sbobina.web.job_store import JobStore
 from sbobina.web.supervisor import Supervisor
 from sbobina.web.upload_limit import BYTES_PER_MB
@@ -196,7 +196,12 @@ def cancel_job(job_id: str, services: Services) -> dict[str, Any]:
 def delete_job(job_id: str, services: Services) -> Response:
     """Remove a terminal job and its files; reject active jobs with HTTP 409."""
     record = services.store.get(job_id=job_id)
-    if record.status in (JobStatus.RUNNING, JobStatus.QUEUED):
+    # A study keeps the job DONE while its child writes into the job directory.
+    study_active = record.study is not None and record.study.status in (
+        StudyStatus.QUEUED,
+        StudyStatus.RUNNING,
+    )
+    if record.status in (JobStatus.RUNNING, JobStatus.QUEUED) or study_active:
         raise ConflictError(
             message="Annulla il job prima di eliminarlo", code="JOB_NOT_DELETABLE"
         )
