@@ -157,7 +157,7 @@ Usabile da sola: `sbobina studio <json>` produce materiali validati senza il web
 
 **[B-7] T030-T031**
 
-- [ ] **T030** Estrarre `src/sbobina/ollama_chat.py` da `llm_corrector.py`: `chat_json(client,
+- [x] **T030** Estrarre `src/sbobina/ollama_chat.py` da `llm_corrector.py`: `chat_json(client,
   request: ChatRequest) -> str` (contenuto della risposta), mappatura errori
   (`CorrectorUnavailableError`/`InvalidResponseError` restano quelli di oggi), rimozione del fence
   markdown. `llm_corrector` lo usa; nessun cambio di comportamento. Aggiornare `CLAUDE.md`
@@ -165,7 +165,7 @@ Usabile da sola: `sbobina studio <json>` produce materiali validati senza il web
   verify: `uv run pytest tests/test_llm_corrector.py tests/test_correction.py` verdi **senza
   modifiche ai test esistenti**; nuovi test di `ollama_chat` con client finto (fence, JSON nudo,
   `ResponseError`, `httpx.TransportError`).
-- [ ] **T031** `src/sbobina/study_models.py` (dominio + schema pydantic della risposta) e
+- [x] **T031** `src/sbobina/study_models.py` (dominio + schema pydantic della risposta) e
   `src/sbobina/study_citations.py` puro: `normalize_tokens(text)`, `locate_quote(segments,
   segment_index, quote, allowed) -> CitationMatch | Rejection` (contiguità sul passaggio o sul
   successivo nello stesso blocco, 3-40 parole), `validate_item(...)` stretto (una citazione
