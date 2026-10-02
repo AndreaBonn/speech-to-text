@@ -1,6 +1,6 @@
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import patch
 
 import anyio
@@ -12,7 +12,7 @@ from starlette.types import Message
 from sbobina.settings import Settings
 from sbobina.web import api_models, downloads
 from sbobina.web.app import create_app
-from sbobina.web.downloads import DownloadManager
+from sbobina.web.downloads import DownloadManager, DownloadState
 
 BASE_URL = "http://127.0.0.1:8765"
 
@@ -136,3 +136,35 @@ def test_download_events_emits_progress_then_end_and_respects_disconnect() -> No
                 await anext(stream)
 
     anyio.run(scenario)
+
+
+def test_download_events_sends_unchanged_state_once_then_pings_when_idle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(api_models, "DOWNLOADS_POLL_INTERVAL_S", 0.0)
+    monkeypatch.setattr(api_models, "DOWNLOADS_PING_INTERVAL_S", 0.0)
+    done = DownloadState(source="ollama", name="qwen3.5:2b", status="done")
+
+    class StaticManager:
+        def list(self) -> list[DownloadState]:
+            return [done]
+
+    async def scenario() -> list[str]:
+        async def receive() -> Message:
+            return {"type": "http.request"}
+
+        request = Request(scope={"type": "http"}, receive=receive)
+        stream = api_models._download_events(
+            request=request, manager=cast(DownloadManager, StaticManager())
+        )
+        with anyio.fail_after(5):
+            return [await anext(stream) for _ in range(4)]
+
+    events = anyio.run(scenario)
+
+    assert [event.split("\n")[0] for event in events] == [
+        "event: progress",
+        "event: end",
+        ": ping",
+        ": ping",
+    ]

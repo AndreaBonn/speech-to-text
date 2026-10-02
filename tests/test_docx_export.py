@@ -1,5 +1,6 @@
 from io import BytesIO
 
+import pytest
 from docx import Document
 from docx.document import Document as DocxDocument
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -33,8 +34,10 @@ def test_render_book_docx_body_is_justified_with_first_line_indent() -> None:
 
     body = document.styles["Normal"]
     assert body.paragraph_format.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY
-    assert body.paragraph_format.first_line_indent is not None
-    assert body.paragraph_format.first_line_indent > 0
+    indent = body.paragraph_format.first_line_indent
+    assert indent is not None
+    # Word stores the indent in twips, so 0.6 cm comes back as 0.5997 cm.
+    assert indent.cm == pytest.approx(0.6, abs=0.01)
 
 
 def test_render_book_docx_page_is_a4() -> None:
@@ -64,3 +67,9 @@ def test_render_book_docx_title_uses_body_serif_not_word_default() -> None:
     document = _open(render_book_docx(title="T", paragraphs=["x"]))
 
     assert document.styles["Title"].font.name == document.styles["Normal"].font.name
+
+
+def test_render_book_docx_without_paragraphs_keeps_only_the_title() -> None:
+    document = _open(render_book_docx(title="Vuota", paragraphs=[]))
+
+    assert [p.text for p in document.paragraphs] == ["Vuota"]

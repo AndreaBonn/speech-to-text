@@ -44,3 +44,9 @@ def test_compute_wer_identical_texts_is_zero_ignoring_case_and_punctuation() -> 
 def test_compute_wer_empty_reference_raises() -> None:
     with pytest.raises(ValueError, match="riferimento"):
         compute_wer(reference=" ,. ", hypothesis="qualcosa")
+
+
+def test_compute_wer_hypothesis_empty_after_normalization_is_all_deletions() -> None:
+    report = compute_wer(reference="ciao mondo", hypothesis="[00:00:00] ...")
+
+    assert (report.wer, report.deletions, report.insertions) == (1.0, 2, 0)

@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from sbobina.models import Transcript, load_transcript, save_transcript
 from sbobina.settings import Settings
+from sbobina.web.api_corrected import MAX_EDIT_CHARS
 from sbobina.web.app import create_app
 from sbobina.web.job_models import JobConfig, JobRecord, JobStatus
 from sbobina.web.job_store import JobStore
@@ -96,12 +97,34 @@ def test_export_txt_original_uses_source_stem_as_title(client: TestClient) -> No
     assert response.text == "Lezione 3\n\nIl processo è\n\nPoi altro.\n"
 
 
+def test_export_without_source_name_or_subject_is_titled_by_date_and_ascii_named(
+    client: TestClient,
+) -> None:
+    store = _store(client)
+    record = store.create(config=JobConfig())
+    record = store.update(record=record.model_copy(update={"status": JobStatus.DONE}))
+    save_transcript(
+        transcript=_transcript(),
+        path=store.jobs_dir / str(record.id) / "audio.corretto.json",
+    )
+
+    response = client.get(url=f"/api/v1/jobs/{record.id}/export/txt")
+
+    assert response.status_code == 200
+    assert response.headers["content-disposition"] == (
+        'attachment; filename="audio.corretto.txt"'
+    )
+    created = record.created_at.strftime("%d/%m/%Y")
+    assert response.text.startswith(f"Lezione del {created}\n\n")
+
+
 def test_export_missing_corrected_variant_returns_404(client: TestClient) -> None:
     record, _ = _job(client, corrected=False)
 
     response = client.get(url=f"/api/v1/jobs/{record.id}/export/txt")
 
     assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
 def test_edit_span_saves_json_rewrites_markdown_and_returns_reader(
@@ -199,6 +222,7 @@ def test_edit_span_without_corrected_copy_returns_404(client: TestClient) -> Non
     )
 
     assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
 def test_create_corrected_copies_original_once(client: TestClient) -> None:
@@ -286,3 +310,34 @@ def test_edit_span_without_revision_returns_422(client: TestClient) -> None:
     )
 
     assert response.status_code == 422
+    fields = [detail["field"] for detail in response.json()["error"]["details"]]
+    assert fields == ["body.revision"]
+
+
+def test_create_corrected_while_job_runs_returns_409(client: TestClient) -> None:
+    record, directory = _job(client, status=JobStatus.RUNNING, corrected=False)
+
+    response = client.post(url=f"/api/v1/jobs/{record.id}/transcript/corrected")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "JOB_IN_PROGRESS"
+    assert not (directory / "audio.corretto.json").exists()
+
+
+def test_edit_span_text_over_limit_returns_field_error(client: TestClient) -> None:
+    record, _ = _job(client)
+
+    response = client.patch(
+        url=f"/api/v1/jobs/{record.id}/transcript/corrected",
+        json={
+            "start": 1,
+            "end": 2,
+            "expected": "processo",
+            "text": "x" * (MAX_EDIT_CHARS + 1),
+            "revision": _revision(client=client, record=record),
+        },
+    )
+
+    assert response.status_code == 422
+    fields = [detail["field"] for detail in response.json()["error"]["details"]]
+    assert fields == ["body.text"]

@@ -370,3 +370,20 @@ def test_transcribe_file_per_job_settings_keep_cpu_default_model(
         "large-v3-turbo", device="cpu", compute_type="int8", cpu_threads=8
     )
     assert result.model == "large-v3-turbo"
+
+
+def test_collect_segments_logs_progress_once_per_five_minutes_of_audio(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    raw_segments = [
+        SimpleNamespace(start=0.0, end=end, words=None)
+        for end in (100.0, 310.0, 400.0, 620.0)
+    ]
+
+    with caplog.at_level(logging.INFO, logger=transcriber.logger.name):
+        transcriber._collect_segments(raw_segments, duration=700.0)
+
+    assert [r.getMessage() for r in caplog.records] == [
+        "Trascritti 00:05:10 di 00:11:40",
+        "Trascritti 00:10:20 di 00:11:40",
+    ]

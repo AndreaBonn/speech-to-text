@@ -74,6 +74,14 @@ def test_job_config_uses_settings_and_runtime_defaults() -> None:
     )
 
 
+def test_job_config_without_runtime_keeps_the_settings_choices() -> None:
+    config = Settings(device="cpu", compute_type="int8", whisper_model="tiny")
+
+    job = JobConfig.from_settings(config=config)
+
+    assert (job.device, job.compute_type, job.whisper_model) == ("cpu", "int8", "tiny")
+
+
 def test_record_round_trips_json() -> None:
     from datetime import UTC, datetime
     from uuid import uuid4

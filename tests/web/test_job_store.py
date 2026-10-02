@@ -162,3 +162,16 @@ def test_corrupt_json_is_not_silently_skipped(tmp_path: Path) -> None:
     )
     with pytest.raises(PydanticValidationError):
         store.list(page=1, per_page=10)
+
+
+def test_corrupt_progress_json_is_not_silently_reset(tmp_path: Path) -> None:
+    from pydantic import ValidationError as PydanticValidationError
+
+    store = JobStore(data_dir=tmp_path)
+    job = store.create(config=JobConfig())
+    (tmp_path / "jobs" / str(job.id) / "progress.json").write_text(
+        "broken", encoding="utf-8"
+    )
+
+    with pytest.raises(PydanticValidationError):
+        store.read_progress(job_id=str(job.id))

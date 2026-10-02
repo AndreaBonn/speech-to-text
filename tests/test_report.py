@@ -88,3 +88,19 @@ def test_report_complete_run_has_no_interruption_line_and_says_when_lists_are_em
 
     assert "interrotta" not in report
     assert report.count("Niente da segnalare.") == 4
+
+
+def test_report_suggestion_bounds_include_lower_and_exclude_threshold() -> None:
+    result = CorrectionResult(
+        transcript=TRANSCRIPT,
+        applied=[],
+        rejected=[
+            _rejected("limite_basso", NOT_ALIKE, 0.5),
+            _rejected("soglia", NOT_ALIKE, 0.6),
+        ],
+    )
+
+    report = render_corrections_report(result, model="m", removed=[])
+
+    assert "«limite_basso»" in report
+    assert "«soglia»" not in report

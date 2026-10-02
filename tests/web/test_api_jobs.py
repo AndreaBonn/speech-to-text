@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import cast
 from unittest.mock import Mock
 
+import av
+import numpy as np
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -19,6 +21,7 @@ from sbobina.web.stage_runner import _find_audio
 BASE_URL = "http://127.0.0.1:8765"
 JOBS_URL = "/api/v1/jobs"
 MIB = 1024 * 1024
+WAV_HEADER_BYTES = 44
 
 
 @pytest.fixture
@@ -84,6 +87,48 @@ def test_upload_invalid_file_returns_field_error_and_no_residue(
 
     assert response.status_code == 422
     assert response.json()["error"]["details"][0]["field"] == "file"
+    assert list((tmp_path / "jobs").glob("*")) == []
+
+
+def _video_only_mp4() -> bytes:
+    buffer = io.BytesIO()
+    with av.open(file=buffer, mode="w", format="mp4") as container:
+        stream = container.add_stream(codec_name="mpeg4", rate=1)
+        stream.width, stream.height, stream.pix_fmt = 16, 16, "yuv420p"
+        frame = av.VideoFrame.from_ndarray(
+            array=np.zeros(shape=(16, 16, 3), dtype=np.uint8), format="rgb24"
+        )
+        for packet in [*stream.encode(frame), *stream.encode()]:
+            container.mux(packet)
+    return buffer.getvalue()
+
+
+def test_upload_container_without_audio_track_returns_field_error(
+    client: TestClient, tmp_path: Path
+) -> None:
+    response = client.post(
+        url=JOBS_URL, files={"file": ("video.m4a", _video_only_mp4(), "audio/mp4")}
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["details"] == [
+        {"field": "file", "message": "Il file non contiene una traccia audio"}
+    ]
+    assert list((tmp_path / "jobs").glob("*")) == []
+
+
+def test_upload_failing_to_queue_returns_500_and_removes_the_job(
+    client: TestClient, tmp_path: Path, audio: bytes
+) -> None:
+    supervisor = cast(FastAPI, client.app).state.supervisor
+    supervisor.submit.side_effect = OSError("disk full")
+
+    response = client.post(
+        url=JOBS_URL, files={"file": ("lezione.wav", audio, "audio/wav")}
+    )
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "INTERNAL_ERROR"
     assert list((tmp_path / "jobs").glob("*")) == []
 
 
@@ -194,3 +239,28 @@ def test_source_name_drops_control_and_format_characters() -> None:
     # Browsers percent-encode newlines and NUL in multipart file names, so these
     # reach the function only through other clients: check it directly.
     assert source_name(filename="lez\u202eione\n3\x00\t.m4a") == "lezione3.m4a"
+
+
+def _wav_of_exact_size(total_bytes: int) -> bytes:
+    buffer = io.BytesIO()
+    with wave.open(f=buffer, mode="wb") as output:
+        output.setnchannels(nchannels=1)
+        output.setsampwidth(sampwidth=2)
+        output.setframerate(framerate=8000)
+        output.writeframes(data=b"\x00\x00" * ((total_bytes - WAV_HEADER_BYTES) // 2))
+    data = buffer.getvalue()
+    assert len(data) == total_bytes
+    return data
+
+
+@pytest.mark.parametrize(("extra", "status"), [(0, 201), (2, 413)])
+def test_upload_size_limit_is_inclusive(
+    client: TestClient, extra: int, status: int
+) -> None:
+    audio = _wav_of_exact_size(total_bytes=MIB + extra)
+
+    response = client.post(
+        url=JOBS_URL, files={"file": ("limite.wav", audio, "audio/wav")}
+    )
+
+    assert response.status_code == status

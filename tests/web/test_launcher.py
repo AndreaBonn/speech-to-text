@@ -1,3 +1,4 @@
+import logging
 import socket
 import threading
 import time
@@ -203,3 +204,18 @@ def test_startup_report_describes_runtime_model_and_ollama(
     for fragment in expected:
         assert fragment in report
     assert ("GPU NVIDIA" in report) == (device == "cuda")
+
+
+def test_run_server_logs_the_startup_report_before_serving(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(launcher, "is_port_available", lambda host, port: True)
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: None)
+    monkeypatch.setattr(
+        launcher, "startup_report", lambda config: ["Dispositivo: CPU", "Ollama: ok"]
+    )
+
+    with caplog.at_level(logging.INFO, logger=launcher.logger.name):
+        launcher.run_server(config=Settings(web_port=8765), open_browser=False)
+
+    assert caplog.messages[:2] == ["Dispositivo: CPU", "Ollama: ok"]

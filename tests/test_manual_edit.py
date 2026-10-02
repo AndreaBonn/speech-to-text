@@ -159,3 +159,19 @@ def test_replace_span_untouched_segment_keeps_its_bounds() -> None:
     )
 
     assert edited.segments[1] == _transcript().segments[1]
+
+
+def test_replace_span_fewer_words_take_the_whole_span_time() -> None:
+    edited = replace_span(
+        transcript=_transcript(),
+        start=0,
+        end=3,
+        text="Questo",
+        expected="Il processo è",
+    )
+
+    word = edited.words[0]
+    assert word.text == "Questo"
+    assert (word.start, word.end) == pytest.approx((0.0, 1.2))
+    assert word.corrected_from == "Il processo è"
+    assert [w.text for w in edited.words[1:]] == [" un", " fatto."]

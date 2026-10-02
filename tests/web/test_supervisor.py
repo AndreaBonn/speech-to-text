@@ -14,8 +14,10 @@ from sbobina.web.job_store import JobStore
 from sbobina.web.supervisor import Supervisor, SupervisorOptions
 
 RUNNER = """
+import os
 import signal
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -23,6 +25,10 @@ stage, directory = sys.argv[1:]
 path = Path(directory)
 if (path / 'ignore-term').exists():
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
+if (path / 'exit-on-eof').exists():
+    threading.Thread(
+        target=lambda: (sys.stdin.read(), os._exit(0)), daemon=True
+    ).start()
 with (path.parent / 'order.log').open('a') as stream:
     stream.write(path.name + ':' + stage + '\\n')
 (path / (stage + '.started')).touch()
@@ -289,3 +295,94 @@ def test_child_env_leaves_utf8_unset_elsewhere(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.delenv("PYTHONUTF8", raising=False)
     assert "PYTHONUTF8" not in supervisor._child_env()
+
+
+def test_recovery_reads_every_page_of_queued_jobs(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(supervisor, "RECOVERY_PAGE_SIZE", 5)
+    queued = [harness.create() for _ in range(12)]
+
+    harness.supervisor.start()
+
+    wait_for(predicate=lambda: all(harness.finished(job_id=j) for j in queued))
+    assert (harness.store.jobs_dir / "order.log").read_text().splitlines() == [
+        f"{job_id}:transcribe" for job_id in queued
+    ]
+
+
+def test_start_while_running_keeps_the_same_worker(harness: Harness) -> None:
+    harness.supervisor.start()
+    worker = harness.supervisor._thread
+
+    harness.supervisor.start()
+
+    assert harness.supervisor._thread is worker
+
+
+def test_recover_on_boot_while_running_raises(harness: Harness) -> None:
+    harness.supervisor.start()
+
+    with pytest.raises(RuntimeError, match="Cannot recover"):
+        harness.supervisor.recover_on_boot()
+
+
+def test_stop_lets_a_child_exit_on_stdin_close_without_terminating(
+    harness: Harness,
+) -> None:
+    # A generous reap window: the child needs time to see EOF under CI load,
+    # and missing it would fall back to SIGTERM and fail for the wrong reason.
+    patient = Supervisor(
+        job_store=harness.store,
+        options=SupervisorOptions(
+            command=(sys.executable, "-m", "fake_runner"), terminate_timeout_s=5.0
+        ),
+    )
+    job_id = harness.create(hold=True)
+    harness.marker(job_id=job_id, name="exit-on-eof").touch()
+    patient.start()
+    try:
+        wait_for(
+            predicate=harness.marker(job_id=job_id, name="transcribe.started").exists
+        )
+        process = patient._process
+        assert process is not None
+    finally:
+        patient.stop()
+
+    assert process.returncode == 0  # exited by itself, not by SIGTERM (-15)
+    assert harness.record(job_id=job_id).status == JobStatus.INTERRUPTED
+
+
+def test_job_no_longer_queued_when_dequeued_is_skipped(harness: Harness) -> None:
+    busy = harness.create(hold=True)
+    changed = harness.create()
+    kept = harness.create()
+    harness.supervisor.start()
+    wait_for(predicate=harness.marker(job_id=busy, name="transcribe.started").exists)
+    harness.store.update(
+        record=harness.record(job_id=changed).model_copy(
+            update={"status": JobStatus.CANCELLED}
+        )
+    )
+
+    harness.marker(job_id=busy, name="hold").unlink()
+
+    wait_for(predicate=lambda: harness.finished(job_id=kept))
+    assert harness.record(job_id=changed).status == JobStatus.CANCELLED
+    assert (harness.store.jobs_dir / "order.log").read_text().splitlines() == [
+        f"{busy}:transcribe",
+        f"{kept}:transcribe",
+    ]
+
+
+def test_job_deleted_while_running_does_not_stop_the_queue(harness: Harness) -> None:
+    busy = harness.create(hold=True)
+    kept = harness.create()
+    harness.supervisor.start()
+    wait_for(predicate=harness.marker(job_id=busy, name="transcribe.started").exists)
+
+    harness.store.delete(job_id=busy)
+
+    wait_for(predicate=lambda: harness.finished(job_id=kept))
+    assert harness.supervisor.is_running()

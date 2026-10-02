@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from conftest import make_segment, make_transcript, make_word
 
-from sbobina import cli, llm_corrector
+from sbobina import cli, llm_corrector, pipeline
 from sbobina.cli import main
 from sbobina.correction import Corrector, CorrectorUnavailableError, Edit
 from sbobina.models import load_transcript, save_transcript
@@ -71,6 +71,26 @@ def test_trascrivi_output_dir_that_is_a_file_returns_error_code(tmp_path: Path) 
     not_a_dir.write_text("x", encoding="utf-8")
 
     assert main(["trascrivi", str(audio), "-o", str(not_a_dir)]) == 1
+
+
+@pytest.mark.parametrize("explicit_dir", [False, True])
+def test_trascrivi_writes_next_to_audio_unless_output_dir_given(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, explicit_dir: bool
+) -> None:
+    audio = tmp_path / "lezione.m4a"
+    audio.write_bytes(b"")
+    target = tmp_path / "uscita"
+    destinations: list[Path] = []
+
+    def fake_transcribe(audio_path: Path, output_dir: Path, config: Settings) -> Path:
+        destinations.append(output_dir)
+        return output_dir / "lezione.json"
+
+    monkeypatch.setattr(pipeline, "transcribe_to_dir", fake_transcribe)
+    argv = ["trascrivi", str(audio), *(["-o", str(target)] if explicit_dir else [])]
+
+    assert main(argv) == 0
+    assert destinations == [target if explicit_dir else tmp_path]
 
 
 def test_correggi_writes_corrected_transcript_and_report(
@@ -203,3 +223,20 @@ def test_log_correction_progress_logs_every_ten_and_at_the_end(
     with caplog.at_level(logging.INFO):
         cli._log_correction_progress(done, total)
     assert (f"Corretti {done} paragrafi su {total}" in caplog.text) is logged
+
+
+def test_wer_reads_plain_text_hypothesis(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    reference = tmp_path / "gold.txt"
+    reference.write_text("Teorema di Heisenberg.", encoding="utf-8")
+    hypothesis = tmp_path / "ipotesi.txt"
+    hypothesis.write_text("teorema di Sennberg", encoding="utf-8")
+
+    exit_code = main(["wer", str(reference), str(hypothesis)])
+
+    assert exit_code == 0
+    assert (
+        "WER 33.33% su 3 parole: 1 sostituite, 0 mancanti, 0 in più"
+        in capsys.readouterr().out
+    )

@@ -232,3 +232,67 @@ def test_ollama_download_unreachable_sets_italian_message() -> None:
     state = manager.list()[0]
     assert state.status == "failed"
     assert state.message == "Ollama non è raggiungibile."
+
+
+def test_ollama_download_refused_by_server_reports_the_reason() -> None:
+    with patch.object(ollama, "Client") as factory:
+        factory.return_value.__enter__.return_value.pull.side_effect = (
+            ollama.ResponseError("pull model manifest: file does not exist")
+        )
+        manager = downloads.DownloadManager(settings=Settings(ollama_host=HOST))
+        manager.start(source="ollama", name="qwnn:9b")
+        manager.join(source="ollama", name="qwnn:9b", timeout=5)
+
+    state = manager.list()[0]
+    assert state.status == "failed"
+    assert state.message is not None
+    assert state.message.startswith(
+        "Ollama ha rifiutato il download: pull model manifest: file does not exist"
+    )
+
+
+def test_join_unknown_download_returns_immediately() -> None:
+    manager = downloads.DownloadManager(settings=Settings())
+
+    manager.join(source="ollama", name="mai-avviato", timeout=0)
+
+    assert manager.list() == []
+
+
+def test_whisper_progress_survives_a_blob_renamed_while_polling(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(downloads, "POLL_INTERVAL_S", 0.01)
+    monkeypatch.setattr(downloads, "_whisper_plan", lambda repo_id: (None, tmp_path))
+    real_blob_bytes = downloads._blob_bytes
+    calls = 0
+    raced = threading.Event()
+
+    def racing_blob_bytes(blobs: Path | None) -> int:
+        nonlocal calls
+        calls += 1
+        if calls == 2:  # first poll, after the baseline read
+            raced.set()
+            raise FileNotFoundError("blob renamed between iterdir() and stat()")
+        return real_blob_bytes(blobs=blobs)
+
+    progress_after_race: list[int] = []
+
+    def fake_snapshot(
+        *, repo_id: str, allow_patterns: list[str], dry_run: bool = False, **_: object
+    ) -> str:
+        raced.wait(timeout=5)
+        (tmp_path / "etag.incomplete").write_bytes(b"0" * 9)
+        _wait_until(lambda: manager.list()[0].completed == 9)
+        progress_after_race.append(manager.list()[0].completed)
+        return str(tmp_path)
+
+    monkeypatch.setattr(downloads, "_blob_bytes", racing_blob_bytes)
+    with patch.object(downloads, "snapshot_download", side_effect=fake_snapshot):
+        manager = downloads.DownloadManager(settings=Settings())
+        manager.start(source="whisper", name="tiny")
+        manager.join(source="whisper", name="tiny", timeout=5)
+
+    assert progress_after_race == [9]
+    assert manager.list()[0].status == "done"
+    assert "Avanzamento del download non leggibile" in caplog.messages

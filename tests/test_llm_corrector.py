@@ -1,6 +1,8 @@
 import json
 import logging
+from types import SimpleNamespace
 
+import httpx
 import ollama
 import pytest
 
@@ -14,6 +16,10 @@ from sbobina.llm_corrector import (
     parse_response,
 )
 from sbobina.notices import USER_NOTICE
+
+ANSWER_WITH_ONE_EDIT = (
+    '{"correzioni": [{"originale": "legione", "corretto": "lesione"}]}'
+)
 
 
 def test_parse_response_maps_italian_keys_to_edits() -> None:
@@ -179,3 +185,76 @@ def test_ensure_model_unknown_name_raises_with_the_name(
 
     with pytest.raises(ModelDownloadError, match="qwnn:9b"):
         ensure_model(model="qwnn:9b", host="http://x")
+
+
+class _AnsweringClient:
+    """Ollama client double whose ``chat`` returns a fixed message content."""
+
+    content: str | None = None
+
+    def __init__(self, host: str) -> None:
+        pass
+
+    def chat(self, **kwargs: object) -> object:
+        return SimpleNamespace(message=SimpleNamespace(content=self.content))
+
+
+def test_ollama_corrector_returns_edits_from_the_model_answer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(_AnsweringClient, "content", ANSWER_WITH_ONE_EDIT)
+    monkeypatch.setattr(ollama, "Client", _AnsweringClient)
+    corrector = make_ollama_corrector(model="m", host="http://x", subject=None)
+
+    assert corrector("la legione", "") == [
+        Edit(original="legione", corrected="lesione")
+    ]
+
+
+def test_ollama_corrector_empty_message_is_an_invalid_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(_AnsweringClient, "content", None)
+    monkeypatch.setattr(ollama, "Client", _AnsweringClient)
+    corrector = make_ollama_corrector(model="m", host="http://x", subject=None)
+
+    with pytest.raises(InvalidResponseError):
+        corrector("la legione", "")
+
+
+def test_ensure_model_server_error_on_lookup_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailingClient:
+        def __init__(self, host: str) -> None:
+            pass
+
+        def show(self, model: str) -> object:
+            raise ollama.ResponseError("internal error", status_code=500)
+
+    monkeypatch.setattr(ollama, "Client", FailingClient)
+
+    with pytest.raises(CorrectorUnavailableError, match="internal error"):
+        ensure_model(model="qwen3.5:9b", host="http://x")
+
+
+def test_ensure_model_connection_lost_during_pull_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = httpx.ReadError("connection reset")
+    monkeypatch.setattr(
+        ollama, "Client", _FakeOllama(installed=set(), pull_error=error)
+    )
+
+    with pytest.raises(CorrectorUnavailableError, match="connection reset"):
+        ensure_model(model="qwen3.5:9b", host="http://x")
+
+
+def test_build_user_message_puts_previous_paragraph_before_the_text() -> None:
+    message = build_user_message("ha esinto il credito", "la lesione degli interessi")
+
+    assert message == (
+        "Paragrafo precedente, solo come contesto (non correggerlo):\n"
+        "la lesione degli interessi\n\n"
+        "Testo da correggere:\nha esinto il credito"
+    )

@@ -1,4 +1,5 @@
 import json
+import time
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -38,6 +39,22 @@ class LiveStream:
         frame = self.frames.get(timeout=TEST_TIMEOUT_S)
         fields = dict(line.split(": ", 1) for line in frame.splitlines() if line)
         return fields["event"], cast(dict[str, JsonValue], json.loads(fields["data"]))
+
+    def receive_report(self) -> tuple[str, dict[str, JsonValue]]:
+        # write() changes job.json before progress.json, as the supervisor does:
+        # a poll between the two sees the new stage with no report yet. That
+        # frame appears or not depending on timing, so skip it here, together
+        # with any keep-alive ping that lands between the two writes.
+        deadline = time.monotonic() + TEST_TIMEOUT_S
+        while True:
+            frame = self.frames.get(timeout=max(0.0, deadline - time.monotonic()))
+            if frame.startswith(":"):
+                continue
+            fields = dict(line.split(": ", 1) for line in frame.splitlines() if line)
+            data = cast(dict[str, JsonValue], json.loads(fields["data"]))
+            if data["progress"] is not None:
+                return fields["event"], data
+            assert (data["speed"], data["eta_s"]) == (None, None)
 
     def write(self, fraction: float, stage: str = "transcribing") -> None:
         # Like the supervisor: job.json names the stage before the child reports.
@@ -131,7 +148,7 @@ def test_events_progress_updates_emit_increasing_values(
         values = []
         for fraction in (0.2, 0.5, 0.9):
             stream.write(fraction=fraction)
-            event, data = stream.receive()
+            event, data = stream.receive_report()
             assert event == "progress"
             values.append(data["progress"])
         assert values == [0.2, 0.5, 0.9]
@@ -145,11 +162,11 @@ def test_events_identical_progress_emits_ping_without_duplicate(
     with _open_stream(app=app, job=job) as stream:
         assert stream.receive()[1]["status"] == "queued"
         stream.write(fraction=0.5)
-        assert stream.receive()[1]["progress"] == 0.5
+        assert stream.receive_report()[1]["progress"] == 0.5
         stream.write(fraction=0.5)
         assert stream.frames.get(timeout=TEST_TIMEOUT_S) == ": ping\n\n"
         stream.write(fraction=0.75)
-        assert stream.receive()[1]["progress"] == 0.75
+        assert stream.receive_report()[1]["progress"] == 0.75
 
 
 @pytest.mark.parametrize("status", ["done", "failed", "cancelled", "interrupted"])
@@ -197,7 +214,7 @@ def test_events_stage_progress_reports_speed_and_eta(
     with _open_stream(app=app, job=job) as stream:
         assert stream.receive()[1]["stage"] == "queued"
         stream.write(fraction=0.25)
-        event, data = stream.receive()
+        event, data = stream.receive_report()
         assert event == "progress"
         assert (data["stage"], data["speed"], data["eta_s"]) == (
             "transcribing",
@@ -205,7 +222,7 @@ def test_events_stage_progress_reports_speed_and_eta(
             30.0,
         )
         stream.write(fraction=0.5, stage="correcting")
-        event, data = stream.receive()
+        event, data = stream.receive_report()
         assert event == "progress"
         assert (data["stage"], data["speed"], data["eta_s"]) == (
             "correcting",
@@ -309,7 +326,7 @@ def test_events_stale_progress_from_previous_stage_is_not_shown(
     with _open_stream(app=app, job=job) as stream:
         stream.receive()
         stream.write(fraction=1.0, stage="transcribing")
-        assert stream.receive()[1]["stage"] == "transcribing"
+        assert stream.receive_report()[1]["stage"] == "transcribing"
         # The supervisor moves to correction before the child writes anything.
         stream.job = stream.store.update(
             record=stream.job.model_copy(update={"stage": JobStage.CORRECTING})

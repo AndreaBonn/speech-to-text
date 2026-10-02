@@ -75,3 +75,20 @@ def test_create_app_before_transcribe_uses_configured_host(
     factory.call_args.kwargs["before_transcribe"]()
 
     unload.assert_called_once_with(host="http://configured:11434")
+
+
+def test_unload_ollama_models_skips_entries_without_a_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = Mock()
+    client.ps.return_value = ollama.ProcessResponse(
+        models=[
+            ollama.ProcessResponse.Model(model=None),
+            ollama.ProcessResponse.Model(model="qwen3.5:9b"),
+        ]
+    )
+    monkeypatch.setattr(ollama, "Client", Mock(return_value=client))
+
+    gpu_release.unload_ollama_models(host="http://ollama.test:11434")
+
+    client.generate.assert_called_once_with(model="qwen3.5:9b", keep_alive=0)

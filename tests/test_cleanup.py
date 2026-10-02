@@ -60,3 +60,31 @@ def test_keeps_longer_sentence_containing_grazie_next_to_pause() -> None:
     _, removed = remove_silence_fillers(transcript)
 
     assert removed == []
+
+
+def test_grazie_with_pause_exactly_at_threshold_is_removed() -> None:
+    transcript = make_transcript(
+        [
+            make_segment(_seg("prove", 0.0)),
+            make_segment(_seg("Grazie.", 0.5)),
+            make_segment(_seg("Riprendiamo", 0.9 + 10.0)),
+        ]
+    )
+
+    _, removed = remove_silence_fillers(transcript)
+
+    assert [s.text for s in removed] == ["Grazie."]
+
+
+def test_grazie_with_pause_just_below_threshold_is_kept() -> None:
+    transcript = make_transcript(
+        [
+            make_segment(_seg("prove", 0.0)),
+            make_segment(_seg("Grazie.", 0.5)),
+            make_segment(_seg("Riprendiamo", 0.9 + 9.9)),
+        ]
+    )
+
+    _, removed = remove_silence_fillers(transcript)
+
+    assert removed == []

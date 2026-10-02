@@ -323,3 +323,26 @@ def test_apply_edits_chained_edits_keep_what_whisper_heard() -> None:
 
     assert result.words[1].text == " regione"
     assert result.words[1].corrected_from == "lesione"
+
+
+def test_correct_transcript_after_skipped_chunk_passes_its_raw_text_as_context() -> (
+    None
+):
+    transcript = make_transcript(
+        [
+            make_segment(list(_words("ha esinto il credito"))),
+            make_segment([make_word(f" p{i}", 10.0 + i) for i in range(4)]),
+            make_segment([make_word(f" q{i}", 20.0 + i) for i in range(4)]),
+        ]
+    )
+    contexts: list[str] = []
+
+    def corrector(text: str, context: str) -> list[Edit]:
+        contexts.append(context)
+        if text.startswith("p0"):
+            raise InvalidResponseError("json non valido")
+        return [Edit(original="esinto", corrected="estinto")]
+
+    correct_transcript(transcript, corrector=corrector, max_words=4)
+
+    assert contexts == ["", "ha estinto il credito", "p0 p1 p2 p3"]

@@ -234,3 +234,23 @@ def test_with_progress_does_not_count_a_call_that_stops_the_run() -> None:
     with pytest.raises(CorrectorUnavailableError):
         tracked("x", "")
     assert calls == []
+
+
+@pytest.mark.parametrize(("gap_s", "paragraphs"), [(5.0, 1), (1.0, 2)])
+def test_write_markdown_uses_the_paragraph_gap_from_settings(
+    tmp_path: Path, gap_s: float, paragraphs: int
+) -> None:
+    transcript = make_transcript(
+        [
+            make_segment([make_word(" primo", 0.0)]),
+            make_segment([make_word(" dopo", 2.4)]),
+        ]
+    )
+
+    path = pipeline.write_markdown(
+        transcript,
+        json_path=tmp_path / "a.json",
+        config=Settings(paragraph_gap_s=gap_s),
+    )
+
+    assert path.read_text(encoding="utf-8").count("[00:00:0") == paragraphs

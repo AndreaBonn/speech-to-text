@@ -224,3 +224,14 @@ def test_get_audio_uuid_alias_resolves_canonical_directory(
 
     assert response.status_code == 200
     assert response.content == AUDIO
+
+
+def test_get_audio_when_recording_was_removed_returns_not_found(
+    client: TestClient, job_dir: Path
+) -> None:
+    (job_dir / "audio.wav").unlink()
+
+    response = client.get(url=f"/api/v1/jobs/{job_dir.name}/audio")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"

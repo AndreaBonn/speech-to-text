@@ -179,5 +179,19 @@ def test_ollama_status_client_failure_returns_message_and_logs(
         factory.return_value.__enter__.return_value.list.side_effect = error
         result = model_service.ollama_status(host=HOST)
     assert result["status"] == "not_running"
-    assert result["message"]
+    assert str(result["message"]).startswith("Ollama non è disponibile.")
     assert "Ollama" in caplog.text
+
+
+def test_is_whisper_model_cached_true_when_in_local_cache(tmp_path: Path) -> None:
+    with patch.object(model_service, "download_model", return_value=str(tmp_path)):
+        assert model_service.is_whisper_model_cached(name="tiny") is True
+
+
+def test_is_whisper_model_cached_false_when_missing_locally() -> None:
+    with patch.object(
+        model_service,
+        "download_model",
+        side_effect=LocalEntryNotFoundError("missing"),
+    ):
+        assert model_service.is_whisper_model_cached(name="tiny") is False

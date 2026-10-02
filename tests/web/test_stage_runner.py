@@ -378,3 +378,36 @@ def test_run_stage_transcribe_labels_output_with_uploaded_name(tmp_path: Path) -
     assert load_transcript(directory / "audio.json").source == "Lezione 3.m4a"
     heading = (directory / "audio.md").read_text(encoding="utf-8").splitlines()[0]
     assert heading == "# Sbobinatura: Lezione 3.m4a"
+
+
+def test_run_stage_correct_pipeline_returning_a_path_fails_with_one(
+    job_dir: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    def correct_returning_path(
+        json_path: Path,
+        config: Settings,
+        subject: str | None,
+        on_progress: Callable[[int, int], None],
+    ) -> Path:
+        return json_path
+
+    result = stage_runner.run_stage(
+        stage="correct", job_dir=job_dir, pipeline=correct_returning_path
+    )
+
+    exc_info = caplog.records[-1].exc_info
+    assert result == 1
+    assert exc_info is not None and isinstance(exc_info[1], TypeError)
+
+
+def test_main_unexpected_startup_failure_returns_one(job_dir: Path) -> None:
+    with (
+        patch.object(
+            stage_runner,
+            "start_stdin_watchdog",
+            side_effect=RuntimeError("can't start new thread"),
+        ),
+        patch.object(stage_runner, "run_stage") as runner,
+    ):
+        assert stage_runner.main(argv=["transcribe", str(job_dir)]) == 1
+    runner.assert_not_called()

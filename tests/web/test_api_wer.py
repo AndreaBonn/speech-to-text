@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from sbobina.cli import main
 from sbobina.models import save_transcript
 from sbobina.settings import Settings
+from sbobina.web.api_wer import MAX_TEXT_BYTES
 from sbobina.web.app import create_app
 from sbobina.web.job_models import JobConfig
 from sbobina.web.job_store import JobStore
@@ -124,3 +125,35 @@ def test_wer_invalid_input_returns_field_error(
     assert response.status_code == 422
     fields = [detail["field"] for detail in response.json()["error"]["details"]]
     assert fields == [field]
+
+
+def test_wer_reference_over_five_megabytes_returns_field_error(
+    client: TestClient, job_dir: Path
+) -> None:
+    oversized = b"a" * (MAX_TEXT_BYTES + 1)
+
+    response = client.post(
+        WER_URL,
+        files={"reference": ("gold.txt", oversized, "text/plain")},
+        data={"job_id": job_dir.name},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["details"] == [
+        {"field": "reference", "message": "File di testo troppo grande"}
+    ]
+
+
+def test_wer_reference_of_exactly_five_megabytes_is_accepted(
+    client: TestClient, job_dir: Path
+) -> None:
+    padding = b" " * (MAX_TEXT_BYTES - len(REFERENCE.encode()))
+
+    response = client.post(
+        WER_URL,
+        files={"reference": ("gold.txt", REFERENCE.encode() + padding, "text/plain")},
+        data={"job_id": job_dir.name},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["reference_words"] == 6

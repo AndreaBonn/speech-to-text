@@ -8,7 +8,7 @@ from pydantic import JsonValue
 from sbobina.settings import Settings
 from sbobina.web import pages
 from sbobina.web.app import create_app
-from sbobina.web.job_models import JobConfig
+from sbobina.web.job_models import JobConfig, JobStatus
 from sbobina.web.job_store import JobStore
 
 BASE_URL = "http://127.0.0.1:8765"
@@ -193,3 +193,33 @@ def test_pages_show_the_transcriber_brand(tmp_path: Path) -> None:
 
     assert '<div class="rail__brand">Transcriber</div>' in body
     assert "<title>Nuova trascrizione · Transcriber</title>" in body
+
+
+def test_rail_links_reader_to_the_newest_done_job(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    done = store.create(config=JobConfig(), source_name="vecchia.m4a")
+    store.update(record=done.model_copy(update={"status": JobStatus.DONE}))
+    store.create(config=JobConfig(), source_name="in-coda.m4a")
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/").text
+
+    assert f'href="/lettore/{done.id}"' in body
+    assert 'aria-disabled="true"' not in body
+
+
+@pytest.mark.parametrize(
+    ("subject", "expected_title"), [("Fisica", "Fisica"), (None, "Lezione del ")]
+)
+def test_reader_page_without_source_name_falls_back_to_subject_then_date(
+    tmp_path: Path, subject: str | None, expected_title: str
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig(subject=subject))
+    if subject is None:
+        expected_title += record.created_at.strftime("%d/%m/%Y")
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get(f"/lettore/{record.id}").text
+
+    assert f'<h2 class="reader__title">{expected_title}</h2>' in body

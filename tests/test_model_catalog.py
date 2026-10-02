@@ -97,6 +97,8 @@ def test_parse_billion_params(raw: str | None, expected: float | None) -> None:
     [
         (2.0, "bassa", "alta"),
         (3.0, "media", "alta"),
+        (6.9, "media", "alta"),
+        (7.0, "alta", "media"),
         (9.7, "alta", "media"),
         (14.0, "alta", "bassa"),
     ],
@@ -159,3 +161,24 @@ def test_ollama_options_when_ollama_is_down_make_no_install_claim() -> None:
     options = ollama_options(installed=[], default_model="qwen3.5:9b", is_ready=False)
 
     assert [option.label for option in options] == ["qwen3.5:9b", "Altro modello…"]
+
+
+def test_whisper_options_unknown_model_without_size_shows_only_its_note() -> None:
+    options = whisper_options(
+        models=[_whisper(name="large-v9", downloaded=False)],
+        gpu_model="large-v3",
+        cpu_model="large-v3-turbo",
+    )
+
+    assert options[1].label == "large-v9 · da scaricare"
+    assert options[1].lines == (UNKNOWN_NOTE,)
+
+
+def test_whisper_options_marks_the_cpu_recommendation_too() -> None:
+    options = whisper_options(
+        models=[_whisper(name="large-v3-turbo", downloaded=True, cpu=True)],
+        gpu_model="large-v3",
+        cpu_model="large-v3-turbo",
+    )
+
+    assert options[1].label == "large-v3-turbo · scaricato · consigliato"

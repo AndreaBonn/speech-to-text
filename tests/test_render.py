@@ -118,3 +118,20 @@ def test_render_shows_correction_with_original_as_superscript() -> None:
 
 def test_mark_correction_escapes_html_in_what_whisper_heard() -> None:
     assert mark_correction(" lesione", "a<b") == " lesione<sup>a&lt;b</sup>"
+
+
+def test_mark_word_punctuation_only_token_is_left_unmarked() -> None:
+    assert mark_word(" ,") == " ,"
+
+
+def test_mark_correction_punctuation_only_token_gets_no_superscript() -> None:
+    assert mark_correction(" …", heard="ehm") == " …"
+
+
+def test_render_pause_exactly_at_gap_threshold_starts_new_paragraph() -> None:
+    first = make_segment([Word(start=0.0, end=0.5, text=" primo", probability=0.99)])
+    second = make_segment([Word(start=2.5, end=3.0, text=" dopo", probability=0.99)])
+
+    markdown = render_markdown(make_transcript([first, second]), OPTIONS)
+
+    assert "[00:00:00] primo\n\n[00:00:02] dopo" in markdown
