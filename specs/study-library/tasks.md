@@ -69,7 +69,7 @@ i task marcati "(Q<n>)" si riscrivono prima di partire.
 
 **[B-3] T013-T015**
 
-- [ ] **T013** Pagina `/corsi` (`pages.py`, `templates/corsi.html`, `static/js/corsi.js`): elenco
+- [x] **T013** Pagina `/corsi` (`pages.py`, `templates/corsi.html`, `static/js/corsi.js`): elenco
   corsi, apertura di un corso → lezioni con data, durata, stato studio (quando F5 c'è) e link al
   lettore; voce nav "Corsi" in `NAV_SPECS`. Riga `DIAL:` derivata da `design.md`. Rischio: basso.
   verify: test della pagina (200, voce nav attiva); render a 375 e 1280 px.

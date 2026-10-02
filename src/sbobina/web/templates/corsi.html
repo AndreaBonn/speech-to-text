@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="corsi-root" class="courses">
+  <div id="corsi-list" class="courses__list">
+    <div id="corsi-list-status" class="history__status" role="alert" hidden></div>
+
+    <div class="table-wrap">
+      <table class="table courses-table">
+        <thead>
+          <tr>
+            <th scope="col">Corso</th>
+            <th scope="col">Lezioni</th>
+            <th scope="col">Ultima lezione</th>
+          </tr>
+        </thead>
+        <tbody id="corsi-list-tbody">
+          <tr><td colspan="3"><div class="skeleton-row"></div></td></tr>
+          <tr><td colspan="3"><div class="skeleton-row"></div></td></tr>
+          <tr><td colspan="3"><div class="skeleton-row"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="corsi-list-empty" class="empty-state" hidden>
+      <p class="empty-state__text">
+        Nessun corso ancora. Le lezioni vengono raggruppate per corso non
+        appena ne carichi una.
+      </p>
+      <a class="btn btn--primary" href="/">Nuova trascrizione</a>
+    </div>
+
+    <nav id="corsi-list-pagination" class="pagination" aria-label="Pagine dei corsi" hidden></nav>
+  </div>
+
+  <div id="corsi-detail" class="courses__detail" hidden>
+    <a id="corsi-detail-back" class="btn btn--ghost" href="/corsi">&larr; Tutti i corsi</a>
+    <h2 id="corsi-detail-title" class="section-title"></h2>
+
+    <div id="corsi-detail-status" class="history__status" role="alert" hidden></div>
+
+    <div class="table-wrap">
+      <table class="table history-table">
+        <thead>
+          <tr>
+            <th scope="col">Lezione</th>
+            <th scope="col">Data</th>
+            <th scope="col">Durata</th>
+            <th scope="col">Stato</th>
+          </tr>
+        </thead>
+        <tbody id="corsi-detail-tbody"></tbody>
+      </table>
+    </div>
+
+    <div id="corsi-detail-empty" class="empty-state" hidden>
+      <p class="empty-state__text">
+        Questo corso non ha ancora lezioni. Caricane una per iniziare.
+      </p>
+      <a class="btn btn--primary" href="/">Nuova trascrizione</a>
+    </div>
+
+    <nav id="corsi-detail-pagination" class="pagination" aria-label="Pagine delle lezioni del corso" hidden></nav>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/corsi.js" defer></script>
+{% endblock %}

@@ -135,6 +135,27 @@ def test_modelli_page_returns_catalogue_shell(tmp_path: Path) -> None:
     assert "/static/js/modelli.js" in body
 
 
+def test_corsi_page_returns_shell(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        response = client.get("/corsi")
+
+    assert response.status_code == 200
+    body = response.text
+    assert 'id="corsi-list"' in body
+    assert 'id="corsi-detail"' in body
+    assert "/static/js/corsi.js" in body
+
+
+def test_corsi_page_marks_its_rail_entry_active(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/corsi").text
+
+    assert ">Corsi<" in body
+    assert 'class="rail__link rail__link--active"' in body
+
+
 def test_confronto_page_returns_form_shell(tmp_path: Path) -> None:
     app = create_app(settings=Settings(), data_dir=tmp_path)
     with TestClient(app=app, base_url=BASE_URL) as client:

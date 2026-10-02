@@ -99,6 +99,35 @@ def test_patch_meta_missing_job_returns_404(client: TestClient) -> None:
     assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
+def test_get_meta_returns_the_saved_course(client: TestClient, tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig())
+    client.patch(url=f"{JOBS_URL}/{record.id}/meta", json={"course": "Fisica"})
+
+    response = client.get(url=f"{JOBS_URL}/{record.id}/meta")
+
+    assert response.status_code == 200
+    assert response.json() == {"data": {"course": "Fisica"}}
+
+
+def test_get_meta_defaults_to_none_without_a_meta_file(
+    client: TestClient, tmp_path: Path
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig())
+
+    response = client.get(url=f"{JOBS_URL}/{record.id}/meta")
+
+    assert response.status_code == 200
+    assert response.json() == {"data": {"course": None}}
+
+
+def test_get_meta_missing_job_returns_404(client: TestClient) -> None:
+    response = client.get(url=f"{JOBS_URL}/missing/meta")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
 def test_courses_aggregates_all_lectures_before_pagination(
     client: TestClient, tmp_path: Path
 ) -> None:

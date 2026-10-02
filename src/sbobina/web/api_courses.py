@@ -64,6 +64,13 @@ def list_courses(
     }
 
 
+@router.get("/jobs/{job_id}/meta")
+def get_meta(job_id: str, request: Request) -> dict[str, Any]:
+    store: JobStore = request.app.state.job_store
+    meta = store.read_meta(job_id=job_id)
+    return {"data": meta.model_dump(mode="json")}
+
+
 @router.patch("/jobs/{job_id}/meta")
 def update_meta(
     job_id: str, body: Annotated[JsonValue, Body()], request: Request

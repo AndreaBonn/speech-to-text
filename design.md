@@ -47,9 +47,10 @@ Spacing: 4-pt scale `--space-3xs` … `--space-3xl`. Radii: 6 px controls,
 
 ## Layout
 - Rail `--rail-width`, content up to `--content-max`, reader text column at
-  `--measure-reading`. Below 768 px the rail becomes a top bar with the five
+  `--measure-reading`. Below 768 px the rail becomes a top bar with the six
   destinations in one scrollable row; no hamburger.
-- Pages: Nuova trascrizione · Lettore · Storico · Modelli · Confronto (WER).
+- Pages: Nuova trascrizione · Corsi · Lettore · Storico · Modelli ·
+  Confronto (WER). Corsi added in T013 to group lectures by course.
 - The reader puts the transcript in the centre column and the list of points
   to re-listen in a side column from 1024 px; below, the list follows the text.
 

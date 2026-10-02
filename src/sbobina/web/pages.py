@@ -30,6 +30,7 @@ class NavSpec:
 
 NAV_SPECS = (
     NavSpec(id="nuova", label="Nuova trascrizione", href="/"),
+    NavSpec(id="corsi", label="Corsi", href="/corsi"),
     NavSpec(id="lettore", label="Lettore", href=None),
     NavSpec(id="storico", label="Storico", href="/storico"),
     NavSpec(id="modelli", label="Modelli", href="/modelli"),
@@ -146,6 +147,18 @@ def index(request: Request, store: JobStoreDep) -> HTMLResponse:
             is_ready=ollama["status"] == "ready",
         ),
         ollama_message=None if ollama["status"] == "ready" else ollama["message"],
+    )
+
+
+@router.get("/corsi", response_class=HTMLResponse)
+def corsi(request: Request, store: JobStoreDep) -> HTMLResponse:
+    """Courses overview; the list and each course's lectures are fetched client-side."""
+    return _render(
+        request=request,
+        template_name="corsi.html",
+        active="corsi",
+        store=store,
+        page_title="Corsi",
     )
 
 
