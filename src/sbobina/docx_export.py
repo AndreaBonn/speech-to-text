@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from io import BytesIO
 
 from docx import Document
@@ -9,6 +10,15 @@ from docx.oxml.styles import CT_Style
 from docx.section import Section
 from docx.shared import Cm, Pt, RGBColor
 from docx.text.paragraph import Paragraph
+
+from sbobina.generation_models import (
+    GenerationCitation,
+    GenerationQuestion,
+    GenerationRecord,
+    SummarySection,
+    SummarySentence,
+)
+from sbobina.generation_render import format_citation_source
 
 PAGE_WIDTH = Cm(21.0)
 PAGE_HEIGHT = Cm(29.7)
@@ -23,6 +33,11 @@ LANGUAGE = "it-IT"
 TITLE_SIZE = Pt(24)
 # Word's default Title is blue Calibri Light, foreign to a serif book page.
 TITLE_COLOR = RGBColor(0x22, 0x22, 0x22)
+# a-d: GenerationQuestion enforces exactly 4 options for multiple_choice.
+OPTION_LETTERS = "abcd"
+DEFAULT_EXAM_TITLE = "Compito"
+DEFAULT_SOLUTIONS_TITLE = "Soluzioni"
+DEFAULT_SUMMARY_TITLE = "Riassunto"
 
 
 def _set_language(style_element: CT_Style) -> None:
@@ -63,6 +78,24 @@ def _set_up_styles(document: DocxDocument) -> None:
     title_style.font.color.rgb = TITLE_COLOR
 
 
+def _new_titled_document(title: str) -> DocxDocument:
+    """A4 document with the shared page/style setup and a Title heading."""
+    document = Document()
+    _set_up_page(section=document.sections[0])
+    _set_up_styles(document=document)
+    document.core_properties.title = title
+    heading = document.add_paragraph(title, style="Title")
+    heading.paragraph_format.first_line_indent = Cm(0)
+    return document
+
+
+def _save(document: DocxDocument) -> bytes:
+    _add_page_number(paragraph=document.sections[0].footer.paragraphs[0])
+    buffer = BytesIO()
+    document.save(buffer)
+    return buffer.getvalue()
+
+
 def render_book_docx(title: str, paragraphs: list[str]) -> bytes:
     """Lay out the transcript as a printable A4 book-style document.
 
@@ -78,17 +111,115 @@ def render_book_docx(title: str, paragraphs: list[str]) -> bytes:
     bytes
         The ``.docx`` file content.
     """
-    document = Document()
-    section = document.sections[0]
-    _set_up_page(section=section)
-    _set_up_styles(document=document)
-    document.core_properties.title = title
-    heading = document.add_paragraph(title, style="Title")
-    heading.paragraph_format.first_line_indent = Cm(0)
+    document = _new_titled_document(title=title)
     for text in paragraphs:
         document.add_paragraph(text)
-    _add_page_number(paragraph=section.footer.paragraphs[0])
+    return _save(document=document)
 
-    buffer = BytesIO()
-    document.save(buffer)
-    return buffer.getvalue()
+
+def _add_numbered_question(document: DocxDocument, index: int, text: str) -> None:
+    paragraph = document.add_paragraph(f"{index}. {text}")
+    paragraph.paragraph_format.first_line_indent = Cm(0)
+
+
+def _add_lettered_options(document: DocxDocument, options: tuple[str, ...]) -> None:
+    for letter, option in zip(OPTION_LETTERS, options, strict=True):
+        paragraph = document.add_paragraph(f"{letter}) {option}")
+        paragraph.paragraph_format.first_line_indent = Cm(0)
+
+
+def render_exam_docx(generation: GenerationRecord) -> bytes:
+    """Compito: numbered questions and lettered options, never solutions.
+
+    Multiple_choice options are listed a-d with no marker on the correct
+    one; open/oral questions have no options. Solutions and citations
+    belong only to ``render_solutions_docx``.
+    """
+    document = _new_titled_document(title=generation.topic or DEFAULT_EXAM_TITLE)
+    for index, question in enumerate(generation.questions, start=1):
+        _add_numbered_question(document=document, index=index, text=question.question)
+        if question.options:
+            _add_lettered_options(document=document, options=question.options)
+    return _save(document=document)
+
+
+def _format_citation(
+    citation: GenerationCitation, doc_filenames: Mapping[str, str]
+) -> str:
+    """Format as '«quote» (file, pagina N)' or '«quote» (lezione, mm:ss)'."""
+    source = format_citation_source(citation=citation, doc_filenames=doc_filenames)
+    return f"«{citation.quote}» ({source})"
+
+
+def _add_solution(
+    document: DocxDocument,
+    index: int,
+    question: GenerationQuestion,
+    doc_filenames: Mapping[str, str],
+) -> None:
+    _add_numbered_question(document=document, index=index, text=question.question)
+    if question.options and question.correct_index is not None:
+        letter = OPTION_LETTERS[question.correct_index]
+        document.add_paragraph(f"Risposta corretta: {letter}")
+    document.add_paragraph(f"Soluzione: {question.solution}")
+    for citation in question.citations:
+        document.add_paragraph(
+            _format_citation(citation=citation, doc_filenames=doc_filenames)
+        )
+
+
+def render_solutions_docx(
+    generation: GenerationRecord, doc_filenames: Mapping[str, str] | None = None
+) -> bytes:
+    """Soluzioni: per domanda la soluzione, la lettera corretta se a
+    crocette, e le citazioni come «testo» (riferimento). Sempre in un file
+    separato dal compito."""
+    title = (
+        f"{DEFAULT_SOLUTIONS_TITLE} - {generation.topic}"
+        if generation.topic
+        else DEFAULT_SOLUTIONS_TITLE
+    )
+    document = _new_titled_document(title=title)
+    for index, question in enumerate(generation.questions, start=1):
+        _add_solution(
+            document=document,
+            index=index,
+            question=question,
+            doc_filenames=doc_filenames or {},
+        )
+    return _save(document=document)
+
+
+def _format_sentence(
+    sentence: SummarySentence, doc_filenames: Mapping[str, str]
+) -> str:
+    if not sentence.citations:
+        return sentence.text
+    refs = "; ".join(
+        format_citation_source(citation=citation, doc_filenames=doc_filenames)
+        for citation in sentence.citations
+    )
+    return f"{sentence.text} ({refs})"
+
+
+def _add_summary_section(
+    document: DocxDocument, section: SummarySection, doc_filenames: Mapping[str, str]
+) -> None:
+    document.add_heading(section.title, level=1)
+    for sentence in section.sentences:
+        document.add_paragraph(
+            _format_sentence(sentence=sentence, doc_filenames=doc_filenames)
+        )
+
+
+def render_summary_docx(
+    generation: GenerationRecord, doc_filenames: Mapping[str, str] | None = None
+) -> bytes:
+    """Riassunto: sezioni come titoli, frasi come paragrafi, citazioni fra
+    parentesi accanto alla frase che le porta."""
+    document = _new_titled_document(title=generation.topic or DEFAULT_SUMMARY_TITLE)
+    for section in generation.sections:
+        _add_summary_section(
+            document=document, section=section, doc_filenames=doc_filenames or {}
+        )
+    return _save(document=document)

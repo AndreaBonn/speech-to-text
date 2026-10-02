@@ -185,7 +185,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
 
 **[B-7] T033-T035**
 
-- [ ] **T033** `generation_pipeline.py` + `generation_render.py`: recupero per argomento (o
+- [x] **T033** `generation_pipeline.py` + `generation_render.py`: recupero per argomento (o
   campionamento distribuito sulle fonti se l'argomento è vuoto), chiamata `chat_json`, validazione
   citazioni, scarto per motivo (anche voce con 0 o più di 3 citazioni, crocetta con opzioni vuote o
   duplicate: scarto della singola voce, non della risposta), conteggio "N su M", un retry su JSON
@@ -220,7 +220,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   (picco VRAM) solo se R2 lo richiede. Rischio: alto (R5).
   verify: `specs/001-course-workspace/eval-generations.md` con tabella dei tentativi e
   `SPEDITO:`; numeri riportati all'utente prima di T039.
-- [ ] **T038** (U4) Export DOCX di compito, soluzioni e riassunto riusando `docx_export.py`
+- [x] **T038** (U4) Export DOCX di compito, soluzioni e riassunto riusando `docx_export.py`
   (unico confine python-docx). Rischio: basso.
   verify: DOCX generato nel test riaperto con python-docx → titoli e domande attesi; soluzioni
   in un file separato dal compito.
