@@ -53,24 +53,28 @@
     }
   }
 
-  function seekWhenReady(seconds) {
-    function seek() {
+  function landWhenReady(seconds) {
+    function land() {
       // Past the end means the link no longer matches this audio: ignore it.
       if (seconds <= player.duration) {
+        markWord(seconds);
         reader.seekTo(seconds);
       }
     }
     if (player.readyState >= HTMLMediaElement.HAVE_METADATA) {
-      seek();
+      land();
     } else {
-      player.addEventListener("loadedmetadata", seek, { once: true });
+      player.addEventListener("loadedmetadata", land, { once: true });
+      // Undecodable audio never sends metadata: still point at the text.
+      player.addEventListener("error", function () {
+        markWord(seconds);
+      }, { once: true });
     }
   }
 
   function land() {
     if (target !== null) {
-      markWord(target);
-      seekWhenReady(target);
+      landWhenReady(target);
     }
   }
 
