@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from faster_whisper.utils import available_models
 from pydantic import UUID4, BaseModel, ConfigDict, Field, JsonValue, field_validator
@@ -23,6 +24,30 @@ class JobStage(StrEnum):
     TRANSCRIBING = "transcribing"
     CORRECTING = "correcting"
     DONE = "done"
+    STUDY = "study"
+
+
+class WorkItem(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    job_id: str
+    action: Literal["pipeline", "study"]
+
+
+class StudyStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    INTERRUPTED = "interrupted"
+
+
+class StudyRun(BaseModel):
+    model_config = ConfigDict(frozen=True, revalidate_instances="always")
+
+    status: StudyStatus
+    error: dict[str, JsonValue] | None = None
+    updated_at: datetime
 
 
 class JobConfig(BaseModel):
@@ -93,5 +118,6 @@ class JobRecord(BaseModel):
     updated_at: datetime
     pid: int | None = None
     error: dict[str, JsonValue] | None = None
+    study: StudyRun | None = None
     # Name of the uploaded file as the user knows it; empty for older jobs.
     source_name: str = ""
