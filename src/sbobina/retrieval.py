@@ -249,7 +249,7 @@ def fuse_by_rank(
     return [passages[passage_id] for passage_id in order]
 
 
-def _cut_to_budget(
+def cut_to_budget(
     ranked: list[RetrievedPassage], budget_words: int
 ) -> list[RetrievedPassage]:
     """Keep passages in rank order while the running word count fits.
@@ -268,17 +268,29 @@ def _cut_to_budget(
     return selected
 
 
-def retrieve(
-    index: SearchIndex, scope: RetrievalScope, question: str, budget_words: int
+def fuse_candidates(
+    index: SearchIndex, scope: RetrievalScope, question: str
 ) -> list[RetrievedPassage]:
-    """Passages of one course answering question, fused by rank, within budget."""
+    """Lecture and document passages of one course matching question, fused by rank.
+
+    Not yet windowed (T025, see sbobina.lecture_windows) nor cut to a word
+    budget: callers that need either do so afterwards, in that order, since
+    the budget must count window words, not raw 10-30 word segments.
+    """
     match = question_to_fts(question=question)
     if match is None:
         return []
-    ranked = fuse_by_rank(
+    return fuse_by_rank(
         rankings=[
             _ranked_lecture_passages(index=index, scope=scope, match=match),
             _ranked_document_passages(index=index, scope=scope, match=match),
         ]
     )
-    return _cut_to_budget(ranked=ranked, budget_words=budget_words)
+
+
+def retrieve(
+    index: SearchIndex, scope: RetrievalScope, question: str, budget_words: int
+) -> list[RetrievedPassage]:
+    """Passages of one course answering question, fused by rank, within budget."""
+    fused = fuse_candidates(index=index, scope=scope, question=question)
+    return cut_to_budget(ranked=fused, budget_words=budget_words)

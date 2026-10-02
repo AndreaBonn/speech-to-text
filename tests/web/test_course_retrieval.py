@@ -1,8 +1,14 @@
+from contextlib import closing
 from pathlib import Path
 
-from sbobina.web.course_retrieval import course_scope
+from sbobina.models import Segment, Transcript, Word, save_transcript
+from sbobina.retrieval import LectureSource, RetrievalScope
+from sbobina.search_text import Passage
+from sbobina.web.api_files import TRANSCRIPT_FILES
+from sbobina.web.course_retrieval import WindowedQuery, course_scope, retrieve_windows
 from sbobina.web.job_models import JobConfig, LectureMeta
 from sbobina.web.job_store import JobStore
+from sbobina.web.search_index import LectureState, open_index
 
 
 def test_course_scope_collects_lectures_by_effective_course(tmp_path: Path) -> None:
@@ -26,3 +32,94 @@ def test_course_scope_is_empty_for_unknown_course(tmp_path: Path) -> None:
     scope = course_scope(store=store, course_id="matematica")
 
     assert scope.job_ids == frozenset()
+
+
+def _write_lecture(store: JobStore, job_id: str) -> None:
+    """60 segments of 20 words, segment 30 a short 12-word match on 'contratto'."""
+    segments = [
+        Segment(
+            start=float(i),
+            end=float(i) + 1,
+            words=(
+                Word(
+                    start=float(i),
+                    end=float(i) + 1,
+                    text="parola " * 20,
+                    probability=0.99,
+                ),
+            ),
+        )
+        for i in range(60)
+    ]
+    segments[30] = Segment(
+        start=30.0,
+        end=31.0,
+        words=(Word(start=30.0, end=31.0, text="contratto " * 12, probability=0.99),),
+    )
+    transcript = Transcript(
+        source="lezione.m4a",
+        model="large-v3",
+        language="it",
+        duration=60.0,
+        segments=tuple(segments),
+    )
+    directory = store.jobs_dir / job_id
+    directory.mkdir(parents=True, exist_ok=True)
+    save_transcript(
+        transcript=transcript, path=directory / TRANSCRIPT_FILES["original"]
+    )
+
+
+def test_retrieve_windows_expands_lecture_hit_beyond_raw_segment(
+    tmp_path: Path,
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig(subject="Fisica"))
+    job_id = str(record.id)
+    _write_lecture(store=store, job_id=job_id)
+
+    with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
+        index.replace_lecture(
+            job_id=job_id,
+            state=LectureState(variant="original", path_mtime_ns=1, path_size=1),
+            passages=[Passage(segment_index=30, start=30.0, text="contratto " * 12)],
+        )
+        scope = RetrievalScope(course_id="fisica", job_ids=frozenset({job_id}))
+        windows = retrieve_windows(
+            store=store,
+            index=index,
+            query=WindowedQuery(scope=scope, question="contratto", budget_words=1000),
+        )
+
+    assert len(windows) == 1
+    assert len(windows[0].text.split()) > 12
+    assert windows[0].source == LectureSource(
+        job_id=job_id, segment_index=30, start=30.0
+    )
+
+
+def test_retrieve_windows_cuts_budget_on_expanded_window_not_raw_segment(
+    tmp_path: Path,
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig(subject="Fisica"))
+    job_id = str(record.id)
+    _write_lecture(store=store, job_id=job_id)
+
+    with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
+        index.replace_lecture(
+            job_id=job_id,
+            state=LectureState(variant="original", path_mtime_ns=1, path_size=1),
+            passages=[Passage(segment_index=30, start=30.0, text="contratto " * 12)],
+        )
+        scope = RetrievalScope(course_id="fisica", job_ids=frozenset({job_id}))
+        # The raw segment (12 words) fits a 20-word budget; its expanded
+        # ~250-word window does not: the cut must see the window, not the
+        # segment, or this would wrongly return it.
+        windows = retrieve_windows(
+            store=store,
+            index=index,
+            query=WindowedQuery(scope=scope, question="contratto", budget_words=20),
+        )
+
+    assert windows == []

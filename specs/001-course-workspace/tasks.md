@@ -133,7 +133,7 @@ riscrivono prima di partire.
   budget di parole). `Passage` porta testo, fonte e un id stabile per la citazione. Rischio: medio.
   verify: "cos'è la causa del contratto?" → query senza `cos`, `è`, `la`, `del`; input con `"`,
   `NEAR(`, `*` → nessuna eccezione; passaggi di un altro corso mai restituiti; budget rispettato.
-- [ ] **T025** (ADR D2, tabella Chunking) Il recupero delle lezioni restituisce una finestra di
+- [x] **T025** (ADR D2, tabella Chunking) Il recupero delle lezioni restituisce una finestra di
   ~250 parole attorno a ogni segmento trovato (segmenti adiacenti della stessa trascrizione),
   fusa se due finestre si toccano, invece del singolo segmento Whisper di 10-30 parole. La
   citazione resta ancorata al segmento trovato. Emerso dalla review di T023. Rischio: medio.
