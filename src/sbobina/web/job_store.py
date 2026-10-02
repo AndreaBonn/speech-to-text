@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -10,8 +11,16 @@ from uuid import UUID, uuid4
 
 from pydantic import JsonValue, TypeAdapter
 
+from sbobina.courses import course_key as normalized_course_key
+from sbobina.courses import effective_course
 from sbobina.web.errors import NotFoundError, ValidationError
-from sbobina.web.job_models import JobConfig, JobRecord, JobStage, JobStatus
+from sbobina.web.job_models import (
+    JobConfig,
+    JobRecord,
+    JobStage,
+    JobStatus,
+    LectureMeta,
+)
 
 PROGRESS_ADAPTER = TypeAdapter(dict[str, JsonValue])
 # Windows rejects renaming onto a path a reader still has open; a short retry
@@ -89,13 +98,24 @@ class JobStore:
         path = self._job_dir(job_id=job_id) / "job.json"
         return JobRecord.model_validate_json(path.read_text(encoding="utf-8"))
 
-    def list(self, page: int = 1, per_page: int = 10) -> JobPage:
+    def iter_records(self) -> Iterator[JobRecord]:
+        for path in self.jobs_dir.glob("*/job.json"):
+            yield JobRecord.model_validate_json(path.read_text(encoding="utf-8"))
+
+    def _course_key(self, record: JobRecord) -> str:
+        meta = self.read_meta(job_id=str(record.id))
+        label = effective_course(course=meta.course, subject=record.config.subject)
+        return normalized_course_key(label=label)
+
+    def list(
+        self, page: int = 1, per_page: int = 10, course_key: str | None = None
+    ) -> JobPage:
         if page < 1 or per_page < 1:
             raise ValidationError(message="Pagina e dimensione devono essere positive")
-        paths = self.jobs_dir.glob("*/job.json")
         records = [
-            JobRecord.model_validate_json(path.read_text(encoding="utf-8"))
-            for path in paths
+            record
+            for record in self.iter_records()
+            if course_key is None or self._course_key(record=record) == course_key
         ]
         records.sort(key=lambda record: record.created_at, reverse=True)
         total = len(records)
@@ -123,6 +143,18 @@ class JobStore:
 
     def delete(self, job_id: str) -> None:
         shutil.rmtree(self._job_dir(job_id=job_id))
+
+    def read_meta(self, job_id: str) -> LectureMeta:
+        path = self._job_dir(job_id=job_id) / "meta.json"
+        if not path.exists():
+            return LectureMeta(course=None)
+        return LectureMeta.model_validate_json(path.read_text(encoding="utf-8"))
+
+    def write_meta(self, job_id: str, meta: LectureMeta) -> LectureMeta:
+        path = self._job_dir(job_id=job_id) / "meta.json"
+        validated = LectureMeta.model_validate(meta)
+        atomic_write(path=path, content=validated.model_dump_json())
+        return validated
 
     def read_progress(self, job_id: str) -> dict[str, JsonValue]:
         path = self._job_dir(job_id=job_id) / "progress.json"

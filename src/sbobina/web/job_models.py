@@ -4,6 +4,7 @@ from enum import StrEnum
 from faster_whisper.utils import available_models
 from pydantic import UUID4, BaseModel, ConfigDict, Field, JsonValue, field_validator
 
+from sbobina.courses import normalize_course_label
 from sbobina.platform_info import RuntimeChoice
 from sbobina.settings import ComputeType, Device, Settings, settings
 
@@ -68,6 +69,17 @@ class JobConfig(BaseModel):
                 whisper_model=runtime.whisper_model,
             )
         return cls.model_validate(values)
+
+
+class LectureMeta(BaseModel):
+    model_config = ConfigDict(frozen=True, revalidate_instances="always")
+
+    course: str | None
+
+    @field_validator("course")
+    @classmethod
+    def validate_course(cls, value: str | None) -> str | None:
+        return normalize_course_label(raw=value)
 
 
 class JobRecord(BaseModel):
