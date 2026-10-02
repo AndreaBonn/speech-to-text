@@ -342,3 +342,106 @@ ai task successivi.
 
 Complessità media. Codice implementato, suite completa verde (599 passed),
 ruff e mypy puliti. Tre commit atomici su `main`, nessun push.
+
+## 2026-10-02 - Biblioteca studio, T030-T031 (B-7)
+
+Implementati i due task nel working tree, senza commit. Nessuna modifica a
+`src/sbobina/web/`, `tests/web/` o ai test preesistenti della correzione.
+I file intermedi e i log di questa sessione sono in `/tmp/sbobina-b7/`.
+
+### Modifiche
+
+- Creato `src/sbobina/ollama_chat.py`: `ChatRequest` frozen, chiamata chat,
+  mappatura degli errori esistenti e rimozione del fence Markdown.
+- Modificato `src/sbobina/llm_corrector.py`: usa il confine condiviso;
+  `parse_response` continua ad accettare autonomamente risposte fenced.
+  `ensure_model` e la validazione Pydantic della correzione restano qui.
+- Creato `src/sbobina/study_models.py`: dominio frozen, schema Pydantic con
+  alias italiani, riferimenti `S12` parsati in indici interi, dati persistibili
+  separati dai riferimenti alle parole risolti a runtime. JSON I/O resta T033.
+- Creato `src/sbobina/study_citations.py`: match esatto su token normalizzati,
+  finestra limitata al segmento indicato e al successivo numerico ammesso dal
+  blocco, prima occorrenza, timestamp della prima parola, scarto della voce
+  intera se una citazione fallisce, termine del concetto presente in una
+  citazione. La mappa dei caratteri conserva le parole originali anche quando
+  il trascrittore divide una parola in più elementi `Word`.
+- Creati `tests/test_ollama_chat.py`, `tests/test_study_models.py` e
+  `tests/test_study_citations.py`; aggiornato il layout in `CLAUDE.md`.
+- Aggiornato questo report. I file Python nuovi hanno al massimo 227 righe;
+  tutte le funzioni nuove sono entro 30 righe, verificato con AST.
+
+Scelte di contratto esplicitate: una voce senza citazioni è scartata come
+`QUOTE_NOT_FOUND`; il successivo è sempre `segment_index + 1`, mai il prossimo
+membro arbitrario di `allowed`. Una citazione interamente nel successivo è
+ammessa e restituisce l'indice effettivo della prima parola. Lo schema usa
+secondi numerici per `inizio`. Gli apostrofi sono separatori nella
+normalizzazione, come la punteggiatura. Nessuna verifica di fedeltà semantica.
+
+### TDD e mutation check
+
+Tutti i comandi uv hanno il prefisso
+`UV_CACHE_DIR=/tmp/sbobina-uv-cache`: il primo tentativo senza prefisso falliva
+con `Read-only file system` sulla cache `/home/bonn/.cache/uv`.
+
+- Baseline: `uv run pytest tests/test_llm_corrector.py tests/test_correction.py -q`
+  → `41 passed in 0.16s`.
+- T030 RED: `uv run pytest tests/test_ollama_chat.py -q`, contenente
+  `test_chat_json_returns_unfenced_content_and_preserves_options`, prima del
+  nuovo modulo → `1 error in 0.19s`, `ModuleNotFoundError: sbobina.ollama_chat`.
+  GREEN, includendo le regressioni preesistenti → `49 passed in 0.16s`.
+- T031 RED: `uv run pytest tests/test_study_citations.py tests/test_study_models.py -q`,
+  contenente `test_locate_quote_d5_resolves_cause_timestamp_and_word_indices`,
+  prima dei due moduli → `2 errors in 0.09s`, moduli mancanti.
+  GREEN → `36 passed in 0.07s`.
+- Mutante: in `_window_tokens`, confronto
+  `segment_index <= index <= segment_index + 1` sostituito con
+  `segment_index <= index >= segment_index + 1`.
+  Comando esatto:
+  `UV_CACHE_DIR=/tmp/sbobina-uv-cache uv run pytest tests/test_study_citations.py::test_locate_quote_accepts_adjacent_passages_but_rejects_a_gap -q`
+  → `1 failed in 0.07s`: il caso 12-13 restituiva `QUOTE_NOT_FOUND`.
+- Pulizia eseguita PRIMA del ripristino:
+  `find src/sbobina/__pycache__ -maxdepth 1 -name 'study_citations.*.pyc' -delete`.
+  Ripristinato il confronto originale; `cmp` contro la copia precedente al
+  mutante è uscito 0. Stesso comando di test → `1 passed in 0.05s`.
+
+### Verifica e limiti dell'ambiente
+
+- Review indipendente `code-reviewer`: APPROVE, nessun rilievo concreto;
+  85 test mirati verdi, Ruff e mypy sui sette file assegnati verdi.
+- `uv run pytest` ha raccolto 941 test, mostrato quattro fallimenti CLI ed è
+  rimasto fermo al primo test di `tests/web/test_api_corrected.py`.
+  Interrotto con Ctrl-C, exit 130; log `/tmp/sbobina-b7/pytest-full.log`.
+- `uv run pytest --ignore=tests/web --tb=short` →
+  `4 failed, 546 passed in 1.25s`. I quattro test CLI falliscono nel contatto
+  reale a Ollama da `ensure_model`: `CorrectorUnavailableError: ConnectionError:
+  Failed to connect to Ollama`.
+- Controllo della baseline CLI: estratto il sorgente con
+  `git show HEAD:src/sbobina/llm_corrector.py > /tmp/sbobina-b7/llm_corrector_baseline.py`,
+  caricato come `sbobina.llm_corrector` tramite `importlib.util`, poi eseguito
+  `pytest.main(['tests/test_cli.py', '-q', '--tb=short'])` via `uv run python`.
+  Risultato identico: `4 failed, 20 passed in 0.75s`, stessi quattro test e
+  stesso errore Ollama. Nessun test alterato per aggirare l'ambiente.
+- Diagnosi limitata del blocco web:
+  `timeout 15s env UV_CACHE_DIR=/tmp/sbobina-uv-cache uv run pytest tests/web/test_api_corrected.py -x -vv -o faulthandler_timeout=5`
+  → exit 124. Il primo test, `test_export_docx_corrected_is_book_text_named_after_audio`,
+  resta in attesa nel portale AnyIO chiamato da Starlette TestClient.
+  Causa non determinata, nessuna attribuzione al lavoro parallelo e nessuna
+  modifica ai file web. Log `/tmp/sbobina-b7/pytest-web-timeout.log`.
+
+BASIS: measured per test, confronto con HEAD e controlli statici;
+unknown per la causa del blocco web. Nessuna percentuale di copertura misurata.
+Scostamenti funzionali: nessuno. Suite completa da rieseguire dall'orchestratore
+nel proprio ambiente; il verde globale non è dichiarato.
+
+Controlli finali dopo il ripristino del mutante (stesso prefisso UV_CACHE_DIR):
+
+- `uv run pytest tests/test_ollama_chat.py tests/test_llm_corrector.py tests/test_correction.py tests/test_study_models.py tests/test_study_citations.py -q`
+  → `85 passed in 0.19s`.
+- `uv run ruff check .` → `All checks passed!`.
+- `uv run ruff format --check .` → `116 files already formatted`.
+- `uv run mypy src tests` → `Success: no issues found in 101 source files`.
+- `git diff --check` → exit 0.
+
+CHECKS: code-reviewer ESEGUITO; test mirati e controlli statici ESEGUITI;
+suite globale NON COMPLETATA; a11y-gate N/A (nessuna UI modificata).
+ESITO: review, implementazione pronta per l'orchestratore, nessun commit.
