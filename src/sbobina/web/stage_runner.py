@@ -19,11 +19,17 @@ from sbobina.pipeline import (
 from sbobina.settings import Settings, settings
 from sbobina.web.job_models import JobRecord, JobStage
 from sbobina.web.job_store import JobStore
+from sbobina.web.study_stage import generate_study_files
+from sbobina.web.supervisor import OLLAMA_UNAVAILABLE_EXIT
 
 logger = logging.getLogger("sbobina")
 PROGRESS_INTERVAL_S = 1.0
 NON_AUDIO_SUFFIXES = frozenset({".part", ".json", ".md", ".tmp"})
-STAGES = {"transcribe": JobStage.TRANSCRIBING, "correct": JobStage.CORRECTING}
+STAGES = {
+    "transcribe": JobStage.TRANSCRIBING,
+    "correct": JobStage.CORRECTING,
+    "study": JobStage.STUDY,
+}
 StagePipeline = Callable[..., Path | CorrectionOutcome]
 
 
@@ -47,7 +53,8 @@ class _Progress:
         if self.stage == JobStage.TRANSCRIBING:
             self.audio_s = max(0.0, float(done))
         if (
-            self.last_write is not None
+            self.stage != JobStage.STUDY
+            and self.last_write is not None
             and timestamp - self.last_write < PROGRESS_INTERVAL_S
         ):
             return
@@ -114,7 +121,7 @@ def _prepare_stage(
     return audio_path, config, record
 
 
-def _execute_stage(
+def _execute_pipeline_stage(
     job_dir: Path, pipeline: StagePipeline | None, progress: _Progress
 ) -> None:
     audio_path, config, record = _prepare_stage(job_dir=job_dir, progress=progress)
@@ -143,6 +150,20 @@ def _execute_stage(
         on_progress=progress,
     )
     _check_outcome(outcome=outcome)
+
+
+def _execute_stage(
+    job_dir: Path, pipeline: StagePipeline | None, progress: _Progress
+) -> None:
+    if progress.stage != JobStage.STUDY:
+        _execute_pipeline_stage(job_dir=job_dir, pipeline=pipeline, progress=progress)
+        return
+    record = progress.store.get(job_id=progress.job_id)
+    config = Settings.model_validate(
+        {**settings.model_dump(), **record.config.model_dump()}
+    )
+    study = pipeline if pipeline is not None else generate_study_files
+    study(job_dir=job_dir, config=config, on_progress=progress)
 
 
 def _execute_with_notices(
@@ -174,20 +195,7 @@ def run_stage(
     pipeline: StagePipeline | None = None,
     now: Callable[[], float] = time.monotonic,
 ) -> int:
-    """Run a stage without starting a watchdog; return exit code 0, 1 or 2.
-
-    The runner only writes ``progress.json``: ``job.json`` is owned by the
-    supervisor, which knows the child's pid and decides every status change.
-
-    Parameters
-    ----------
-    stage, job_dir : str, Path
-        ``transcribe`` or ``correct`` and the absolute job directory.
-    pipeline : callable, optional
-        Replacement for the selected stage's real pipeline, with its signature.
-    now : callable
-        Monotonic clock used for progress throttling and elapsed time.
-    """
+    """Run a stage and write progress; job state belongs to the supervisor."""
     try:
         progress = _Progress(
             store=JobStore(data_dir=job_dir.parent.parent),
@@ -202,7 +210,7 @@ def run_stage(
         logger.exception(
             "Stage %s fallito per il job %s: Ollama irraggiungibile", stage, job_dir
         )
-        return 2 if stage == "correct" else 1
+        return OLLAMA_UNAVAILABLE_EXIT if stage in ("correct", "study") else 1
     except Exception:
         logger.exception("Stage %s fallito per il job %s", stage, job_dir)
         return 1

@@ -225,11 +225,11 @@ Usabile da sola: `sbobina studio <json>` produce materiali validati senza il web
 
 **[B-9] T040-T042**
 
-- [ ] **T040** Dividere `web/supervisor.py` (291 righe): `_spawn`, `_reap`, `_child_env` in
+- [x] **T040** Dividere `web/supervisor.py` (291 righe): `_spawn`, `_reap`, `_child_env` in
   `web/processes.py`. Nessun cambio di comportamento. Rischio: basso.
   verify: `tests/web/test_supervisor.py` e `test_stage_runner.py` verdi senza modifiche;
   `wc -l src/sbobina/web/supervisor.py` < 240.
-- [ ] **T041** Coda di `WorkItem(job_id, action)`; `JobRecord.study: StudyRun | None`
+- [x] **T041** Coda di `WorkItem(job_id, action)`; `JobRecord.study: StudyRun | None`
   (`status: queued|running|done|failed|interrupted`, `error`, `updated_at`); `submit_study`;
   `_execute` per `study` aggiorna `JobRecord.study` lasciando `status` del job a `done`; recupero
   al boot: `study.running` → `interrupted`, `study.queued` rientra in coda in ordine; il `cancel`
@@ -237,7 +237,7 @@ Usabile da sola: `sbobina studio <json>` produce materiali validati senza il web
   verify: test col runner fittizio: pipeline A poi studio B → mai due figli insieme (registro dei
   `Popen` attivi); studio su job `done` → resta `done` e `study.status` `done`; riavvio simulato con
   studio `running` → `interrupted`; test esistenti della coda verdi.
-- [ ] **T042** `stage_runner study <job_dir>`: carica la variante preferita, `generate_study`,
+- [x] **T042** `stage_runner study <job_dir>`: carica la variante preferita, `generate_study`,
   scrive `audio.studio.json/.md` atomici, progresso per blocco in `progress.json`, exit code
   `OLLAMA_UNAVAILABLE_EXIT` se Ollama non risponde (riuso del codice esistente). Rischio: medio.
   verify: test del runner con pipeline finta (file scritti, progresso 0→1); Ollama giù → exit code
