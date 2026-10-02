@@ -19,6 +19,7 @@ from sbobina.web.document_store import (
 )
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import (
+    DocumentSearchPage,
     LectureHit,
     LectureState,
     SearchCorruptError,
@@ -39,6 +40,14 @@ PREFERRED_VARIANTS: tuple[Variant, ...] = ("corrected", "original")
 class SearchQuery:
     match: str
     job_ids: Collection[str] | None
+    limit: int
+    offset: int
+
+
+@dataclass(frozen=True)
+class DocumentSearchQuery:
+    match: str
+    course_id: str | None
     limit: int
     offset: int
 
@@ -250,3 +259,23 @@ def search_lectures(
             passages_per_lecture=passages_per_lecture,
         )
     )
+
+
+def _documents_once(
+    store: JobStore, path: Path, query: DocumentSearchQuery
+) -> DocumentSearchPage:
+    with index_session(path=path) as index:
+        _reconcile(store=store, index=index)
+        return index.search_documents(
+            match=query.match,
+            course_id=query.course_id,
+            limit=query.limit,
+            offset=query.offset,
+        )
+
+
+def search_documents(
+    store: JobStore, path: Path, query: DocumentSearchQuery
+) -> DocumentSearchPage:
+    """Reconcile and query document passages atomically; rebuild once on corruption."""
+    return _with_rebuild(lambda: _documents_once(store=store, path=path, query=query))

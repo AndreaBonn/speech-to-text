@@ -79,6 +79,33 @@
     return li;
   }
 
+  function documentNode(doc) {
+    var li = document.createElement("li");
+    li.className = "search__lecture";
+    var link = document.createElement("a");
+    link.className = "search__title table__link";
+    link.href = doc.href;
+    link.textContent = doc.filename;
+    var meta = document.createElement("p");
+    meta.className = "field__helper";
+    meta.textContent = (doc.course || "Senza corso") + " · pagina " + doc.page;
+    li.appendChild(link);
+    li.appendChild(meta);
+    li.appendChild(snippetNode(doc.snippet));
+    return li;
+  }
+
+  function resultsMessage(lectureCount, documentCount) {
+    var parts = [];
+    if (lectureCount > 0) {
+      parts.push(lectureCount + (lectureCount === 1 ? " lezione trovata" : " lezioni trovate"));
+    }
+    if (documentCount > 0) {
+      parts.push(documentCount + (documentCount === 1 ? " documento trovato" : " documenti trovati"));
+    }
+    return parts.join(" · ") + ".";
+  }
+
   function lectureNode(lecture) {
     var li = document.createElement("li");
     li.className = "search__lecture";
@@ -114,9 +141,12 @@
       showMessage("Nessun risultato per «" + query + "». Prova con meno parole o con un altro corso.");
       return;
     }
-    showMessage(body.meta.total + (body.meta.total === 1 ? " lezione trovata." : " lezioni trovate."));
-    body.data.forEach(function (lecture) {
-      resultsEl.appendChild(lectureNode(lecture));
+    var documentCount = body.data.filter(function (item) {
+      return item.kind === "document";
+    }).length;
+    showMessage(resultsMessage(body.meta.total, documentCount));
+    body.data.forEach(function (item) {
+      resultsEl.appendChild(item.kind === "document" ? documentNode(item) : lectureNode(item));
     });
     resultsEl.hidden = false;
     dom.renderPagination(paginationEl, body.meta, function (next) {

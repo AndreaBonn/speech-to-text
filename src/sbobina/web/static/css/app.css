@@ -1947,6 +1947,13 @@ body {
   white-space: pre-wrap;
 }
 
+/* Same mark as search snippets: the browser's yellow is not a design token. */
+.document__paragraph mark {
+  background: var(--color-accent-soft);
+  color: inherit;
+  border-radius: var(--radius-mark);
+}
+
 .document__no-text {
   margin: 0;
   color: var(--color-ink-3);

@@ -12,6 +12,9 @@ from datetime import UTC, datetime
 from sbobina.document_passages import DocumentPassage
 from sbobina.search_text import MATCH_END, MATCH_START, SnippetPart, snippet_parts
 
+SNIPPET_TOKENS = 32
+SNIPPET_ELLIPSIS = "…"
+
 
 @dataclass(frozen=True)
 class DocumentState:
@@ -105,31 +108,46 @@ def indexed_documents(connection: sqlite3.Connection) -> dict[str, DocumentState
 def search_documents(
     connection: sqlite3.Connection,
     match: str,
-    course_id: str,
+    course_id: str | None,
     limit: int,
     offset: int,
 ) -> DocumentSearchPage:
-    """Return raw passages of one course, ranked by bm25 (lower scores first).
+    """Return raw passages, ranked by bm25 (lower scores first).
 
+    course_id=None searches every course (the API's un-filtered search).
     MATCH must come from build_match_query, never directly from user input:
     https://www.sqlite.org/fts5.html#full_text_query_syntax.
     """
-    clause = "doc_passages MATCH ? AND doc_passages.course_id = ?"
-    parameters: list[object] = [match, course_id]
+    clause = "doc_passages MATCH ?"
+    parameters: list[object] = [match]
+    if course_id is not None:
+        clause += " AND doc_passages.course_id = ?"
+        parameters.append(course_id)
     total = connection.execute(
         f"SELECT count(*) FROM doc_passages WHERE {clause}", parameters
     ).fetchone()[0]
     rows = connection.execute(
-        "SELECT doc_id, page, chunk, "
-        f"highlight(doc_passages, 0, ?, ?) AS highlighted FROM doc_passages "
+        # A document passage is a whole page: snippet() keeps the matched
+        # region only, where lectures (one short segment each) use highlight().
+        # https://www.sqlite.org/fts5.html#the_snippet_function
+        "SELECT doc_id, course_id, page, chunk, "
+        "snippet(doc_passages, 0, ?, ?, ?, ?) AS highlighted FROM doc_passages "
         f"WHERE {clause} ORDER BY bm25(doc_passages), doc_id, page, chunk "
         "LIMIT ? OFFSET ?",
-        [MATCH_START, MATCH_END, *parameters, limit, offset],
+        [
+            MATCH_START,
+            MATCH_END,
+            SNIPPET_ELLIPSIS,
+            SNIPPET_TOKENS,
+            *parameters,
+            limit,
+            offset,
+        ],
     )
     items = [
         DocumentHit(
             doc_id=row["doc_id"],
-            course_id=course_id,
+            course_id=row["course_id"],
             page=row["page"],
             chunk=row["chunk"],
             snippet=snippet_parts(highlighted=row["highlighted"]),

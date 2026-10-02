@@ -117,7 +117,7 @@ riscrivono prima di partire.
   verify: upload → la ricerca successiva trova il documento; delete → sparisce; `search.sqlite3`
   cancellato → ricostruito con lezioni e documenti; tempo di indicizzazione di un manuale reale
   misurato e riportato.
-- [ ] **T022** `GET /api/v1/search` restituisce anche risultati di documento (`kind: "document"`,
+- [x] **T022** `GET /api/v1/search` restituisce anche risultati di documento (`kind: "document"`,
   `doc_id`, `page`, snippet a parti) e il link a `/corsi/<key>/documenti/<id>?p=<page>&q=`; la
   pagina dei risultati li mostra con nome file e pagina; il lettore documento evidenzia il
   termine. Rischio: medio.

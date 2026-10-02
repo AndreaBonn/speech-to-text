@@ -54,6 +54,17 @@ def test_search_documents_is_scoped_to_course(index: SearchIndex) -> None:
     assert [hit.doc_id for hit in page.items] == ["doc2"]
 
 
+def test_search_documents_without_course_id_searches_every_course(
+    index: SearchIndex,
+) -> None:
+    other = DocumentState(course_id="course-2", text_mtime_ns=1, text_size=1)
+    index.replace_document(doc_id="doc1", state=STATE, passages=[PASSAGE])
+    index.replace_document(doc_id="doc2", state=other, passages=[PASSAGE])
+    page = index.search_documents(match='"causa"*', course_id=None, limit=10, offset=0)
+    assert {hit.doc_id for hit in page.items} == {"doc1", "doc2"}
+    assert {hit.course_id for hit in page.items} == {"course-1", "course-2"}
+
+
 def test_replace_document_is_persistent_and_has_no_duplicates(tmp_path: Path) -> None:
     path = tmp_path / "search.sqlite3"
     updated = DocumentState(course_id="course-1", text_mtime_ns=999, text_size=333)
@@ -80,3 +91,24 @@ def test_remove_document_deletes_passages_and_state(index: SearchIndex) -> None:
 
 def test_indexed_documents_empty_on_fresh_index(index: SearchIndex) -> None:
     assert index.indexed_documents() == {}
+
+
+def test_search_documents_returns_a_short_snippet_of_a_long_page(
+    index: SearchIndex,
+) -> None:
+    filler = " ".join(f"parola{n}" for n in range(400))
+    long_page = DocumentPassage(
+        passage_id="doc1:p1:c0",
+        page=1,
+        chunk=0,
+        text=f"{filler} vincolo di bilancio {filler}",
+    )
+    index.replace_document(doc_id="doc1", state=STATE, passages=[long_page])
+
+    page = index.search_documents(
+        match='"vincol"*', course_id="course-1", limit=10, offset=0
+    )
+
+    text = "".join(part.text for part in page.items[0].snippet)
+    assert "vincolo" in text
+    assert len(text.split()) <= 40

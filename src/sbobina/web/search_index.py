@@ -266,7 +266,7 @@ class SearchIndex:
         return document_index.indexed_documents(connection=self._connection)
 
     def search_documents(
-        self, match: str, course_id: str, limit: int, offset: int
+        self, match: str, course_id: str | None, limit: int, offset: int
     ) -> DocumentSearchPage:
         return document_index.search_documents(
             connection=self._connection,
