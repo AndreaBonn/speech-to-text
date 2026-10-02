@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import JsonValue
 
 from sbobina.web.errors import NotFoundError
-from sbobina.web.job_models import JobRecord, JobStatus
+from sbobina.web.job_models import JobRecord, JobStage, JobStatus, StudyStatus
 from sbobina.web.job_store import JobStore
 
 router = APIRouter(prefix="/api/v1/jobs")
@@ -21,7 +21,7 @@ TERMINAL_STATUSES = (
     JobStatus.CANCELLED,
     JobStatus.INTERRUPTED,
 )
-CHANGE_FIELDS = ("status", "stage", "progress", "elapsed_s", "notice")
+CHANGE_FIELDS = ("status", "stage", "progress", "elapsed_s", "notice", "study_status")
 DELETED_END: dict[str, JsonValue] = {"status": "deleted", "stage": None}
 
 
@@ -58,10 +58,22 @@ def _progress_payload(
 
 
 def _read_payload(job_store: JobStore, job_id: str) -> dict[str, JsonValue]:
-    return _progress_payload(
-        record=job_store.get(job_id=job_id),
-        progress=job_store.read_progress(job_id=job_id),
-    )
+    record = job_store.get(job_id=job_id)
+    progress = job_store.read_progress(job_id=job_id)
+    study = record.study if record.status == JobStatus.DONE else None
+    if study is not None:
+        record = record.model_copy(update={"stage": JobStage.STUDY})
+        if study.status == StudyStatus.QUEUED:
+            progress = {}
+    payload = _progress_payload(record=record, progress=progress)
+    if study is not None:
+        payload.update(study_status=study.status, study_error=study.error)
+    return payload
+
+
+def _end_payload(data: dict[str, JsonValue]) -> dict[str, JsonValue]:
+    fields = ("status", "stage", "study_status", "study_error")
+    return {field: data[field] for field in fields if field in data}
 
 
 def _encode_event(event: str, data: dict[str, JsonValue]) -> str:
@@ -83,15 +95,13 @@ async def _stream(
             # an explicit end instead of an aborted connection.
             yield _encode_event(event="end", data=DELETED_END)
             return
-        signature = tuple(data[field] for field in CHANGE_FIELDS)
+        signature = tuple(data.get(field) for field in CHANGE_FIELDS)
         if signature != previous:
             yield _encode_event(event="progress", data=data)
             previous = signature
             last_sent = anyio.current_time()
-        if data["status"] in TERMINAL_STATUSES:
-            yield _encode_event(
-                event="end", data={"status": data["status"], "stage": data["stage"]}
-            )
+        if data.get("study_status", data["status"]) in TERMINAL_STATUSES:
+            yield _encode_event(event="end", data=_end_payload(data=data))
             return
         if anyio.current_time() - last_sent >= PING_INTERVAL_S:
             yield ": ping\n\n"

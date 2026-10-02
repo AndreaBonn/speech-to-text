@@ -245,7 +245,7 @@ Usabile da sola: `sbobina studio <json>` produce materiali validati senza il web
 
 **[B-10] T043-T044**
 
-- [ ] **T043** `src/sbobina/web/api_study.py`: `POST /api/v1/jobs/<id>/study` → 202 (`queued`),
+- [x] **T043** `src/sbobina/web/api_study.py`: `POST /api/v1/jobs/<id>/study` → 202 (`queued`),
   409 se job `queued`/`running`, se lo studio è già in coda o se manca la trascrizione;
   `GET /api/v1/jobs/<id>/study` → materiale rivalidato con paragrafo, timestamp, href al lettore,
   `discarded`, `failed_blocks`, `stale_dropped`; 404 `STUDY_NOT_FOUND` se non generato. Lo stadio
