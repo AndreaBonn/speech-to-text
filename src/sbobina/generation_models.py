@@ -51,17 +51,33 @@ class GenerationRequest(BaseModel):
     sources: GenerationSources = Field(default_factory=GenerationSources)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class GenerationCitation:
-    """Citation as recorded on a generated item.
+    """Citation as persisted, resolved against the source (T030/T033).
 
-    Minimal placeholder for the reference `source_citations.py` (T030) will
-    resolve against documents or lecture segments: a passage label as given to
-    the model (``"P3"``) plus the quoted text.
+    ``passage_id`` is the retrieval's own stable id (e.g. ``"manuale:p214:c0"``
+    or ``"Ljob-1-S3"``), unlike the per-call "P3" label the prompt used, which
+    means nothing once the generation outlives that one call. Exactly one of
+    (doc_id, page) or (job_id, timestamp) is set, mirroring
+    GenerationSourceUsed below.
     """
 
-    passage_ref: str
+    passage_id: str
     quote: str
+    doc_id: str | None
+    page: int | None
+    job_id: str | None
+    timestamp: float | None
+
+    def __post_init__(self) -> None:
+        is_doc = self.doc_id is not None
+        is_lecture = self.job_id is not None
+        if is_doc == is_lecture:
+            raise ValueError("exactly one of doc_id or job_id must be set")
+        if is_doc != (self.page is not None):
+            raise ValueError("page is set only for document citations")
+        if is_lecture != (self.timestamp is not None):
+            raise ValueError("timestamp is set only for lecture citations")
 
 
 @dataclass(frozen=True)

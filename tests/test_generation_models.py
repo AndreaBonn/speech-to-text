@@ -302,12 +302,93 @@ def test_generation_record_accepts_done_status_with_matching_content() -> None:
         questions=(
             _mc_question(
                 citations=(
-                    GenerationCitation(passage_ref="P2", quote="testo citato qui"),
+                    GenerationCitation(
+                        passage_id="manuale:p214:c0",
+                        quote="testo citato qui",
+                        doc_id="manuale",
+                        page=214,
+                        job_id=None,
+                        timestamp=None,
+                    ),
                 )
             ),
         ),
     )
     assert record.questions[0].question == "q"
+
+
+def test_generation_citation_rejects_both_doc_and_job_id() -> None:
+    with pytest.raises(ValueError, match="exactly one"):
+        GenerationCitation(
+            passage_id="p1",
+            quote="q",
+            doc_id="d1",
+            page=1,
+            job_id="j1",
+            timestamp=1.0,
+        )
+
+
+def test_generation_citation_rejects_neither_doc_nor_job_id() -> None:
+    with pytest.raises(ValueError, match="exactly one"):
+        GenerationCitation(
+            passage_id="p1",
+            quote="q",
+            doc_id=None,
+            page=None,
+            job_id=None,
+            timestamp=None,
+        )
+
+
+def test_generation_citation_rejects_page_without_doc_id() -> None:
+    with pytest.raises(ValueError, match="page is set only"):
+        GenerationCitation(
+            passage_id="p1",
+            quote="q",
+            doc_id=None,
+            page=1,
+            job_id="j1",
+            timestamp=1.0,
+        )
+
+
+def test_generation_citation_rejects_timestamp_without_job_id() -> None:
+    with pytest.raises(ValueError, match="timestamp is set only"):
+        GenerationCitation(
+            passage_id="p1",
+            quote="q",
+            doc_id="d1",
+            page=1,
+            job_id=None,
+            timestamp=1.0,
+        )
+
+
+def test_generation_citation_accepts_document_location() -> None:
+    citation = GenerationCitation(
+        passage_id="manuale:p214:c0",
+        quote="q",
+        doc_id="manuale",
+        page=214,
+        job_id=None,
+        timestamp=None,
+    )
+    assert citation.doc_id == "manuale"
+    assert citation.page == 214
+
+
+def test_generation_citation_accepts_lecture_location() -> None:
+    citation = GenerationCitation(
+        passage_id="Ljob-1-S3",
+        quote="q",
+        doc_id=None,
+        page=None,
+        job_id="job-1",
+        timestamp=42.5,
+    )
+    assert citation.job_id == "job-1"
+    assert citation.timestamp == 42.5
 
 
 def test_generation_record_json_round_trip_is_identical() -> None:
@@ -338,7 +419,12 @@ def test_generation_record_json_round_trip_is_identical() -> None:
                         text="L'avviamento produce profitto.",
                         citations=(
                             GenerationCitation(
-                                passage_ref="P4", quote="capacita' di produrre profitto"
+                                passage_id="manuale:p12:c0",
+                                quote="capacita' di produrre profitto",
+                                doc_id="manuale",
+                                page=12,
+                                job_id=None,
+                                timestamp=None,
                             ),
                         ),
                     ),
