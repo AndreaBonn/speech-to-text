@@ -132,7 +132,7 @@ ovvia.
   completo; `q=%22%22` → 422 `field: "q"`; `course=<key>` limita i risultati; indice
   indisponibile → 503 con envelope di errore; dopo `PATCH .../transcript/corrected` (edit manuale)
   la parola nuova si trova senza riavvio.
-- [ ] **T024** Deep link nel lettore: `static/js/reader-link.js` legge `t` e `variant` dall'URL,
+- [x] **T024** Deep link nel lettore: `static/js/reader-link.js` legge `t` e `variant` dall'URL,
   carica quella variante, a metadati audio pronti chiama `seekTo(t)`, porta in vista la parola con
   `start` più vicino e la evidenzia; `t` non numerico o fuori durata → ignorato senza errori.
   `reader.js` espone già `seekTo`: cambia solo per caricare il modulo. Rischio: medio.

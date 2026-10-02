@@ -896,6 +896,12 @@ body {
   background: var(--color-accent-soft);
 }
 
+/* The word a search result or study citation points to. */
+.word--target {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 .reader__points {
   flex: none;
 }
