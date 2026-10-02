@@ -90,28 +90,13 @@ def test_reconcile_finds_new_ready_document(tmp_path: Path, courses_dir: Path) -
         pages=[Page(text="la causa del contratto", no_text=False)],
     )
     with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
-        assert reconcile(store=store, index=index, courses_dir=courses_dir) == 1
+        assert reconcile(store=store, index=index) == 1
         page = index.search_documents(
             match='"contratt"*', course_id="course-1", limit=10, offset=0
         )
         assert page.total == 1
         assert page.items[0].doc_id == "doc1"
         assert page.items[0].page == 1
-
-
-def test_reconcile_without_courses_dir_skips_documents(
-    tmp_path: Path, courses_dir: Path
-) -> None:
-    store = JobStore(data_dir=tmp_path / "data")
-    write_ready_document(
-        courses_dir=courses_dir,
-        course_id="course-1",
-        doc_id="doc1",
-        pages=[Page(text="la causa", no_text=False)],
-    )
-    with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
-        assert reconcile(store=store, index=index) == 0
-        assert index.indexed_documents() == {}
 
 
 def test_reconcile_skips_ready_no_text_document(
@@ -126,7 +111,7 @@ def test_reconcile_skips_ready_no_text_document(
         status=DocumentStatus.READY_NO_TEXT,
     )
     with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
-        assert reconcile(store=store, index=index, courses_dir=courses_dir) == 0
+        assert reconcile(store=store, index=index) == 0
         assert index.indexed_documents() == {}
 
 
@@ -134,7 +119,7 @@ def test_reconcile_skips_document_not_ready(tmp_path: Path, courses_dir: Path) -
     store = JobStore(data_dir=tmp_path / "data")
     write_failed_document(courses_dir=courses_dir, course_id="course-1", doc_id="doc1")
     with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
-        assert reconcile(store=store, index=index, courses_dir=courses_dir) == 0
+        assert reconcile(store=store, index=index) == 0
         assert index.indexed_documents() == {}
 
 
@@ -149,8 +134,8 @@ def test_reconcile_unchanged_document_is_not_reindexed(
         pages=[Page(text="causa", no_text=False)],
     )
     with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
-        assert reconcile(store=store, index=index, courses_dir=courses_dir) == 1
-        assert reconcile(store=store, index=index, courses_dir=courses_dir) == 0
+        assert reconcile(store=store, index=index) == 1
+        assert reconcile(store=store, index=index) == 0
 
 
 def test_reconcile_reindexes_when_text_json_changes(
@@ -164,7 +149,7 @@ def test_reconcile_reindexes_when_text_json_changes(
         pages=[Page(text="prima", no_text=False)],
     )
     with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
-        assert reconcile(store=store, index=index, courses_dir=courses_dir) == 1
+        assert reconcile(store=store, index=index) == 1
         previous = (doc_dir / "text.json").stat()
         write_text(
             doc_dir=doc_dir,
@@ -174,7 +159,7 @@ def test_reconcile_reindexes_when_text_json_changes(
         )
         stamp = previous.st_mtime_ns + 1
         os.utime(doc_dir / "text.json", ns=(stamp, stamp))
-        assert reconcile(store=store, index=index, courses_dir=courses_dir) == 1
+        assert reconcile(store=store, index=index) == 1
         after = index.search_documents(
             match='"dopo"*', course_id="course-1", limit=10, offset=0
         )
@@ -196,11 +181,11 @@ def test_reconcile_removes_document_deleted_from_disk(
         pages=[Page(text="causa", no_text=False)],
     )
     with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
-        assert reconcile(store=store, index=index, courses_dir=courses_dir) == 1
+        assert reconcile(store=store, index=index) == 1
         import shutil
 
         shutil.rmtree(doc_dir)
-        assert reconcile(store=store, index=index, courses_dir=courses_dir) == 0
+        assert reconcile(store=store, index=index) == 0
         assert index.indexed_documents() == {}
 
 
@@ -215,7 +200,7 @@ def test_reconcile_removes_document_no_longer_ready(
         pages=[Page(text="causa", no_text=False)],
     )
     with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
-        assert reconcile(store=store, index=index, courses_dir=courses_dir) == 1
+        assert reconcile(store=store, index=index) == 1
         write_text(
             doc_dir=document_dir(
                 courses_dir=courses_dir, course_id="course-1", doc_id="doc1"
@@ -232,7 +217,7 @@ def test_reconcile_removes_document_no_longer_ready(
                 )
             ),
         )
-        assert reconcile(store=store, index=index, courses_dir=courses_dir) == 0
+        assert reconcile(store=store, index=index) == 0
         assert index.indexed_documents() == {}
 
 
@@ -253,9 +238,9 @@ def test_reconcile_skips_unreadable_text_json_and_keeps_others(
         pages=[Page(text="causa", no_text=False)],
     )
     with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
-        assert reconcile(store=store, index=index, courses_dir=courses_dir) == 2
+        assert reconcile(store=store, index=index) == 2
         (bad_dir / "text.json").write_text("{not json", encoding="utf-8")
-        assert reconcile(store=store, index=index, courses_dir=courses_dir) == 0
+        assert reconcile(store=store, index=index) == 0
         good = index.search_documents(
             match='"contratt"*', course_id="course-1", limit=10, offset=0
         )
@@ -278,7 +263,7 @@ def test_search_session_reconciles_documents_too(
         doc_id="doc1",
         pages=[Page(text="causa", no_text=False)],
     )
-    with search_session(store=store, path=path, courses_dir=courses_dir) as index:
+    with search_session(store=store, path=path) as index:
         page = index.search_documents(
             match='"causa"*', course_id="course-1", limit=10, offset=0
         )

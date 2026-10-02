@@ -65,7 +65,7 @@ def _collect_courses(store: JobStore) -> list[CourseSummary]:
                 lecture_count=0,
                 last_lecture_at=course.created_at,
             )
-            for course in iter_courses(courses_dir=store.jobs_dir.parent / "courses")
+            for course in iter_courses(courses_dir=store.courses_dir)
         ),
     )
 
@@ -131,7 +131,7 @@ def rename_course(
     store: JobStore = request.app.state.job_store
     if not course_key(label=key):
         raise ConflictError(message="Seleziona un corso", code="COURSE_REQUIRED")
-    directory = store.jobs_dir.parent / "courses"
+    directory = store.courses_dir
     try:
         with REGISTRY_LOCK:
             _require_course(store=store, key=key)

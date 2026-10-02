@@ -82,6 +82,13 @@ def _read_passages(path: Path) -> list[Passage] | None:
 
 
 def _reconcile(store: JobStore, index: SearchIndex) -> int:
+    """Bring lectures and course documents in the index in line with disk."""
+    return _reconcile_lectures(store=store, index=index) + _reconcile_documents(
+        courses_dir=store.courses_dir, index=index
+    )
+
+
+def _reconcile_lectures(store: JobStore, index: SearchIndex) -> int:
     indexed = index.indexed_lectures()
     present = set()
     replaced = 0
@@ -163,25 +170,14 @@ def _reconcile_documents(courses_dir: Path, index: SearchIndex) -> int:
     return replaced
 
 
-def reconcile(
-    store: JobStore, index: SearchIndex, courses_dir: Path | None = None
-) -> int:
-    """Reconcile under the shared lock and return the number of reindexed items.
-
-    courses_dir is optional so existing boot-time callers keep working
-    unchanged; without it, document passages are left untouched.
-    """
+def reconcile(store: JobStore, index: SearchIndex) -> int:
+    """Reconcile under the shared lock and return the number of reindexed items."""
     with _SEARCH_LOCK:
-        replaced = _reconcile(store=store, index=index)
-        if courses_dir is not None:
-            replaced += _reconcile_documents(courses_dir=courses_dir, index=index)
-        return replaced
+        return _reconcile(store=store, index=index)
 
 
 @contextmanager
-def search_session(
-    store: JobStore, path: Path, courses_dir: Path | None = None
-) -> Iterator[SearchIndex]:
+def search_session(store: JobStore, path: Path) -> Iterator[SearchIndex]:
     """Keep one lock and one connection through reconciliation and all queries.
 
     Corruption discards the index and raises SearchCorruptError. Use search()
@@ -189,8 +185,6 @@ def search_session(
     """
     with _SEARCH_LOCK, index_session(path=path) as index:
         _reconcile(store=store, index=index)
-        if courses_dir is not None:
-            _reconcile_documents(courses_dir=courses_dir, index=index)
         yield index
 
 

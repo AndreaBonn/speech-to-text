@@ -57,7 +57,7 @@ def _services(request: Request) -> DocumentServices:
     store = request.app.state.job_store
     return DocumentServices(
         settings=request.app.state.settings,
-        courses_dir=store.jobs_dir.parent / "courses",
+        courses_dir=store.courses_dir,
         worker=request.app.state.extraction_worker,
     )
 

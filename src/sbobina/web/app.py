@@ -96,7 +96,7 @@ def create_app(
         options=supervisor_options,
     )
     app.state.extraction_worker = ExtractionWorker(
-        courses_dir=app.state.job_store.jobs_dir.parent / "courses",
+        courses_dir=app.state.job_store.courses_dir,
         options=extraction_worker_options
         if extraction_worker_options is not None
         else ExtractionWorkerOptions(

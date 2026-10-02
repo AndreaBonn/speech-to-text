@@ -65,6 +65,8 @@ def atomic_write(path: Path, content: str) -> None:
 class JobStore:
     def __init__(self, data_dir: Path) -> None:
         self.jobs_dir = data_dir / "jobs"
+        # Course registry and documents live beside the jobs, in the same data dir.
+        self.courses_dir = data_dir / "courses"
 
     def _job_dir(self, job_id: str) -> Path:
         try:
