@@ -43,7 +43,8 @@ class DiscardReason(StrEnum):
     INVALID_OPTIONS = "INVALID_OPTIONS"
 
 
-def _to_generation_citation(resolved: SourceCitation) -> GenerationCitation:
+def to_generation_citation(resolved: SourceCitation) -> GenerationCitation:
+    """Public: chat_pipeline.py reuses this to resolve its own citations."""
     if isinstance(resolved.location, DocumentCitation):
         return GenerationCitation(
             passage_id=resolved.passage_id,
@@ -63,7 +64,7 @@ def _to_generation_citation(resolved: SourceCitation) -> GenerationCitation:
     )
 
 
-def _resolve_citations(
+def resolve_citations(
     proposed: Sequence[ProposedCitation],
     passages: Sequence[RetrievedPassage],
     counts: Counter[str],
@@ -83,7 +84,7 @@ def _resolve_citations(
         if isinstance(result, SourceRejection):
             counts[result.reason] += 1
             return None
-        resolved.append(_to_generation_citation(resolved=result))
+        resolved.append(to_generation_citation(resolved=result))
     return tuple(resolved)
 
 
@@ -101,7 +102,7 @@ def _validate_mc_question(
     if not _has_valid_options(proposed.options):
         counts[DiscardReason.INVALID_OPTIONS] += 1
         return None
-    citations = _resolve_citations(
+    citations = resolve_citations(
         proposed=proposed.citations, passages=passages, counts=counts
     )
     if citations is None:
@@ -120,7 +121,7 @@ def _validate_text_question(
     passages: Sequence[RetrievedPassage],
     counts: Counter[str],
 ) -> GenerationQuestion | None:
-    citations = _resolve_citations(
+    citations = resolve_citations(
         proposed=proposed.citations, passages=passages, counts=counts
     )
     if citations is None:
@@ -158,7 +159,7 @@ def _validate_sentence(
     passages: Sequence[RetrievedPassage],
     counts: Counter[str],
 ) -> SummarySentence | None:
-    citations = _resolve_citations(
+    citations = resolve_citations(
         proposed=proposed.citations, passages=passages, counts=counts
     )
     return (

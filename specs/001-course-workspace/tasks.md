@@ -245,7 +245,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   seriali per la FIFO (ADR D3 da correggere: il diagramma fa passare i CourseWorkItem
   dall'arbitro); test di starvation: chat in arrivo continuo mentre la trascrizione aspetta →
   la trascrizione parte dopo il turno in corso (priorità allo scrittore).
-- [ ] **T041** `chat_pipeline.py` + prompt `chat-v1.md` (via `prompt-master`): domanda + ultimi 2
+- [x] **T041** `chat_pipeline.py` + prompt `chat-v1.md` (via `prompt-master`): domanda + ultimi 2
   scambi → `retrieve` → risposta JSON a frasi con citazioni → validazione → frasi non citate
   rimosse; nessun passaggio o nessuna frase valida → "Non trovo la risposta nel materiale di
   questo corso" senza (o dopo) la chiamata. Rischio: medio.
