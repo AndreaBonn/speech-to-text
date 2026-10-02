@@ -56,3 +56,9 @@ strict = true
 # Third-party packages shipped without type information.
 module = ["faster_whisper.*", "nvidia.*", "jiwer.*", "pypdfium2.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Not a project dependency: scripts/verify_document_xss.py runs it through
+# `uv run --with playwright`, so the venv that mypy checks does not have it.
+module = ["playwright.*"]
+ignore_missing_imports = true

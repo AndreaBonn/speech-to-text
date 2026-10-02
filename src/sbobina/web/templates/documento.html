@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if not_found %}
+<div class="empty-state" role="alert">
+  <p class="empty-state__text">
+    Il documento non esiste, oppure è stato rimosso.
+  </p>
+  <a class="btn btn--secondary" href="/corsi?corso={{ course_key | urlencode }}">Torna al corso</a>
+</div>
+{% else %}
+<div class="document" data-course-key="{{ course_key }}" data-doc-id="{{ doc_id }}">
+  <div class="reader__toolbar">
+    <div class="reader__toolbar-title">
+      <h2 class="reader__title">{{ filename }}</h2>
+      <p class="reader__subtitle">
+        <a class="table__link" href="/corsi?corso={{ course_key | urlencode }}">{{ course_label }}</a>
+      </p>
+    </div>
+    <div class="reader__toolbar-actions">
+      <a class="btn btn--ghost"
+         href="/api/v1/courses/{{ course_key | urlencode }}/documents/{{ doc_id }}/file"
+         download>Scarica originale</a>
+    </div>
+  </div>
+
+  <div id="document-status" class="history__status" role="status" aria-live="polite" hidden></div>
+
+  <article id="document-text" class="document__text" aria-label="Testo del documento">
+    <div class="skeleton-row"></div>
+    <div class="skeleton-row"></div>
+    <div class="skeleton-row"></div>
+  </article>
+
+  <nav id="document-pagination" class="document__pagination" aria-label="Pagine del documento" hidden>
+    <button type="button" id="document-prev" class="btn btn--secondary">&larr; Precedente</button>
+    <span id="document-page-count" class="document__page-count"></span>
+    <button type="button" id="document-next" class="btn btn--secondary">Successiva &rarr;</button>
+  </nav>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if not not_found %}
+<script src="/static/js/dom.js" defer></script>
+<script src="/static/js/documento.js" defer></script>
+{% endif %}
+{% endblock %}

@@ -85,12 +85,55 @@
     </div>
 
     <nav id="corsi-detail-pagination" class="pagination" aria-label="Pagine delle lezioni del corso" hidden></nav>
+
+    <section id="corsi-materials" class="materials" aria-labelledby="corsi-materials-title">
+      <h3 id="corsi-materials-title" class="section-title">Materiali</h3>
+
+      <p id="materials-uncategorized-note" class="field__helper" hidden>
+        Per caricare materiali assegna prima un corso alla lezione: un file da solo non ha dove stare.
+      </p>
+
+      <form id="materials-upload-form" class="materials__upload" novalidate>
+        <label id="materials-dropzone" class="dropzone" for="materials-dropzone-input">
+          <input
+            id="materials-dropzone-input"
+            class="dropzone__input"
+            type="file"
+            accept=".pdf,.docx,.pptx,.txt,.md"
+          />
+          <span id="materials-dropzone-prompt" class="dropzone__prompt">
+            Trascina un file qui o scegli
+            <span class="dropzone__hint">pdf, docx, pptx, txt, md</span>
+          </span>
+        </label>
+        <p id="materials-file-error" class="field__error" role="alert" hidden></p>
+      </form>
+
+      <div id="materials-upload-progress" class="materials__progress" hidden>
+        <div class="progress" role="progressbar" aria-label="Avanzamento del caricamento"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="progress__track"><div id="materials-upload-bar" class="progress__fill"></div></div>
+        </div>
+      </div>
+
+      <div id="materials-status" class="history__status" role="alert" hidden></div>
+
+      <ul id="materials-list" class="materials__list" hidden></ul>
+
+      <div id="materials-empty" class="empty-state" hidden>
+        <p class="empty-state__text">Nessun materiale: carica libro, slide o appunti.</p>
+      </div>
+
+      <nav id="materials-pagination" class="pagination" aria-label="Pagine dei materiali" hidden></nav>
+    </section>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script src="/static/js/dom.js" defer></script>
+<script src="/static/js/corso-upload.js" defer></script>
+<script src="/static/js/corso-materiali.js" defer></script>
 <script src="/static/js/corso-dettaglio.js" defer></script>
 <script src="/static/js/corsi.js" defer></script>
 <script src="/static/js/search.js" defer></script>

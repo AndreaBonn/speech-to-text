@@ -709,12 +709,15 @@ body {
   color: var(--color-ink-2);
 }
 
-.badge--running {
+.badge--running,
+.badge--uploading,
+.badge--extracting {
   background: var(--color-accent-soft);
   color: var(--color-accent);
 }
 
-.badge--done {
+.badge--done,
+.badge--ready {
   background: var(--color-success-bg);
   color: var(--color-success);
 }
@@ -725,7 +728,8 @@ body {
 }
 
 .badge--cancelled,
-.badge--interrupted {
+.badge--interrupted,
+.badge--ready_no_text {
   background: var(--color-warning-bg);
   color: var(--color-warning);
 }
@@ -1847,5 +1851,124 @@ body {
 @media (max-width: 767px) {
   .study__chapter {
     padding: var(--space-sm) var(--space-md);
+  }
+}
+
+/* ---------- Materials (course detail: /corsi) ---------- */
+
+.materials {
+  margin-top: var(--space-xl);
+}
+
+.materials__upload {
+  margin-top: var(--space-sm);
+  max-width: 32rem;
+}
+
+.materials__progress {
+  margin-top: var(--space-sm);
+  max-width: 32rem;
+}
+
+.materials__list {
+  list-style: none;
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.materials__item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.materials__name-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.materials__name {
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.materials__meta {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+.materials__error {
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}
+
+.materials__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+
+@media (max-width: 767px) {
+  .materials__item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* In a column the 16rem basis would become a height, opening a gap. */
+  .materials__name-wrap {
+    flex-basis: auto;
+    width: 100%;
+  }
+}
+
+/* ---------- Document page (/corsi/<key>/documenti/<id>) ---------- */
+
+.document {
+  max-width: var(--content-max);
+}
+
+.document__text {
+  max-width: var(--measure-reading);
+  font-family: var(--font-reading);
+  line-height: var(--leading-reading);
+}
+
+.document__paragraph {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.document__no-text {
+  margin: 0;
+  color: var(--color-ink-3);
+  font-style: italic;
+}
+
+.document__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+  max-width: var(--measure-reading);
+}
+
+.document__page-count {
+  color: var(--color-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 767px) {
+  .document__pagination {
+    flex-wrap: wrap;
   }
 }

@@ -30,6 +30,7 @@
   var labelsByKey = {};
 
   var dom = window.SbobinaDom;
+  var materials = window.SbobinaCourseMaterials;
   var clearChildren = dom.clearChildren;
   var textCell = dom.textCell;
   var showSkeleton = dom.showSkeleton;
@@ -161,12 +162,14 @@
     detailEl.hidden = false;
     detailTitleEl.textContent = labelFor(key, knownLabel);
     loadDetail(key, 1);
+    materials.show(key);
   }
 
   function showList() {
     currentCourseKey = null;
     detailEl.hidden = true;
     listEl.hidden = false;
+    materials.hide();
   }
 
   function refreshTitle() {

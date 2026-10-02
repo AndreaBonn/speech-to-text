@@ -7,8 +7,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import JsonValue
 
-from sbobina.courses import MAX_COURSE_LABEL_LENGTH, effective_course
+from sbobina.course_registry import find_by_key
+from sbobina.courses import MAX_COURSE_LABEL_LENGTH, course_key, effective_course
+from sbobina.document_models import CourseDocument
 from sbobina.model_catalog import ollama_options, whisper_options
+from sbobina.web.document_store import read_document
 from sbobina.web.errors import NotFoundError
 from sbobina.web.job_models import JobRecord, JobStatus
 from sbobina.web.job_store import JobStore
@@ -249,4 +252,44 @@ def studio(request: Request, store: JobStoreDep, job_id: str) -> HTMLResponse:
         page_title="Materiali di studio",
         job_id=job_id,
         title=_reader_title(record),
+    )
+
+
+@router.get("/corsi/{key:path}/documenti/{doc_id}", response_class=HTMLResponse)
+def documento(
+    request: Request, store: JobStoreDep, key: str, doc_id: str
+) -> HTMLResponse:
+    """One course document's reading page; its pages of text load client-side."""
+    courses_dir = store.courses_dir
+    course = find_by_key(courses_dir=courses_dir, key=course_key(label=key))
+    document: CourseDocument | None = None
+    if course is not None:
+        try:
+            document = read_document(
+                courses_dir=courses_dir, course_id=course.id, doc_id=doc_id
+            )
+        except NotFoundError:
+            document = None
+    if course is None or document is None:
+        return _render(
+            request=request,
+            template_name="documento.html",
+            active="corsi",
+            store=store,
+            status_code=404,
+            page_title="Documento",
+            not_found=True,
+            course_key=key,
+        )
+    return _render(
+        request=request,
+        template_name="documento.html",
+        active="corsi",
+        store=store,
+        page_title="Materiale del corso",
+        not_found=False,
+        course_key=key,
+        course_label=course.label,
+        doc_id=doc_id,
+        filename=document.filename,
     )

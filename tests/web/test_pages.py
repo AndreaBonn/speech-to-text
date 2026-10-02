@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -5,11 +6,43 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import JsonValue
 
+from sbobina.course_registry import get_or_create
+from sbobina.document_models import CourseDocument, DocumentKind, DocumentStatus
 from sbobina.settings import Settings
 from sbobina.web import pages
 from sbobina.web.app import create_app
+from sbobina.web.document_store import write_document
 from sbobina.web.job_models import JobConfig, JobStatus, LectureMeta
 from sbobina.web.job_store import JobStore
+
+
+def _write_course_document(
+    tmp_path: Path, filename: str, status: DocumentStatus = DocumentStatus.READY
+) -> tuple[str, str]:
+    """Seed a registered course with one document, bypassing the upload API."""
+    courses_dir = tmp_path / "courses"
+    course = get_or_create(courses_dir=courses_dir, key="fisica", label="Fisica")
+    doc_id = "doc-1"
+    doc_dir = courses_dir / course.id / "documents" / doc_id
+    doc_dir.mkdir(parents=True)
+    extracted = status in (DocumentStatus.READY, DocumentStatus.READY_NO_TEXT)
+    write_document(
+        courses_dir=courses_dir,
+        document=CourseDocument(
+            id=doc_id,
+            course_id=course.id,
+            filename=filename,
+            kind=DocumentKind.PDF,
+            size=1,
+            sha256="0" * 64,
+            status=status,
+            error="EXTRACTION_FAILED" if status == DocumentStatus.FAILED else None,
+            pages=1 if extracted else None,
+            created_at=datetime.now(tz=UTC),
+        ),
+    )
+    return course.key, doc_id
+
 
 BASE_URL = "http://127.0.0.1:8765"
 FORM_FIELD_NAMES = (
@@ -381,3 +414,73 @@ def test_index_explains_beam_size_with_the_recommended_value(tmp_path: Path) -> 
     assert 'aria-describedby="beam_size-tip"' in help_button
     tip = body.split('id="beam_size-tip"')[1].split("</span>")[0]
     assert "Consigliato: 5" in tip
+
+
+def test_corsi_page_includes_the_materials_section(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/corsi").text
+
+    assert 'id="materials-list"' in body
+    assert 'id="materials-dropzone"' in body
+    assert 'id="materials-empty"' in body
+    assert "/static/js/corso-materiali.js" in body
+    assert body.index("/static/js/dom.js") < body.index("/static/js/corso-upload.js")
+    assert body.index("/static/js/corso-upload.js") < body.index(
+        "/static/js/corso-materiali.js"
+    )
+    assert body.index("/static/js/corso-materiali.js") < body.index(
+        "/static/js/corso-dettaglio.js"
+    )
+
+
+def test_documento_page_returns_shell_for_an_existing_document(tmp_path: Path) -> None:
+    key, doc_id = _write_course_document(tmp_path, "Manuale.pdf")
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        response = client.get(f"/corsi/{key}/documenti/{doc_id}")
+
+    assert response.status_code == 200
+    body = response.text
+    assert f'data-doc-id="{doc_id}"' in body
+    assert "Manuale.pdf" in body
+    assert 'id="document-text"' in body
+    assert body.index("/static/js/dom.js") < body.index("/static/js/documento.js")
+
+
+def test_documento_page_returns_404_for_missing_document(tmp_path: Path) -> None:
+    key, _ = _write_course_document(tmp_path, "Manuale.pdf")
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        response = client.get(f"/corsi/{key}/documenti/does-not-exist")
+
+    assert response.status_code == 404
+    assert 'id="document-text"' not in response.text
+
+
+def test_documento_page_returns_404_for_unregistered_course(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        response = client.get("/corsi/does-not-exist/documenti/doc-1")
+
+    assert response.status_code == 404
+
+
+def test_documento_page_escapes_a_malicious_filename(tmp_path: Path) -> None:
+    safe_key, safe_doc_id = _write_course_document(tmp_path, "Manuale.pdf")
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        baseline = client.get(f"/corsi/{safe_key}/documenti/{safe_doc_id}").text
+
+    other_tmp_path = tmp_path / "other"
+    key, doc_id = _write_course_document(
+        other_tmp_path, "Manuale<script>alert(1)</script>.pdf"
+    )
+    app = create_app(settings=Settings(), data_dir=other_tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get(f"/corsi/{key}/documenti/{doc_id}").text
+
+    assert "<script>alert(1)</script>" not in body
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in body
+    # The payload adds no real <script> tag: both pages load the same set.
+    assert body.count("<script") == baseline.count("<script")

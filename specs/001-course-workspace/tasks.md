@@ -86,7 +86,7 @@ riscrivono prima di partire.
 
 **[B-3] T016-T017**
 
-- [ ] **T016** UI "Materiali" nel dettaglio corso (`corso-dettaglio.js`, `corsi.html`): elenco con
+- [x] **T016** UI "Materiali" nel dettaglio corso (`corso-dettaglio.js`, `corsi.html`): elenco con
   stato, upload (pulsante + trascina), avanzamento dell'upload, stato estrazione aggiornato
   (polling leggero o SSE esistente), elimina con conferma, scarica; stati loading, empty
   ("Nessun materiale: carica libro, slide o appunti"), error con causa e file preservato
@@ -94,7 +94,7 @@ riscrivono prima di partire.
   con il testo per pagina e navigazione `?p=`. Riga `DIAL:` da `design.md`. Rischio: medio.
   verify: click-through registrato (carica PDF, carica `.exe` rinominato → messaggio, elimina,
   scarica, apri pagina 3); render 375/1280; `a11y-gate` verde.
-- [ ] **T017** Test avversariale XSS: PDF il cui testo e nome contengono `<script>` e
+- [x] **T017** Test avversariale XSS: PDF il cui testo e nome contengono `<script>` e
   `<img onerror>` → elenco e lettore documento non eseguono nulla. Rischio: basso.
   verify: test Playwright o DOM che conta zero nodi `script`/`img` iniettati e zero dialog.
 
