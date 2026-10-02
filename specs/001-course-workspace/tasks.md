@@ -36,7 +36,7 @@ riscrivono prima di partire.
   chiave trova lo stesso id e i suoi documenti. ADR D1: `POST /api/v1/courses/<key>/rename`
   scrive prima `course.json` poi i `meta.json` (un crash a metà lascia il registro coerente);
   upload su "Senza corso" → 409.
-- [ ] **T012** `document_models.py` + `document_sniff.py` (puro): `sniff_document(head: bytes,
+- [x] **T012** `document_models.py` + `document_sniff.py` (puro): `sniff_document(head: bytes,
   path) -> DocumentKind | None` (PDF da `%PDF-`; DOCX/PPTX da firma zip + `[Content_Types].xml`
   con `wordprocessingml`/`presentationml`; TXT/MD decodificabili UTF-8 senza NUL),
   `check_archive_limits(path)` (somma `file_size` delle voci ≤ 500 MB, voci ≤ 10.000) senza
