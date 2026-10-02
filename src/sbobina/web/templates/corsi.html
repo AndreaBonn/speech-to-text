@@ -1,6 +1,29 @@
 {% extends "base.html" %}
 
 {% block content %}
+<section class="search" aria-labelledby="search-title">
+  <h2 id="search-title" class="section-title">Cerca nelle lezioni</h2>
+  <form id="search-form" class="search__form" role="search" novalidate>
+    <div class="search__field">
+      <label class="field__label" for="search-input">Parole o frase</label>
+      <input id="search-input" class="text-input" type="search" name="q"
+             placeholder="Es. causa del contratto" autocomplete="off"
+             aria-describedby="search-help">
+      <p id="search-help" class="field__helper">La frase esatta va tra virgolette. Trova anche le forme simili: «contratti» trova «contratto».</p>
+    </div>
+    <div class="search__filter">
+      <label class="field__label" for="search-course">Corso</label>
+      <select id="search-course" class="select-input" name="course">
+        <option value="*">Tutti i corsi</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn--primary search__submit">Cerca</button>
+  </form>
+  <div id="search-status" class="history__status" role="status" aria-live="polite" hidden></div>
+  <ol id="search-results" class="search__results" hidden></ol>
+  <nav id="search-pagination" class="pagination" aria-label="Pagine dei risultati" hidden></nav>
+</section>
+
 <div id="corsi-root" class="courses">
   <div id="corsi-list" class="courses__list">
     <div id="corsi-list-status" class="history__status" role="alert" hidden></div>
@@ -68,4 +91,5 @@
 {% block scripts %}
 <script src="/static/js/dom.js" defer></script>
 <script src="/static/js/corsi.js" defer></script>
+<script src="/static/js/search.js" defer></script>
 {% endblock %}

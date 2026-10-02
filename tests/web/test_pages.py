@@ -279,3 +279,15 @@ def test_reader_page_loads_the_deep_link_after_the_reader(tmp_path: Path) -> Non
 
     assert "/static/js/reader-link.js" in body
     assert body.index("/static/js/reader.js") < body.index("/static/js/reader-link.js")
+
+
+def test_corsi_page_has_the_search_form(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/corsi").text
+
+    assert 'id="search-form"' in body
+    assert 'id="search-input"' in body
+    assert 'id="search-course"' in body
+    assert 'id="search-results"' in body
+    assert body.index("/static/js/dom.js") < body.index("/static/js/search.js")

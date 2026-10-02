@@ -1510,3 +1510,88 @@ body {
     padding-bottom: calc(var(--player-height) * 1.6 + 14rem);
   }
 }
+
+/* ---------- Search (on /corsi) ---------- */
+
+.search {
+  margin-bottom: var(--space-xl);
+}
+
+.search__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.search__field {
+  flex: 3 1 18rem;
+  min-width: 0;
+}
+
+.search__filter {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.search__field .text-input,
+.search__filter .select-input {
+  width: 100%;
+}
+
+/* Aligns the button with the inputs, below their labels. */
+.search__submit {
+  margin-top: calc(var(--text-base) * 1.5 + var(--space-2xs));
+}
+
+.search__results {
+  list-style: none;
+  margin: var(--space-md) 0 0;
+  padding: 0;
+}
+
+.search__results[hidden] {
+  display: none;
+}
+
+.search__lecture {
+  padding: var(--space-md) 0;
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+
+.search__title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.search__passages {
+  list-style: none;
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+}
+
+.search__passage {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: baseline;
+  padding: var(--space-2xs) 0;
+}
+
+.search__time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.search__snippet {
+  margin: 0;
+  font-family: var(--font-reading);
+  overflow-wrap: anywhere;
+}
+
+.search__snippet mark {
+  background: var(--color-accent-soft);
+  color: inherit;
+  border-radius: var(--radius-mark);
+}

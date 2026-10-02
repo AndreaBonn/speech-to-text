@@ -141,7 +141,7 @@ ovvia.
 
 **[B-6] T025-T026**
 
-- [ ] **T025** UI ricerca su `/corsi` (`static/js/search.js`): campo di ricerca con filtro corso,
+- [x] **T025** UI ricerca su `/corsi` (`static/js/search.js`): campo di ricerca con filtro corso,
   risultati per lezione (max 3 passaggi, "altri N"), snippet costruito con `textContent` dalle parti,
   stati loading/empty con eco della query/error con query preservata/503. Rischio: medio.
   verify: test con trascrizione che contiene `<script>alert(1)</script>` → nessuna esecuzione
