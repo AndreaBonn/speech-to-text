@@ -35,6 +35,18 @@ class DocumentSearchPage:
     total: int
 
 
+@dataclass(frozen=True)
+class RankedDocumentPassage:
+    """One doc_passages row with its full text and bm25 score, for retrieval."""
+
+    doc_id: str
+    page: int
+    chunk: int
+    passage_id: str
+    text: str
+    score: float
+
+
 def _delete_document(connection: sqlite3.Connection, doc_id: str) -> None:
     connection.execute("DELETE FROM doc_passages WHERE doc_id = ?", (doc_id,))
     connection.execute("DELETE FROM documents WHERE doc_id = ?", (doc_id,))
@@ -125,3 +137,43 @@ def search_documents(
         for row in rows
     ]
     return DocumentSearchPage(items=items, total=total)
+
+
+@dataclass(frozen=True)
+class DocumentScope:
+    course_id: str
+    doc_ids: frozenset[str] | None = None
+
+
+def ranked_document_passages(
+    connection: sqlite3.Connection, match: str, scope: DocumentScope, limit: int
+) -> list[RankedDocumentPassage]:
+    """Full text and bm25 score of one course's passages, best first.
+
+    For retrieval (T023), which needs the whole passage rather than a
+    highlighted snippet and a score comparable across the lecture and
+    document FTS tables for fusion. See adr.md § D2.
+    """
+    # The document filter sits before LIMIT: applied afterwards, a selected
+    # document outranked by others in the course would vanish.
+    clause = "doc_passages MATCH ? AND course_id = ?"
+    parameters: list[object] = [match, scope.course_id]
+    if scope.doc_ids is not None:
+        clause += f" AND doc_id IN ({', '.join('?' for _ in scope.doc_ids)})"
+        parameters.extend(scope.doc_ids)
+    rows = connection.execute(
+        "SELECT doc_id, page, chunk, passage_id, text, bm25(doc_passages) AS score "
+        f"FROM doc_passages WHERE {clause} ORDER BY score LIMIT ?",
+        [*parameters, limit],
+    )
+    return [
+        RankedDocumentPassage(
+            doc_id=row["doc_id"],
+            page=row["page"],
+            chunk=row["chunk"],
+            passage_id=row["passage_id"],
+            text=row["text"],
+            score=row["score"],
+        )
+        for row in rows
+    ]

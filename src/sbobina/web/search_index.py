@@ -2,6 +2,7 @@ import logging
 import sqlite3
 from collections.abc import Collection, Iterable, Iterator
 from contextlib import closing, contextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
@@ -14,7 +15,12 @@ from sbobina.search_text import (
     snippet_parts,
 )
 from sbobina.web import document_index
-from sbobina.web.document_index import DocumentSearchPage, DocumentState
+from sbobina.web.document_index import (
+    DocumentScope,
+    DocumentSearchPage,
+    DocumentState,
+    RankedDocumentPassage,
+)
 from sbobina.web.search_schema import (
     CORRUPTION_CODES,
     PRIMARY_ERROR_MASK,
@@ -111,6 +117,27 @@ def _search_hit(row: sqlite3.Row) -> SearchHit:
         segment_index=row["segment_index"],
         start=row["start"],
         snippet=snippet_parts(highlighted=row["highlighted"]),
+    )
+
+
+@dataclass(frozen=True)
+class RankedLecturePassage:
+    """One passages row with its full text and bm25 score, for retrieval."""
+
+    job_id: str
+    segment_index: int
+    start: float
+    text: str
+    score: float
+
+
+def _ranked_lecture_passage(row: sqlite3.Row) -> RankedLecturePassage:
+    return RankedLecturePassage(
+        job_id=row["job_id"],
+        segment_index=row["segment_index"],
+        start=row["start"],
+        text=row["text"],
+        score=row["score"],
     )
 
 
@@ -247,4 +274,24 @@ class SearchIndex:
             course_id=course_id,
             limit=limit,
             offset=offset,
+        )
+
+    def lecture_passages_for_retrieval(
+        self, match: str, job_ids: Collection[str], limit: int
+    ) -> list[RankedLecturePassage]:
+        """Full text and bm25 score, best first, for retrieval.py (adr.md § D2)."""
+        clause, parameters = _search_filter(match=match, job_ids=job_ids)
+        rows = self._connection.execute(
+            "SELECT passages.job_id, segment_index, start, text, "
+            f"bm25(passages) AS score FROM passages WHERE {clause} "
+            "ORDER BY score LIMIT ?",
+            [*parameters, limit],
+        )
+        return [_ranked_lecture_passage(row=row) for row in rows]
+
+    def document_passages_for_retrieval(
+        self, match: str, scope: DocumentScope, limit: int
+    ) -> list[RankedDocumentPassage]:
+        return document_index.ranked_document_passages(
+            connection=self._connection, match=match, scope=scope, limit=limit
         )

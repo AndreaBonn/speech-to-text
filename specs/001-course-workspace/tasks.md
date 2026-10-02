@@ -126,13 +126,19 @@ riscrivono prima di partire.
 
 **[B-5] T023-T024**
 
-- [ ] **T023** `src/sbobina/retrieval.py`: `question_to_fts(question) -> str` (stopword italiane
+- [x] **T023** `src/sbobina/retrieval.py`: `question_to_fts(question) -> str` (stopword italiane
   in costante, parole di contenuto, prefisso senza vocali finali come la ricerca, OR, nessuna
   sintassi FTS dall'utente), `retrieve(index, course_id, question, budget_words, sources) ->
   list[Passage]` (BM25, solo il corso, filtro opzionale per lezioni/documenti scelti, taglio al
   budget di parole). `Passage` porta testo, fonte e un id stabile per la citazione. Rischio: medio.
   verify: "cos'è la causa del contratto?" → query senza `cos`, `è`, `la`, `del`; input con `"`,
   `NEAR(`, `*` → nessuna eccezione; passaggi di un altro corso mai restituiti; budget rispettato.
+- [ ] **T025** (ADR D2, tabella Chunking) Il recupero delle lezioni restituisce una finestra di
+  ~250 parole attorno a ogni segmento trovato (segmenti adiacenti della stessa trascrizione),
+  fusa se due finestre si toccano, invece del singolo segmento Whisper di 10-30 parole. La
+  citazione resta ancorata al segmento trovato. Emerso dalla review di T023. Rischio: medio.
+  verify: segmento di 12 parole al centro di una lezione → passaggio di 230-270 parole che lo
+  contiene; due segmenti vicini → una sola finestra; budget di parole rispettato.
 - [ ] **T024** Misura del recupero (non delegabile: giudizio). Con l'utente: 30+ domande su un
   corso reale con il passaggio atteso annotato in `specs/001-course-workspace/eval-retrieval.md`;
   `recall@8` e `recall@15`. `BUDGET: 3 iterazioni di query_builder | ranking: recall@8 > recall@15
