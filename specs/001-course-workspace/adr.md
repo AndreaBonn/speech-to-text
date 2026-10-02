@@ -1,6 +1,6 @@
 # ADR-001: Spazio di lavoro del corso (materiali, compiti, riassunti, chat)
 
-**Stato**: Proposto (non ancora accettato dall'utente)
+**Stato**: Accettato il 2026-10-02 dopo le verifiche T001 (in fondo), con una revisione a D4
 **Data**: 2026-10-02
 **Ambito**: decisioni D1-D5 per la feature "materiale del corso" nella pagina `/corsi?corso=<key>`
 **Relazione con decisioni precedenti**: estende `specs/study-library/plan.md` Q1-D (corso da
@@ -589,3 +589,30 @@ Più difficile:
 - Licenze e wheel per Linux/Windows/macOS di `pypdf`, `pypdfium2`, `python-pptx` su PyPI.
 - Prova di estrazione sui PDF reali dell'utente (D4).
 - Rapporto token/parola italiano letto da `prompt_eval_count`.
+
+## Esito delle verifiche (T001, 2026-10-02)
+
+Misurate su questa macchina (Ollama 0.18.0, RTX 4060 8 GB, `qwen3.5:9b`), script in scratchpad.
+
+| Verifica | Esito | Conseguenza |
+|---|---|---|
+| (a) `num_ctx` diverso ricarica il modello? | Sì: 8192 a freddo 6,8 s di load; passare a 4096 ricarica (3,7 s), tornare a 8192 ricarica (3,5 s). A caldo 0,15 s | Ogni chiamata di sbobina usa lo stesso `num_ctx` (`CONTEXT_WINDOW_TOKENS`); la chat non lo cambia |
+| (b) Due richieste concorrenti | Servite in sequenza (0,75 s e 1,35 s), VRAM invariata (6348 MiB); `OLLAMA_NUM_PARALLEL` non impostato | Nessuna crescita di VRAM con più schede; la seconda chat aspetta la prima |
+| (c) Licenze e wheel | `pypdf` 6.19.0 BSD-3-Clause, wheel puro; `python-pptx` 1.0.2 MIT (richiede `lxml`, `Pillow`, `XlsxWriter`); `pypdfium2` 5.13.0 BSD-3-Clause/Apache-2.0, wheel binari multipiattaforma | Tutte compatibili con Apache-2.0 |
+| (d) Estrazione su PDF reali | Non eseguita: nessun PDF reale dell'utente disponibile | Spostata in T014 (3 file reali) |
+| (e) Token per parola italiana | 1500 parole di trascrizione → 3432 token = **2,29 token/parola** | Budget materiale per chiamata ≈ (8192 - prompt ~800 - output ~2048) / 2,29 ≈ **2300 parole**: recupero di ~8 passaggi da ~250 parole, non di più |
+
+Osservazioni non richieste:
+- Il modello caricato occupa 8,9 GB con split 28% CPU / 72% GPU: non entra tutto negli 8 GB, quindi
+  la generazione è più lenta di quanto la VRAM farebbe pensare. Le stime di latenza della chat vanno
+  misurate (T046), non dedotte.
+- Il servizio Ollama ascolta su `0.0.0.0:11434` (systemd `OLLAMA_HOST`): raggiungibile dalla rete
+  locale. sbobina lo chiama su localhost, ma chiunque sulla LAN può usare il modello. Fuori dallo
+  scope del progetto, segnalato all'utente.
+
+### Revisione a D4
+
+`pypdfium2` serve comunque in F5 (OCR, U1) per renderizzare le pagine in immagine, cosa che `pypdf`
+non fa. Una sola libreria PDF invece di due: **`pypdfium2` per estrazione del testo e render**,
+dietro `pdf_text.py`. `pypdf` resta solo come dipendenza di test se serve generare PDF fixture (in
+alternativa le fixture si generano con `pypdfium2` o con un PDF minimo scritto a mano nel test).

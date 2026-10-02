@@ -12,7 +12,7 @@ riscrivono prima di partire.
 
 ## F0 - Verifiche dell'ADR (prima di F1)
 
-- [ ] **T001** Le cinque verifiche aperte in `adr.md` (non delegabile: misura). (a) una chiamata
+- [x] **T001** Le cinque verifiche aperte in `adr.md` (non delegabile: misura). (a) una chiamata
   con `num_ctx` diverso ricarica il modello? (`ollama ps` prima/dopo); (b) effetto di
   `OLLAMA_NUM_PARALLEL` sulla VRAM con due richieste; (c) licenza e wheel di `pypdf`,
   `python-pptx`, `pypdfium2` da PyPI; (d) estrazione `pypdf` su 3 PDF reali dell'utente, pagine
@@ -46,7 +46,7 @@ riscrivono prima di partire.
 
 **[B-2] T013-T015**
 
-- [ ] **T013** Aggiungere `pypdf` e `python-pptx` con `uv add`; verificare la licenza dai
+- [ ] **T013** Aggiungere `pypdfium2` e `python-pptx` con `uv add` (ADR revisione D4); verificare la licenza dai
   metadati installati (`uv run python -c "import importlib.metadata as m; ..."`) e riportarla nel
   commit. `document_extract.py`: unico confine dei tre parser, `extract(path, kind) ->
   ExtractedText` (lista di pagine/slide con testo; TXT/MD in pagine logiche da ~500 parole);
