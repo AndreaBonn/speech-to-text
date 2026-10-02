@@ -30,6 +30,8 @@
     return;
   }
   var slowTimer = null;
+  // Only the latest search may paint: an older, slower answer is dropped.
+  var latestRequest = 0;
 
   function formatTime(seconds) {
     var total = Math.floor(seconds);
@@ -106,7 +108,7 @@
     return li;
   }
 
-  function renderResults(body, query) {
+  function renderResults(body, query, course) {
     resetResults();
     if (body.data.length === 0) {
       showMessage("Nessun risultato per «" + query + "». Prova con meno parole o con un altro corso.");
@@ -118,7 +120,7 @@
     });
     resultsEl.hidden = false;
     dom.renderPagination(paginationEl, body.meta, function (next) {
-      runSearch(query, next);
+      runSearch(query, next, course);
     });
   }
 
@@ -131,10 +133,10 @@
     return (detail && detail.message) || MESSAGES.failed;
   }
 
-  function searchUrl(query, page) {
+  function searchUrl(query, page, course) {
     var params = new URLSearchParams({ q: query, page: String(page), per_page: String(PER_PAGE) });
-    if (courseSelect.value !== ALL_COURSES) {
-      params.set("course", courseSelect.value);
+    if (course !== ALL_COURSES) {
+      params.set("course", course);
     }
     return SEARCH_URL + "?" + params.toString();
   }
@@ -144,31 +146,38 @@
     form.removeAttribute("aria-busy");
   }
 
-  function runSearch(query, page) {
+  function runSearch(query, page, course) {
+    var request = ++latestRequest;
+    var retry = function () {
+      runSearch(query, page, course);
+    };
+    clearTimeout(slowTimer);
     resetResults();
     showMessage(MESSAGES.loading);
     form.setAttribute("aria-busy", "true");
     slowTimer = setTimeout(function () {
       showMessage(MESSAGES.slow);
     }, SLOW_MS);
-    fetch(searchUrl(query, page))
+    fetch(searchUrl(query, page, course))
       .then(function (response) {
         return response.json().then(function (body) {
-          finish();
-          if (!response.ok) {
-            dom.showRetryStatus(statusEl, errorMessage(response, body), function () {
-              runSearch(query, page);
-            });
+          if (request !== latestRequest) {
             return;
           }
-          renderResults(body, query);
+          finish();
+          if (!response.ok) {
+            dom.showRetryStatus(statusEl, errorMessage(response, body), retry);
+            return;
+          }
+          renderResults(body, query, course);
         });
       })
       .catch(function () {
+        if (request !== latestRequest) {
+          return;
+        }
         finish();
-        dom.showRetryStatus(statusEl, MESSAGES.failed, function () {
-          runSearch(query, page);
-        });
+        dom.showRetryStatus(statusEl, MESSAGES.failed, retry);
       });
   }
 
@@ -199,7 +208,7 @@
       input.focus();
       return;
     }
-    runSearch(query, 1);
+    runSearch(query, 1, courseSelect.value);
   });
 
   loadCourses();
