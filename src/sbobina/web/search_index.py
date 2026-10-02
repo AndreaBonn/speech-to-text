@@ -57,6 +57,18 @@ class SearchPage:
     total: int
 
 
+@dataclass(frozen=True)
+class LectureHit:
+    job_id: str
+    passage_count: int
+
+
+@dataclass(frozen=True)
+class LecturePage:
+    items: list[LectureHit]
+    total: int
+
+
 def _create_schema(connection: sqlite3.Connection) -> None:
     """Use accent-insensitive Unicode tokens and three-character prefix indexes.
 
@@ -231,6 +243,32 @@ class SearchIndex:
             clause=clause, parameters=parameters, page=(limit, offset)
         )
         return SearchPage(items=[_search_hit(row=row) for row in rows], total=total)
+
+    def search_lectures(
+        self, match: str, job_ids: Collection[str] | None, page: tuple[int, int]
+    ) -> LecturePage:
+        """Page lectures by their best passage, counting every match in each.
+
+        bm25() is not allowed inside an aggregate, so a MATERIALIZED CTE scores
+        the passages first. page is (limit, offset) over lectures, not passages.
+        """
+        clause, parameters = _search_filter(match=match, job_ids=job_ids)
+        scored = (
+            "WITH scored AS MATERIALIZED (SELECT passages.job_id AS job_id, "
+            f"bm25(passages) AS score FROM passages WHERE {clause}) "
+        )
+        total = self._connection.execute(
+            scored + "SELECT count(DISTINCT job_id) FROM scored", parameters
+        ).fetchone()[0]
+        rows = self._connection.execute(
+            scored + "SELECT job_id, count(*) AS hits, min(score) AS best FROM scored "
+            "GROUP BY job_id ORDER BY best, job_id LIMIT ? OFFSET ?",
+            [*parameters, *page],
+        )
+        items = [
+            LectureHit(job_id=row["job_id"], passage_count=row["hits"]) for row in rows
+        ]
+        return LecturePage(items=items, total=total)
 
     def _select_hits(
         self, clause: str, parameters: list[object], page: tuple[int, int]

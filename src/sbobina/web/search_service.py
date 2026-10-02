@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Collection, Iterator
+from collections.abc import Callable, Collection, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,8 +10,10 @@ from sbobina.search_text import Passage, passages_from_transcript
 from sbobina.web.api_files import TRANSCRIPT_FILES
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import (
+    LectureHit,
     LectureState,
     SearchCorruptError,
+    SearchHit,
     SearchIndex,
     SearchPage,
     Variant,
@@ -30,6 +32,18 @@ class SearchQuery:
     job_ids: Collection[str] | None
     limit: int
     offset: int
+
+
+@dataclass(frozen=True)
+class LectureResult:
+    lecture: LectureHit
+    passages: list[SearchHit]
+
+
+@dataclass(frozen=True)
+class LectureResults:
+    items: list[LectureResult]
+    total: int
 
 
 def _preferred_transcript(directory: Path) -> tuple[Path, LectureState] | None:
@@ -112,10 +126,54 @@ def _search_once(store: JobStore, path: Path, query: SearchQuery) -> SearchPage:
         )
 
 
-def search(store: JobStore, path: Path, query: SearchQuery) -> SearchPage:
-    """Reconcile and query atomically; rebuild once if a read discovers corruption."""
+def _lectures_once(
+    store: JobStore, path: Path, query: SearchQuery, passages_per_lecture: int
+) -> LectureResults:
+    with index_session(path=path) as index:
+        _reconcile(store=store, index=index)
+        page = index.search_lectures(
+            match=query.match,
+            job_ids=query.job_ids,
+            page=(query.limit, query.offset),
+        )
+        items = [
+            LectureResult(
+                lecture=hit,
+                passages=index.search(
+                    match=query.match,
+                    job_ids=[hit.job_id],
+                    limit=passages_per_lecture,
+                    offset=0,
+                ).items,
+            )
+            for hit in page.items
+        ]
+        return LectureResults(items=items, total=page.total)
+
+
+def _with_rebuild[T](run: Callable[[], T]) -> T:
+    """Run under the shared lock; replay once after a corrupt index is discarded."""
     with _SEARCH_LOCK:
         try:
-            return _search_once(store=store, path=path, query=query)
+            return run()
         except SearchCorruptError:
-            return _search_once(store=store, path=path, query=query)
+            return run()
+
+
+def search(store: JobStore, path: Path, query: SearchQuery) -> SearchPage:
+    """Reconcile and query passages atomically; rebuild once on corruption."""
+    return _with_rebuild(lambda: _search_once(store=store, path=path, query=query))
+
+
+def search_lectures(
+    store: JobStore, path: Path, query: SearchQuery, passages_per_lecture: int
+) -> LectureResults:
+    """Page lectures (limit/offset count lectures) with their best passages."""
+    return _with_rebuild(
+        lambda: _lectures_once(
+            store=store,
+            path=path,
+            query=query,
+            passages_per_lecture=passages_per_lecture,
+        )
+    )

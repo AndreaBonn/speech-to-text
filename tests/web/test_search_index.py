@@ -218,3 +218,42 @@ def test_search_returns_more_than_three_passages_per_lecture(
     page = index.search(match='"causa"', job_ids=None, limit=10, offset=0)
     assert page.total == 5
     assert [hit.segment_index for hit in page.items] == list(range(5))
+
+
+def _passages(count: int, text: str) -> list[Passage]:
+    return [Passage(segment_index=i, start=float(i), text=text) for i in range(count)]
+
+
+def test_search_lectures_counts_every_lecture_past_a_thousand_passages(
+    index: SearchIndex,
+) -> None:
+    index.replace_lecture(
+        job_id="dense", state=STATE, passages=_passages(1100, "contratto contratto")
+    )
+    index.replace_lecture(
+        job_id="sparse",
+        state=STATE,
+        passages=_passages(1, "il contratto e poi molte altre parole diverse"),
+    )
+
+    first = index.search_lectures(match='"contratt"*', job_ids=None, page=(1, 0))
+    second = index.search_lectures(match='"contratt"*', job_ids=None, page=(1, 1))
+
+    assert first.total == 2
+    assert [hit.job_id for hit in first.items] == ["dense"]
+    assert first.items[0].passage_count == 1100
+    assert [hit.job_id for hit in second.items] == ["sparse"]
+    assert second.items[0].passage_count == 1
+
+
+def test_search_lectures_respects_job_ids_and_misses(index: SearchIndex) -> None:
+    index.replace_lecture(job_id="a", state=STATE, passages=_passages(2, "contratto"))
+    index.replace_lecture(job_id="b", state=STATE, passages=_passages(2, "contratto"))
+
+    page = index.search_lectures(match='"contratt"*', job_ids=["b"], page=(10, 0))
+    missing = index.search_lectures(match='"assente"', job_ids=None, page=(10, 0))
+
+    assert [hit.job_id for hit in page.items] == ["b"]
+    assert page.total == 1
+    assert missing.items == []
+    assert missing.total == 0
