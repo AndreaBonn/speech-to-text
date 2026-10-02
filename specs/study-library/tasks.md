@@ -12,7 +12,7 @@ i task marcati "(Q<n>)" si riscrivono prima di partire.
 
 **[B-1] T001-T003**
 
-- [ ] **T001** `.github/workflows/ci.yml` secondo plan § CI: trigger `push` e `pull_request` verso
+- [x] **T001** `.github/workflows/ci.yml` secondo plan § CI: trigger `push` e `pull_request` verso
   `main`, `permissions: contents: read`, `concurrency` per ref, job `check` su `ubuntu-24.04`,
   `timeout-minutes: 15`; passi checkout (`persist-credentials: false`), `astral-sh/setup-uv` con
   `enable-cache: true` e `cache-dependency-glob: uv.lock`, `uv python install`, `uv sync --locked`,
@@ -24,13 +24,13 @@ i task marcati "(Q<n>)" si riscrivono prima di partire.
   verify: `grep -E "uses: .+@[0-9a-f]{40}" .github/workflows/ci.yml` conta tutte le righe `uses:`;
   nessuna riga `uses:` senza SHA; `permissions` e `persist-credentials: false` presenti; il file
   passa `yamllint` (hook `format-changed-file.sh`).
-- [ ] **T002** Prova locale dell'ambiente CI (R5): in una copia pulita del repo (`git worktree add`
+- [x] **T002** Prova locale dell'ambiente CI (R5): in una copia pulita del repo (`git worktree add`
   nella scratchpad) eseguire con `env -i HOME=<vuota> PATH=<uv>:/usr/bin:/bin
   CUDA_VISIBLE_DEVICES="" OLLAMA_HOST=http://127.0.0.1:9 HF_HUB_OFFLINE=1` la stessa sequenza del
   workflow, partendo da `uv sync --locked` in un venv nuovo. Rischio: basso.
   verify: tutti e cinque i passi exit 0; numero di test riportato (544 il 2026-10-02, cresce con le
   fasi successive); se un passo fallisce, causa nominata prima di toccare il workflow.
-- [ ] **T003** Badge: in `README.md` e `README.it.md` sostituire la riga 9
+- [x] **T003** Badge: in `README.md` e `README.it.md` sostituire la riga 9
   (`![Tests](https://img.shields.io/badge/tests-478%20passed-brightgreen)`) con
   `[![CI](https://github.com/AndreaBonn/speech-to-text/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AndreaBonn/speech-to-text/actions/workflows/ci.yml)`.
   Rischio: basso.
