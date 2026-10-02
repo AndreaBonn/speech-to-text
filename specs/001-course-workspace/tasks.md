@@ -46,18 +46,18 @@ riscrivono prima di partire.
 
 **[B-2] T013-T015**
 
-- [ ] **T013** Aggiungere `pypdfium2` e `python-pptx` con `uv add` (ADR revisione D4); verificare la licenza dai
+- [x] **T013** Aggiungere `pypdfium2` e `python-pptx` con `uv add` (ADR revisione D4); verificare la licenza dai
   metadati installati (`uv run python -c "import importlib.metadata as m; ..."`) e riportarla nel
   commit. `document_extract.py`: unico confine dei tre parser, `extract(path, kind) ->
   ExtractedText` (lista di pagine/slide con testo; TXT/MD in pagine logiche da ~500 parole);
-  `is_scanned(text, pages)` (media < 50 caratteri per pagina). Rischio: medio.
+  stato `ready_no_text` se oltre metà delle pagine ha meno di 20 caratteri (unica soglia, `is_scanned` rimossa). Rischio: medio.
   verify: PDF di 3 pagine generato nel test → 3 pagine col testo atteso; PPTX con 2 slide → 2
   "pagine"; PDF con sole immagini → `ready_no_text`; licenze nel messaggio di commit.
   Security (P1): PPTX con entità XML interna ed esterna (`<!ENTITY x SYSTEM "file:///etc/hostname">`)
   in `slide1.xml` → estrazione fallisce o ignora l'entità, mai il contenuto del file nel testo;
   la dipendenza si accetta solo con questo test verde (python-docx disabilita già
   `resolve_entities`, python-pptx non è verificato).
-- [ ] **T014** (D4) `web/extraction_runner.py`: processo figlio `extract <doc_dir>` che scrive
+- [x] **T014** (D4) `web/extraction_runner.py`: processo figlio `extract <doc_dir>` che scrive
   `text.json` atomico; il padre (riuso `web/processes.py`) applica `extraction_timeout_s`
   (default 120), uccide e marca `EXTRACTION_TIMEOUT`; un'estrazione per volta, fuori dalla coda
   GPU; al boot gli `extracting` orfani tornano in estrazione. Prova su 3 file reali dell'utente

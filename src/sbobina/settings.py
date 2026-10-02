@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     web_port: int = 8765
     data_dir: Path = Path("data")
     web_max_upload_mb: int = 1024
+    extraction_timeout_s: float = Field(default=120.0, gt=0.0)
+    extraction_max_memory_mb: int = Field(default=2048, gt=0)
 
     @field_validator("web_host")
     @classmethod
