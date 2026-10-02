@@ -1,5 +1,7 @@
 import json
 
+from study_fixtures import FakeChat
+
 from sbobina.chat_pipeline import (
     MAX_HISTORY_TURNS,
     MAX_PASSAGES,
@@ -11,8 +13,6 @@ from sbobina.chat_pipeline import (
     answer,
     build_retrieval_question,
 )
-from study_fixtures import FakeChat
-
 from sbobina.generation_pipeline import estimate_tokens
 from sbobina.ollama_chat import CONTEXT_WINDOW_TOKENS
 from sbobina.retrieval import DocumentSource, RetrievedPassage
@@ -266,7 +266,10 @@ def test_answer_discards_sentence_when_one_of_its_citations_is_fabricated() -> N
                     "testo": "La causa e' illecita.",
                     "citazioni": [
                         {"passaggio": "P1", "testo": "la causa e' illecita quando"},
-                        {"passaggio": "P1", "testo": "parole mai scritte nel passaggio"},
+                        {
+                            "passaggio": "P1",
+                            "testo": "parole mai scritte nel passaggio",
+                        },
                     ],
                 }
             ]
