@@ -48,7 +48,9 @@ def effective_course(course: str | None, subject: str | None) -> str | None:
     return normalize_course_label(raw=course) or _clean_course_label(raw=subject)
 
 
-def group_courses(records: Iterable[CourseLecture]) -> list[CourseSummary]:
+def group_courses(
+    records: Iterable[CourseLecture], registered: Iterable[CourseSummary] = ()
+) -> list[CourseSummary]:
     """Group lectures by effective course, newest first without mutating inputs."""
     groups: dict[str, CourseSummary] = {}
     for record in sorted(records, key=lambda item: item.created_at, reverse=True):
@@ -61,4 +63,6 @@ def group_courses(records: Iterable[CourseLecture]) -> list[CourseSummary]:
             lecture_count=previous.lecture_count + 1 if previous else 1,
             last_lecture_at=previous.last_lecture_at if previous else record.created_at,
         )
-    return list(groups.values())
+    for course in registered:
+        groups.setdefault(course.key, course)
+    return sorted(groups.values(), key=lambda item: item.last_lecture_at, reverse=True)

@@ -27,7 +27,7 @@ riscrivono prima di partire.
   dettaglio corso in `corso-dettaglio.js`. Nessun cambio di comportamento. Rischio: basso.
   verify: `wc -l` di entrambi < 250; click-through di `/corsi` (ricerca, apertura corso, link al
   lettore) identico a prima, registrato.
-- [ ] **T011** (D1) `src/sbobina/course_registry.py`: `data/courses/<course_id>/course.json`
+- [x] **T011** (D1) `src/sbobina/course_registry.py`: `data/courses/<course_id>/course.json`
   (`id` uuid4, `key`, `label`, `created_at`), `get_or_create(key, label)`, `find_by_key`,
   `rename_key(old, new)`; scrittura atomica (riuso `atomic_write`). `group_courses` include i
   corsi del registro senza lezioni. Rischio: medio (R1).
