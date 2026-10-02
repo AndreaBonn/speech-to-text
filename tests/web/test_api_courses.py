@@ -203,3 +203,15 @@ def test_courses_accepts_nfkc_expanded_legacy_subject(
     assert response.json()["data"][0]["key"] == "ffi" * 34
     filtered = client.get(url=JOBS_URL, params={"course": "ffi" * 34})
     assert [item["id"] for item in filtered.json()["data"]] == [str(record.id)]
+
+
+@pytest.mark.parametrize("payload", ["Fisica", ["Fisica"], 3])
+def test_patch_meta_reports_a_non_object_body_on_the_body_field(
+    client: TestClient, tmp_path: Path, payload: object
+) -> None:
+    record = JobStore(data_dir=tmp_path).create(config=JobConfig())
+
+    response = client.patch(url=f"{JOBS_URL}/{record.id}/meta", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["details"][0]["field"] == "body"

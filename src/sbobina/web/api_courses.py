@@ -20,7 +20,8 @@ def _parse_meta(body: JsonValue) -> LectureMeta:
         details = [
             {
                 "type": detail["type"],
-                "loc": ("course",),
+                # An empty loc means the body itself is not an object.
+                "loc": detail["loc"] or ("body",),
                 "msg": str(
                     detail.get("ctx", {}).get(
                         "error", "Specifica il corso come testo o null"
