@@ -252,7 +252,7 @@ Usabile da sola: `sbobina studio <json>` produce materiali validati senza il web
   `study` compare negli eventi SSE esistenti. Rischio: medio.
   verify: test API per ogni codice; `stale_dropped` > 0 dopo un `PATCH` della trascrizione che
   tocca una parola citata.
-- [ ] **T044** Pagina `/studio/<id>` (`templates/studio.html`, `static/js/studio.js`): avviso in
+- [x] **T044** Pagina `/studio/<id>` (`templates/studio.html`, `static/js/studio.js`): avviso in
   alto (materiale generato, ogni voce con la sua fonte), capitoli, voci con citazione cliccabile
   → `/lettore/<id>?t=&variant=`, contatori scarti e voci non più verificabili, blocchi non
   elaborati con i tempi, pulsante "Genera"/"Rigenera" con avanzamento SSE e stati

@@ -171,6 +171,11 @@
       link.href = "/lettore/" + job.id;
       link.textContent = jobTitle(job);
       nameCell.appendChild(link);
+      var studyLink = document.createElement("a");
+      studyLink.className = "table__link table__sublink";
+      studyLink.href = "/studio/" + job.id;
+      studyLink.textContent = "Materiali di studio";
+      nameCell.appendChild(studyLink);
     } else {
       nameCell.textContent = jobTitle(job);
     }

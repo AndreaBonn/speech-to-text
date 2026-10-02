@@ -293,6 +293,51 @@ def test_corsi_page_has_the_search_form(tmp_path: Path) -> None:
     assert body.index("/static/js/dom.js") < body.index("/static/js/search.js")
 
 
+def test_studio_page_returns_shell_for_an_existing_job(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig(subject="Fisica"), source_name="a.m4a")
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        response = client.get(f"/studio/{record.id}")
+
+    assert response.status_code == 200
+    body = response.text
+    assert f'data-job-id="{record.id}"' in body
+    assert "a.m4a" in body
+    assert 'id="study-chapters"' in body
+    assert f'href="/lettore/{record.id}"' in body
+    assert body.index("/static/js/dom.js") < body.index("/static/js/studio.js")
+
+
+def test_studio_script_is_served_and_mounts_text_only(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        response = client.get("/static/js/studio.js")
+
+    assert response.status_code == 200
+    assert "/api/v1/jobs/" in response.text
+    # LLM output is untrusted: the script must never parse it as markup.
+    assert "innerHTML" not in response.text
+
+
+def test_studio_page_returns_404_for_missing_job(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        response = client.get("/studio/does-not-exist")
+
+    assert response.status_code == 404
+    assert 'id="study-chapters"' not in response.text
+
+
+def test_reader_links_to_the_study_page(tmp_path: Path) -> None:
+    record = JobStore(data_dir=tmp_path).create(config=JobConfig())
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get(f"/lettore/{record.id}").text
+
+    assert f'href="/studio/{record.id}"' in body
+
+
 def test_pages_apply_the_saved_theme_before_the_stylesheets(tmp_path: Path) -> None:
     app = create_app(settings=Settings(), data_dir=tmp_path)
     with TestClient(app=app, base_url=BASE_URL) as client:

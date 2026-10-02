@@ -223,3 +223,30 @@ def _reader_course(store: JobStore, record: JobRecord) -> str:
     """The course shown in the reader field: the user's choice, else the subject."""
     meta = store.read_meta(job_id=str(record.id))
     return effective_course(course=meta.course, subject=record.config.subject) or ""
+
+
+@router.get("/studio/{job_id}", response_class=HTMLResponse)
+def studio(request: Request, store: JobStoreDep, job_id: str) -> HTMLResponse:
+    """Study notes of one lecture; the material itself loads client-side."""
+    try:
+        record = store.get(job_id=job_id)
+    except NotFoundError:
+        return _render(
+            request=request,
+            template_name="reader.html",
+            active="lettore",
+            store=store,
+            status_code=404,
+            page_title="Materiali di studio",
+            not_found=True,
+            job_id=job_id,
+        )
+    return _render(
+        request=request,
+        template_name="studio.html",
+        active="lettore",
+        store=store,
+        page_title="Materiali di studio",
+        job_id=job_id,
+        title=_reader_title(record),
+    )

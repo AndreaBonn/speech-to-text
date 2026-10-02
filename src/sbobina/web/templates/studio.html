@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="study" data-job-id="{{ job_id }}">
+  <div class="reader__toolbar">
+    <div class="reader__toolbar-title">
+      <h2 class="reader__title">{{ title }}</h2>
+      <p class="reader__subtitle">Materiali di studio generati dalla trascrizione</p>
+    </div>
+    <div class="reader__toolbar-actions">
+      <a class="btn btn--ghost" href="/lettore/{{ job_id }}">Torna al lettore</a>
+      <button type="button" id="study-generate" class="btn btn--primary">Genera</button>
+    </div>
+  </div>
+
+  <p class="study__notice" role="note">
+    Testo generato automaticamente da un modello locale. Ogni voce mostra la frase della lezione
+    da cui è tratta: controllala con un clic prima di studiarci sopra.
+  </p>
+
+  <div id="study-status" class="history__status" role="status" aria-live="polite" hidden></div>
+  <div id="study-progress" class="study__progress" hidden>
+    <div class="progress" role="progressbar" aria-label="Avanzamento della generazione"
+         aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div class="progress__track"><div id="study-progress-bar" class="progress__fill"></div></div>
+    </div>
+  </div>
+  <div id="study-summary" class="study__summary" hidden></div>
+  <ol id="study-chapters" class="study__chapters" hidden></ol>
+  <div id="study-empty" class="empty-state" hidden>
+    <p class="empty-state__text">
+      Per questa lezione non ci sono ancora materiali di studio. La generazione usa il modello locale
+      e su una lezione di un'ora e mezza richiede circa venti minuti.
+    </p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dom.js" defer></script>
+<script src="/static/js/studio.js" defer></script>
+{% endblock %}
