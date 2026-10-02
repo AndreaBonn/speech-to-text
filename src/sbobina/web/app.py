@@ -15,6 +15,7 @@ from sbobina.settings import LOOPBACK_HOSTS, Settings
 from sbobina.web import search_service
 from sbobina.web.api_corrected import router as corrected_router
 from sbobina.web.api_courses import router as courses_router
+from sbobina.web.api_documents import router as documents_router
 from sbobina.web.api_files import router as files_router
 from sbobina.web.api_jobs import router as jobs_router
 from sbobina.web.api_models import create_models_router
@@ -25,6 +26,7 @@ from sbobina.web.api_wer import WER_REQUEST_LIMIT_BYTES
 from sbobina.web.api_wer import router as wer_router
 from sbobina.web.downloads import DownloadManager
 from sbobina.web.errors import AppError
+from sbobina.web.extraction_worker import ExtractionWorker, ExtractionWorkerOptions
 from sbobina.web.gpu_release import unload_ollama_models
 from sbobina.web.job_store import JobStore
 from sbobina.web.middleware import OriginMiddleware, web_origin
@@ -56,11 +58,14 @@ def _reconcile_search_index(app: FastAPI) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     supervisor: Supervisor = app.state.supervisor
+    extraction_worker: ExtractionWorker = app.state.extraction_worker
     try:
         # start() first marks jobs left running by a previous server as
         # interrupted; both calls block on disk and child processes, so they run
         # off the event loop.
         await anyio.to_thread.run_sync(supervisor.start)
+        await anyio.to_thread.run_sync(extraction_worker.recover_on_boot)
+        await anyio.to_thread.run_sync(extraction_worker.start)
         try:
             await anyio.to_thread.run_sync(partial(_reconcile_search_index, app=app))
         except Exception as error:
@@ -69,6 +74,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
         yield
     finally:
+        await anyio.to_thread.run_sync(extraction_worker.stop)
         await anyio.to_thread.run_sync(supervisor.stop)
 
 
@@ -76,6 +82,7 @@ def create_app(
     settings: Settings,
     data_dir: Path | None = None,
     supervisor_options: SupervisorOptions | None = None,
+    extraction_worker_options: ExtractionWorkerOptions | None = None,
 ) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
     app.state.settings = settings
@@ -88,6 +95,15 @@ def create_app(
         before_transcribe=partial(unload_ollama_models, host=settings.ollama_host),
         options=supervisor_options,
     )
+    app.state.extraction_worker = ExtractionWorker(
+        courses_dir=app.state.job_store.jobs_dir.parent / "courses",
+        options=extraction_worker_options
+        if extraction_worker_options is not None
+        else ExtractionWorkerOptions(
+            timeout_s=settings.extraction_timeout_s,
+            max_memory_mb=settings.extraction_max_memory_mb,
+        ),
+    )
     app.state.download_manager = DownloadManager(settings=settings)
     app.add_middleware(OriginMiddleware, origin=web_origin(settings=settings))
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_TRUSTED_HOSTS)
@@ -98,6 +114,9 @@ def create_app(
                 max_upload_mb=settings.web_max_upload_mb
             ),
             "/api/v1/wer": WER_REQUEST_LIMIT_BYTES,
+        },
+        suffix_limits={
+            "/documents": upload_limit_bytes(max_upload_mb=settings.course_doc_max_mb),
         },
     )
     _register_routes(app=app, settings=settings)
@@ -112,6 +131,7 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(create_models_router(settings=settings))
     app.include_router(jobs_router)
     app.include_router(courses_router)
+    app.include_router(documents_router)
     app.include_router(search_router)
     app.include_router(study_router)
     app.include_router(files_router)

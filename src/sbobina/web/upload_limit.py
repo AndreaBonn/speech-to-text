@@ -23,10 +23,17 @@ class UploadLimitMiddleware:
     request without it is refused instead of being trusted.
     """
 
-    def __init__(self, app: ASGIApp, limits: Mapping[str, int]) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        limits: Mapping[str, int],
+        suffix_limits: Mapping[str, int] | None = None,
+    ) -> None:
         self.app = app
         # Every multipart endpoint needs its own cap: path -> max request bytes.
         self.limits = dict(limits)
+        # For routes with a path parameter (course key), matched by suffix instead.
+        self.suffix_limits = dict(suffix_limits) if suffix_limits is not None else {}
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         rejection = self._rejection(scope=scope)
@@ -35,10 +42,23 @@ class UploadLimitMiddleware:
             return
         await rejection(scope, receive, send)
 
+    def _max_bytes(self, path: str) -> int | None:
+        exact = self.limits.get(path)
+        if exact is not None:
+            return exact
+        return next(
+            (
+                limit
+                for suffix, limit in self.suffix_limits.items()
+                if path.endswith(suffix)
+            ),
+            None,
+        )
+
     def _rejection(self, scope: Scope) -> JSONResponse | None:
         if scope["type"] != "http" or scope["method"] != LIMITED_METHOD:
             return None
-        max_bytes = self.limits.get(scope["path"].rstrip("/"))
+        max_bytes = self._max_bytes(path=scope["path"].rstrip("/"))
         if max_bytes is None:
             return None
         headers = dict(scope["headers"])

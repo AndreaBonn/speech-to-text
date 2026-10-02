@@ -9,6 +9,7 @@ import pytest
 
 from sbobina.document_models import CourseDocument, DocumentKind, DocumentStatus
 from sbobina.web import document_store
+from sbobina.web.errors import ConflictError
 from sbobina.web.extraction_worker import ExtractionWorker, ExtractionWorkerOptions
 
 # A fake child, in the spirit of test_supervisor.py's RUNNER: touches
@@ -202,3 +203,43 @@ def test_stop_terminates_active_child_and_keeps_document_for_recovery(
     assert not built.worker.is_running()
     # Interrupted, not failed: the next boot re-queues it via recover_on_boot.
     assert built.status(doc_id="doc-1") == DocumentStatus.EXTRACTING
+
+
+def _uploaded(doc_id: str) -> CourseDocument:
+    return CourseDocument(
+        id=doc_id,
+        course_id="course-1",
+        filename="manual.pdf",
+        kind=DocumentKind.PDF,
+        size=10,
+        sha256="a" * 64,
+        status=DocumentStatus.UPLOADING,
+        error=None,
+        pages=None,
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+
+
+def test_enqueue_new_persists_extracting_without_an_uploading_window(
+    harness: Harness,
+) -> None:
+    doc_dir = document_store.document_dir(
+        courses_dir=harness.courses_dir, course_id="course-1", doc_id="doc-1"
+    )
+    doc_dir.mkdir(parents=True)
+    stored = harness.worker.enqueue_new(document=_uploaded(doc_id="doc-1"))
+    assert stored.status == DocumentStatus.EXTRACTING
+    assert harness.status(doc_id="doc-1") == DocumentStatus.EXTRACTING
+
+
+def test_remove_if_idle_refuses_extracting_and_removes_finished(
+    harness: Harness,
+) -> None:
+    busy_dir = harness.add_document(doc_id="busy", status=DocumentStatus.EXTRACTING)
+    with pytest.raises(ConflictError):
+        harness.worker.remove_if_idle(course_id="course-1", doc_id="busy")
+    assert busy_dir.exists()
+
+    idle_dir = harness.add_document(doc_id="idle")
+    harness.worker.remove_if_idle(course_id="course-1", doc_id="idle")
+    assert not idle_dir.exists()

@@ -70,7 +70,7 @@ riscrivono prima di partire.
   vivo; test con spy che `check_archive_limits` è chiamato prima di `docx.Document`/
   `Presentation` (zip bomb mai decompressa). Su Windows `resource` non esiste: limite dichiarato
   come solo timeout.
-- [ ] **T015** `web/api_documents.py`: `POST /api/v1/courses/<key>/documents` multipart (riuso
+- [x] **T015** `web/api_documents.py`: `POST /api/v1/courses/<key>/documents` multipart (riuso
   `_write_upload` di `api_jobs.py` estratto in un modulo condiviso se serve per il limite di
   righe), salvataggio sotto id generato, sniff sui primi byte prima di accettare, 413/415 con
   pulizia dei file parziali; `GET` elenco paginato; `GET .../<id>/file` come allegato con

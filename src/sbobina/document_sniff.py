@@ -1,6 +1,6 @@
 import codecs
 import zlib
-from pathlib import Path
+from pathlib import Path, PurePath
 from zipfile import BadZipFile, ZipFile
 
 from sbobina.document_models import DocumentKind
@@ -14,6 +14,7 @@ OFFICE_TYPES = {
     b"wordprocessingml": DocumentKind.DOCX,
     b"presentationml": DocumentKind.PPTX,
 }
+TEXT_SUFFIXES = {".txt": DocumentKind.TXT, ".md": DocumentKind.MD}
 SIGNATURE_OVERLAP_BYTES = max(map(len, OFFICE_TYPES)) - 1
 
 
@@ -71,12 +72,18 @@ def _is_utf8_text(path: Path) -> bool:
     return True
 
 
-def sniff_document(head: bytes, path: Path) -> DocumentKind | None:
-    """Identify PDF/Office signatures or validate the whole file as UTF-8 text."""
+def sniff_document(head: bytes, path: Path, filename: str) -> DocumentKind | None:
+    """Identify PDF/Office signatures or validate the whole file as UTF-8 text.
+
+    Binary formats are told by their bytes. Text has no signature, so it is
+    accepted only when the uploaded ``filename`` claims .txt or .md: a UTF-8
+    file named .pdf is a disguised file, not a text document.
+    """
     if head.startswith(b"%PDF-"):
         return DocumentKind.PDF
     if head.startswith(ZIP_SIGNATURES):
         return _sniff_office(path=path)
-    if not _is_utf8_text(path=path):
+    kind = TEXT_SUFFIXES.get(PurePath(filename).suffix.casefold())
+    if kind is None or not _is_utf8_text(path=path):
         return None
-    return DocumentKind.MD if path.suffix.casefold() == ".md" else DocumentKind.TXT
+    return kind

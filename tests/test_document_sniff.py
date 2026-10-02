@@ -38,6 +38,8 @@ def write_archive(path: Path, declared_size: int) -> None:
         ("notes.MD", b"# Notes", DocumentKind.MD),
         ("notes.txt", b"", DocumentKind.TXT),
         ("fake.pdf", b"MZ\x90\x00\xff", None),
+        ("fake.pdf", b"MZfake text without NUL", None),
+        ("notes.docx", b"plain utf-8 text", None),
         ("notes.txt", b"hello\x00world", None),
         ("notes.md", b"hello\xffworld", None),
         ("notes.txt", b"a" * 8192 + b"\x00", None),
@@ -50,9 +52,12 @@ def test_sniff_document_content_identifies_kind(
 ) -> None:
     path = tmp_path / name
     path.write_bytes(content)
-    assert sniff_document(head=content[:32], path=path) == expected
+    assert sniff_document(head=content[:32], path=path, filename=name) == expected
     path.write_bytes(b"%PDF-1.7")
-    assert sniff_document(head=path.read_bytes(), path=path) == DocumentKind.PDF
+    assert (
+        sniff_document(head=path.read_bytes(), path=path, filename=path.name)
+        == DocumentKind.PDF
+    )
 
 
 @pytest.mark.parametrize(
@@ -81,9 +86,15 @@ def test_sniff_document_zip_content_types_identifies_office(
                 "[Content_Types].xml",
                 f'<Types><Override ContentType="{content_type}"/></Types>',
             )
-    assert sniff_document(head=path.read_bytes()[:4], path=path) == expected
+    assert (
+        sniff_document(head=path.read_bytes()[:4], path=path, filename=path.name)
+        == expected
+    )
     path.write_bytes(b"%PDF-")
-    assert sniff_document(head=path.read_bytes(), path=path) == DocumentKind.PDF
+    assert (
+        sniff_document(head=path.read_bytes(), path=path, filename=path.name)
+        == DocumentKind.PDF
+    )
 
 
 @pytest.mark.parametrize("declared_size", [MAX_ARCHIVE_BYTES + 1, 1024**3])
@@ -118,7 +129,7 @@ def test_sniff_document_bomb_is_rejected_before_content_read(tmp_path: Path) -> 
     path = tmp_path / "bomb.docx"
     write_archive(path=path, declared_size=1024**3)
     with pytest.raises(ArchiveTooLargeError):
-        sniff_document(head=path.read_bytes()[:4], path=path)
+        sniff_document(head=path.read_bytes()[:4], path=path, filename=path.name)
 
 
 def test_check_archive_limits_total_size_rejects_sum(tmp_path: Path) -> None:
@@ -137,7 +148,10 @@ def test_sniff_document_unreadable_zip_returns_none(
     path = tmp_path / "unreadable.docx"
     with ZipFile(path, mode="w") as archive:
         archive.writestr("[Content_Types].xml", "wordprocessingml")
-    assert sniff_document(head=path.read_bytes()[:4], path=path) == DocumentKind.DOCX
+    assert (
+        sniff_document(head=path.read_bytes()[:4], path=path, filename=path.name)
+        == DocumentKind.DOCX
+    )
     data = bytearray(path.read_bytes())
     central = data.index(CENTRAL_DIRECTORY_SIGNATURE)
     local_offset = LOCAL_FLAGS_OFFSET if is_encrypted else LOCAL_COMPRESSION_OFFSET
@@ -148,4 +162,24 @@ def test_sniff_document_unreadable_zip_returns_none(
     struct.pack_into("<H", data, local_offset, value)
     struct.pack_into("<H", data, central + central_offset, value)
     path.write_bytes(data)
-    assert sniff_document(head=bytes(data[:4]), path=path) is None
+    assert sniff_document(head=bytes(data[:4]), path=path, filename=path.name) is None
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected"),
+    [
+        ("Appunti.MD", DocumentKind.MD),
+        ("note.txt", DocumentKind.TXT),
+        ("note.pdf", None),
+    ],
+)
+def test_sniff_document_text_kind_follows_original_filename_not_storage_path(
+    tmp_path: Path, filename: str, expected: DocumentKind | None
+) -> None:
+    # The API sniffs a temporary file with a fixed name: only the uploaded
+    # filename can say whether UTF-8 text is a .md, a .txt, or a disguised file.
+    path = tmp_path / "upload.part"
+    path.write_bytes(b"# Titolo\n\ntesto")
+    assert (
+        sniff_document(head=path.read_bytes(), path=path, filename=filename) == expected
+    )

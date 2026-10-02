@@ -6,21 +6,26 @@ requests while a child process parses a document.
 """
 
 import logging
+import shutil
 import subprocess
 import sys
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import Condition, Thread
 
+from sbobina.document_models import CourseDocument, DocumentStatus
 from sbobina.web.document_store import (
     document_dir,
     iter_extracting_documents,
     mark_extracted,
     mark_extracting,
     mark_failed,
+    read_document,
     read_text,
+    write_document,
 )
+from sbobina.web.errors import ConflictError
 from sbobina.web.processes import _reap, _spawn
 
 logger = logging.getLogger("sbobina")
@@ -91,6 +96,37 @@ class ExtractionWorker:
                 item = ExtractionItem(course_id=document.course_id, doc_id=document.id)
                 if item not in self._queue:
                     self._queue.append(item)
+
+    def enqueue_new(self, document: CourseDocument) -> CourseDocument:
+        """Persist a just-uploaded document as ``extracting`` and queue it.
+
+        Writing and queueing under the worker lock leaves no on-disk state in
+        which a concurrent delete could remove a document about to be extracted.
+        """
+        stored = replace(document, status=DocumentStatus.EXTRACTING)
+        with self._condition:
+            write_document(courses_dir=self._courses_dir, document=stored)
+            self._queue.append(
+                ExtractionItem(course_id=stored.course_id, doc_id=stored.id)
+            )
+            self._condition.notify()
+        return stored
+
+    def remove_if_idle(self, course_id: str, doc_id: str) -> None:
+        """Delete a document's files unless its extraction is queued or running."""
+        with self._condition:
+            document = read_document(
+                courses_dir=self._courses_dir, course_id=course_id, doc_id=doc_id
+            )
+            if document.status is DocumentStatus.EXTRACTING:
+                raise ConflictError(
+                    message="Documento in estrazione", code="DOCUMENT_BUSY"
+                )
+            shutil.rmtree(
+                document_dir(
+                    courses_dir=self._courses_dir, course_id=course_id, doc_id=doc_id
+                )
+            )
 
     def submit(self, course_id: str, doc_id: str) -> None:
         with self._condition:
