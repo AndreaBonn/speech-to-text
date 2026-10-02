@@ -147,4 +147,4 @@ def test_expand_window_bridge_merges_every_window_it_touches() -> None:
 
     assert len(windows) == 1
     assert windows[0].passage_id == hits[0].passage_id
-    assert windows[0].text.split() == [f"w{i}" for i in range(0, 25)]
+    assert windows[0].text.split() == [f"w{i}" for i in range(25)]
