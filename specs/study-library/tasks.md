@@ -81,7 +81,7 @@ i task marcati "(Q<n>)" si riscrivono prima di partire.
   Esito: campo solo nel lettore; lo storico non lo monta (le righe hanno già le azioni e
   `/corsi` copre il raggruppamento). Il limite di lunghezza lo giudica solo il server: NFKC può
   espandere oltre 100 un testo che `maxlength` ammette (verificato con 34 legature «ﬃ»).
-- [ ] **T015** Gate di fase. verify: suite, ruff, format, mypy; `a11y-gate` verde su `/corsi` e
+- [x] **T015** Gate di fase. verify: suite, ruff, format, mypy; `a11y-gate` verde su `/corsi` e
   lettore; click-through registrato; `wc -l` dei file toccati ≤ 300 (salvo `reader.js`/`jobs.js`,
   che non crescono di più delle righe di montaggio).
 
@@ -93,7 +93,7 @@ ovvia.
 
 **[B-4] T020-T022**
 
-- [ ] **T020** `src/sbobina/search_text.py` puro: `passages_from_transcript(transcript) ->
+- [x] **T020** `src/sbobina/search_text.py` puro: `passages_from_transcript(transcript) ->
   list[Passage(segment_index, start, text)]` (segmenti vuoti saltati); `build_match_query(raw) ->
   str | None` (plan § Ricerca: parole `"x"*` senza vocali finali da 5 lettere, frasi esatte, max 10 termini, virgolette
   raddoppiate, None se nulla resta); `snippet_parts(highlighted) -> list[SnippetPart]`.
@@ -102,7 +102,7 @@ ovvia.
   `"` → stringa sicura o None; ogni output eseguito su una tabella FTS5 reale in memoria senza
   `OperationalError` (test parametrizzato, anche con input generati: 200 stringhe casuali di
   simboli).
-- [ ] **T021** `src/sbobina/web/search_index.py`, unico confine sqlite: `open_index(path)` (crea
+- [x] **T021** `src/sbobina/web/search_index.py`, unico confine sqlite: `open_index(path)` (crea
   schema, verifica `user_version`, verifica FTS5 → `SearchUnavailableError`), `replace_lecture`,
   `remove_lecture`, `indexed_lectures`, `search(match, job_ids, limit, offset) -> SearchPage`.
   Parametri sempre bindati. Rischio: alto (primo indice del progetto).
@@ -114,7 +114,7 @@ ovvia.
   `user_version` diverso → ricostruito; file di byte casuali → ricostruito con WARNING (caplog);
   FTS5 assente simulato (connessione che solleva su `CREATE VIRTUAL TABLE`) →
   `SearchUnavailableError`.
-- [ ] **T022** `src/sbobina/web/search_service.py`: `reconcile(store, index)` confronta per job il
+- [x] **T022** `src/sbobina/web/search_service.py`: `reconcile(store, index)` confronta per job il
   file preferito (corretto se esiste, altrimenti originale, Q5) per `(path, mtime_ns, size)` con
   `lectures`, reindicizza i cambiati, rimuove gli assenti; lock unico per riconciliazione + query.
   Rischio: medio (R1). verify: test che scrivono i file **senza** passare dal server: nuova
