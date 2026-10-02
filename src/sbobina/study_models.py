@@ -11,6 +11,8 @@ class RejectionReason(StrEnum):
     QUOTE_TOO_SHORT = "QUOTE_TOO_SHORT"
     QUOTE_TOO_LONG = "QUOTE_TOO_LONG"
     TERM_NOT_IN_QUOTE = "TERM_NOT_IN_QUOTE"
+    # The quote repeats inside its passage and the saved form cannot tell which.
+    AMBIGUOUS_QUOTE = "AMBIGUOUS_QUOTE"
 
 
 @dataclass(frozen=True)

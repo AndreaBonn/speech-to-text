@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen3.5:9b"
     ollama_host: str = "http://localhost:11434"
     correction_chunk_words: int = Field(default=200, ge=20)
+    study_block_words: int = Field(default=1200, gt=0)
+    study_num_predict: int = Field(default=2048, gt=0)
     uncertain_threshold: float = Field(default=0.7, gt=0.0, le=1.0)
     paragraph_gap_s: float = Field(default=2.0, gt=0.0)
     paragraph_max_s: float = Field(default=120.0, gt=0.0)

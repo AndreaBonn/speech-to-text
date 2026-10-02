@@ -18,6 +18,7 @@ class ChatRequest:
     system_prompt: str
     user_message: str
     schema: dict[str, Any]
+    num_predict: int | None = None
 
 
 def strip_markdown_fence(content: str) -> str:
@@ -27,6 +28,9 @@ def strip_markdown_fence(content: str) -> str:
 
 def chat_json(client: Client, request: ChatRequest) -> str:
     """Return unfenced content; the caller validates its task-specific schema."""
+    options = {"temperature": 0, "num_ctx": CONTEXT_WINDOW_TOKENS}
+    if request.num_predict is not None:
+        options["num_predict"] = request.num_predict
     try:
         response = client.chat(
             model=request.model,
@@ -36,7 +40,7 @@ def chat_json(client: Client, request: ChatRequest) -> str:
             ],
             format=request.schema,
             think=False,
-            options={"temperature": 0, "num_ctx": CONTEXT_WINDOW_TOKENS},
+            options=options,
         )
     except (ConnectionError, ResponseError, httpx.TransportError) as err:
         raise CorrectorUnavailableError(f"{type(err).__name__}: {err}") from err

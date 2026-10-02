@@ -92,3 +92,17 @@ def test_chat_json_leaves_content_validation_to_the_caller() -> None:
         )
         == "not JSON"
     )
+
+
+def test_chat_json_forwards_study_output_limit() -> None:
+    from dataclasses import replace
+
+    client = FakeClient(content='{"capitoli": []}')
+    chat_json(
+        client=cast(ollama.Client, client), request=replace(request(), num_predict=321)
+    )
+    assert client.arguments["options"] == {
+        "temperature": 0,
+        "num_ctx": 8192,
+        "num_predict": 321,
+    }
