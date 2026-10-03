@@ -5,7 +5,7 @@ import ollama
 import pytest
 
 from sbobina.correction import CorrectorUnavailableError, InvalidResponseError
-from sbobina.ollama_chat import ChatRequest, chat_json
+from sbobina.ollama_chat import ChatRequest, chat_json, close_open_brackets
 
 
 class FakeClient:
@@ -141,3 +141,57 @@ def test_chat_json_warns_when_output_hits_the_limit(
     warnings = [r for r in caplog.records if r.levelname == "WARNING"]
     assert len(warnings) == 1
     assert "troncata" in warnings[0].getMessage()
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        ('{"a": [{"b": 1}]', '{"a": [{"b": 1}]}'),
+        ('{"a": [{"b": "x}"}', '{"a": [{"b": "x}"}]}'),
+        ('{"a": "va\\"le"', '{"a": "va\\"le"}'),
+        ('{"a": 1}', '{"a": 1}'),
+    ],
+)
+def test_close_open_brackets_appends_missing_closers(
+    content: str, expected: str
+) -> None:
+    assert close_open_brackets(content=content) == expected
+
+
+@pytest.mark.parametrize(
+    "content",
+    ['{"a": "cut in the mid', '{"a": [1}', '{"a": 1}}', "not json"],
+)
+def test_close_open_brackets_leaves_unrepairable_content_alone(content: str) -> None:
+    assert close_open_brackets(content=content) == content
+
+
+def test_chat_json_repairs_a_reply_missing_its_last_brace(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("INFO", logger="sbobina")
+    client = FakeClient(content='{"sezioni": [{"titolo": "t", "frasi": []}]')
+
+    content = chat_json(client=cast(ollama.Client, client), request=request())
+
+    assert content == '{"sezioni": [{"titolo": "t", "frasi": []}]}'
+    assert "chiuse" in caplog.text
+
+
+class TruncatedClient:
+    def chat(self, **kwargs: object) -> ollama.ChatResponse:
+        return ollama.ChatResponse(
+            message=ollama.Message(role="assistant", content='{"a": [{"x": 1}'),
+            done_reason="length",
+        )
+
+
+def test_chat_json_leaves_a_truncated_reply_unrepaired() -> None:
+    # Closing a reply cut by num_predict would accept a partial list as
+    # complete and skip the caller's retry: only a reply that stopped on its
+    # own gets its missing closers.
+    content = chat_json(
+        client=cast(ollama.Client, TruncatedClient()), request=request()
+    )
+
+    assert content == '{"a": [{"x": 1}'

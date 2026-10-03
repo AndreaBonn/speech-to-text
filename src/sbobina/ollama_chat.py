@@ -24,6 +24,41 @@ class ChatRequest:
     num_predict: int | None = None
 
 
+_CLOSERS = {"{": "}", "[": "]"}
+
+
+def _open_brackets(content: str) -> list[str] | None:
+    """Unclosed brackets in order, or None if a string is cut or they mismatch."""
+    stack: list[str] = []
+    in_string = escaped = False
+    for char in content:
+        if escaped:
+            escaped = False
+        elif in_string:
+            escaped = char == "\\"
+            in_string = char != '"'
+        elif char == '"':
+            in_string = True
+        elif char in _CLOSERS:
+            stack.append(char)
+        elif char in "}]" and (not stack or _CLOSERS[stack.pop()] != char):
+            return None
+    return None if in_string else stack
+
+
+def close_open_brackets(content: str) -> str:
+    """Append the closers a reply forgot, never touching what it wrote.
+
+    Measured on qwen3.5:9b (T036): with think=False Ollama does not enforce
+    the schema, and a complete summary ended "]}]}]" without its root "}".
+    A reply cut inside a string or with mismatched brackets is left as is.
+    """
+    stack = _open_brackets(content=content)
+    if not stack:
+        return content
+    return content + "".join(_CLOSERS[char] for char in reversed(stack))
+
+
 def strip_markdown_fence(content: str) -> str:
     fenced = _MARKDOWN_FENCE.match(content)
     return fenced.group(1) if fenced else content
@@ -63,4 +98,10 @@ def chat_json(client: Client, request: ChatRequest) -> str:
     except ValueError as err:
         raise InvalidResponseError(f"{type(err).__name__}: {err}") from err
     _log_usage(response=response)
-    return strip_markdown_fence(content=response.message.content or "")
+    content = strip_markdown_fence(content=response.message.content or "")
+    if response.done_reason == "length":
+        return content
+    closed = close_open_brackets(content=content)
+    if closed != content:
+        logger.warning("Risposta di Ollama con parentesi non chiuse: chiuse in coda")
+    return closed
