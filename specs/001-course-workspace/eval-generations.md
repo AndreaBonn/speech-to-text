@@ -65,3 +65,23 @@ possibili, non provate: ordinare i candidati dando precedenza a chi contiene il 
 scartare le domande la cui citazione non contiene nessun termine dell'argomento tranne quelli
 presenti in quasi tutto il corso. Entrambe toccano il recupero condiviso con chat e ricerca e
 vanno rimisurate con `scripts/eval_retrieval.py` (T024) prima di tenerle.
+
+## T039 - Gate F3 (2026-10-03)
+
+Server di misura, clip di 5 minuti della lezione reale. In coda, nell'ordine: trascrizione,
+generazione (aperte, 5, "avviamento"), trascrizione. `nvidia-smi --query-compute-apps`
+campionato ogni 2 s (più fitto dei 15 s richiesti).
+
+| t | Processi sulla GPU |
+|---|---|
+| 2-28 s | figlio Python di Whisper |
+| 30-69 s | ollama |
+| 69-93 s | figlio Python di Whisper; Ollama scaricato da `gpu_release` prima dello stage |
+
+48 campioni, **0 con più di un processo**. Tre job `done`. Suite 1400 test, ruff, format e mypy
+verdi; nessun file nuovo sopra 300 righe dopo `a74c19f`. Export DOCX di compito e soluzioni
+coperto dai test API (`test_download_compito_docx_never_contains_solution_text`).
+
+Durante il gate una richiesta da 11 domande è stata accettata: il server di misura era partito
+prima di `3bf6828` e il processo padre teneva in memoria il vecchio massimo (20). Annullata prima
+che partisse; il codice corrente la rifiuta con 422 (`test_generation_request_rejects_out_of_range_count`).

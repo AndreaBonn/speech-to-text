@@ -224,7 +224,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   (unico confine python-docx). Rischio: basso.
   verify: DOCX generato nel test riaperto con python-docx → titoli e domande attesi; soluzioni
   in un file separato dal compito.
-- [ ] **T039** Gate F3. verify: suite, ruff, format, mypy, `wc -l`; run reale con generazione
+- [x] **T039** Gate F3. verify: suite, ruff, format, mypy, `wc -l`; run reale con generazione
   accodata dietro una trascrizione e `nvidia-smi --query-compute-apps` ogni 15 s → mai Whisper e
   Ollama insieme; export DOCX di compito e soluzioni via `docx_export.py` (U4 = DOCX, T038).
 
