@@ -147,7 +147,8 @@ Opzione 2. Dettagli:
 ### Budget di contesto (BASIS: inferred)
 
 `num_ctx 8192` = prompt di sistema (~700) + storia della chat (~500, solo chat) + output
-(`num_predict` 700 per la chat, 1.500 per un passo di compito) + materiale. Restano circa
+(`num_predict` 768 per la chat, `CHAT_NUM_PREDICT`; per i compiti 260/200/280 token a voce secondo
+il formato, crocette/aperte/orale; 2560 per il riassunto) + materiale. Restano circa
 **5.000-6.000 token di materiale**, cioè 3.300-4.000 parole italiane assumendo ~1,5 token per
 parola sul tokenizer Qwen. Il rapporto va misurato leggendo `prompt_eval_count` dalle risposte,
 come fatto per lo studio (T034); l'assemblatore usa una stima prudente `len(testo) / 3,2` e si
@@ -238,6 +239,9 @@ corregge sulla misura.
 - **v1: opzione 1 + opzione 5.** Chat: BM25 sull'intero corso (lezioni del corso + documenti).
   Riassunto: BM25 sull'argomento, filtrato dall'ambito se indicato. Compito: ambito obbligatorio,
   nessuna ricerca.
+  **Superato:** l'argomento è facoltativo anche per il compito; se vuoto,
+  `source_sampling.sample_across_sources` (chiamato da `web/course_retrieval.sample_course`)
+  campiona in modo distribuito su tutte le fonti del corso invece di richiedere un ambito.
 - **Gate per il denso (opzioni 3 con 2 o 4)**: set di 30 domande reali su un corso vero con i
   passaggi attesi annotati a mano; si misura recall@8 del BM25. Sotto 0,7 si apre l'ADR del denso
   e si confrontano 2 e 4 sullo stesso set. È lo stesso criterio della roadmap ("tienilo solo se il
@@ -262,6 +266,8 @@ riconciliazione su `(mtime_ns, size)` di `text.json`, `SCHEMA_VERSION = 2` (il d
 la ricostruzione al primo avvio è il comportamento previsto, non una migrazione). Il filtro per
 corso delle lezioni si calcola alla query dall'insieme dei `job_id` del corso (stessa lettura di
 `meta.json` che fa già `/courses`), così una modifica a `meta.json` non lascia l'indice indietro.
+Emerso in implementazione: la fusione per rango (RRF) resta attiva anche quando un solo ramo
+BM25 ha risultati, senza un percorso separato per "solo lessicale".
 
 ### Citazioni verificabili sui documenti
 
@@ -279,6 +285,9 @@ corso delle lezioni si calcola alla query dall'insieme dei `job_id` del corso (s
   è coerente per costruzione anche quando l'estrazione è imperfetta. Il limite va detto in UI:
   la citazione prova che la frase è nel testo estratto, e il link apre la pagina del PDF originale
   per il controllo a vista.
+- Emerso in implementazione: una citazione il cui testo compare in un altro passaggio dato al
+  modello è riattribuita a quel passaggio (`source_citations.resolve_citation`) invece di essere
+  scartata; è inventata, e scartata da sola, solo se non compare in nessun passaggio dato.
 
 ---
 
@@ -385,6 +394,20 @@ Algoritmo dei compiti (coerente con Q6-A, niente reduce LLM):
 Riassunto di un argomento: BM25 (dentro l'ambito, se indicato) → top passaggi → chiamate per gruppo
 con punti citati → punti ordinati per posizione nella sorgente. Nessuna fusione LLM.
 
+Emerso in implementazione: una risposta completa del modello (non troncata da `num_predict`) che
+lascia parentesi JSON aperte viene chiusa prima del parsing (`ollama_chat.close_open_brackets`);
+mai quando `done_reason == "length"`, dove la risposta è davvero troncata.
+
+**Superato (coda e persistenza dei run):** l'unione discriminata non è `JobWorkItem` |
+`CourseWorkItem`, e lo stato non sta in `runs/<run_id>.json`: l'implementazione usa
+`GenerationRecord` (`generation_models.py`), salvato in
+`data/courses/<uuid>/generations/<gen_id>.json`, e lo smistamento per bersaglio (pipeline, study,
+generation, ocr) è nelle tabelle di dispatch di `web/course_actions.py`, non in
+`course_work_items.py`. Stesso principio della decisione (file separato quando il supervisore
+cresce), nomi e percorsi diversi emersi in implementazione. La lease esclusiva è applicata in
+`web/transcription_gate.py` (copre `before_transcribe` e la trascrizione stessa) tramite
+`web/gpu_lock.GpuArbiter`.
+
 ---
 
 ## D4. Estrazione del testo
@@ -444,6 +467,8 @@ training data): vanno controllate su PyPI e nella documentazione prima di aggiun
   o ordine sbagliato, controllata a mano su 20 pagine campione. Se `pypdf` sbaglia oltre il 5%
   delle pagine, si passa a `pypdfium2` cambiando solo quel modulo. BASIS della scelta di default:
   inferred.
+  **Superato:** la prova sul 5% non è stata eseguita; vedi «Revisione a D4» in fondo, che passa a
+  `pypdfium2` come default per tutta l'estrazione (serve comunque per il render OCR di F5).
 - **PPTX**: `python-pptx` (MIT, stesso autore di `python-docx`, UNVERIFIED), testo delle forme in
   ordine di lettura + note del relatore.
 - **DOCX**: `python-docx` già presente; titoli come confini di sezione.
@@ -455,6 +480,12 @@ training data): vanno controllate su PyPI e nella documentazione prima di aggiun
 - **Scansionati**: pagina con meno di 20 caratteri estratti marcata `no_text`; documento con oltre
   metà delle pagine `no_text` marcato "probabilmente scansionato, testo non disponibile" in UI.
   Nessun OCR in v1.
+  **Superato:** l'OCR è stato implementato in F5 con `qwen2.5vl:7b` in locale, su CPU (circa 270 s
+  a pagina, `eval.md` T050-T052). Stato per documento in `ocr.json` (`web/ocr_store.OcrRun`), non
+  nel registro del corso. Il figlio OCR gira sotto lo stesso `RLIMIT_AS` dell'estrazione
+  (`web/child_limits.py`, commit `c0d0255`); il supervisore lo uccide dopo
+  `ocr_process_timeout_s` (3600 s) con `OCR_TIMEOUT`; il rendering della pagina è limitato a
+  2500 px sul lato lungo.
 - **Dove gira**: processo figlio dedicato (`python -m sbobina.course_ingest <doc_dir>`) lanciato da
   un esecutore a un posto nel processo web, **fuori dalla coda GPU** (è solo CPU: non tocca R4 e
   non deve aspettare dietro una trascrizione di un'ora). Il processo figlio isola il server da PDF
@@ -521,10 +552,18 @@ data/courses/<uuid>/
   chats/<conversation_id>.jsonl
 ```
 
+**Superato:** le generazioni (compiti e riassunti) non hanno due cartelle `exams/`/`summaries/`
+separate: condividono `generations/<gen_id>.json` (`GenerationRecord`), con un campo che
+distingue il formato.
+
 - Ogni artefatto generato registra `{model, prompt_version, generated_at, sources: [{doc_id, sha256}
   | {job_id, revision}], discarded: [{reason, count}]}`. Le citazioni si rivalidano in lettura: un
   documento rimosso o una lezione modificata rendono la citazione "fonte cambiata", visibile, non
   cancellata in silenzio.
+  Implementato (commit `06f41ca`): ogni generazione registra `sha256` per i documenti e
+  `revision` per le lezioni di tutte le fonti date al modello; una citazione la cui fonte è
+  cambiata arriva con `changed: true` e la pagina mostra " · fonte modificata dopo la
+  generazione".
 - Dedupe dei documenti per `sha256` dentro il corso: 409 `DOCUMENT_EXISTS` con l'id esistente.
 - Rimozione di un documento: cancellazione della cartella + riconciliazione dell'indice; gli
   artefatti che lo citavano restano e mostrano la fonte come rimossa.

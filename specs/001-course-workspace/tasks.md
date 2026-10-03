@@ -69,7 +69,8 @@ riscrivono prima di partire.
   file, test con un runner che alloca oltre il limite → `failed` + `EXTRACTION_FAILED` e server
   vivo; test con spy che `check_archive_limits` è chiamato prima di `docx.Document`/
   `Presentation` (zip bomb mai decompressa). Su Windows `resource` non esiste: limite dichiarato
-  come solo timeout.
+  come solo timeout. Prova non registrata: nessuna tabella di pagine/tempi sui 3 file reali
+  trovata in `specs/001-course-workspace/`.
 - [x] **T015** `web/api_documents.py`: `POST /api/v1/courses/<key>/documents` multipart (riuso
   `_write_upload` di `api_jobs.py` estratto in un modulo condiviso se serve per il limite di
   righe), salvataggio sotto id generato, sniff sui primi byte prima di accettare, 413/415 con
@@ -116,7 +117,8 @@ riscrivono prima di partire.
   ~150-250 parole tagliati sui confini di frase, mai a cavallo di due pagine. Rischio: medio.
   verify: upload → la ricerca successiva trova il documento; delete → sparisce; `search.sqlite3`
   cancellato → ricostruito con lezioni e documenti; tempo di indicizzazione di un manuale reale
-  misurato e riportato.
+  misurato e riportato. Prova non registrata: nessun tempo di indicizzazione trovato nei file di
+  `specs/001-course-workspace/`.
 - [x] **T022** `GET /api/v1/search` restituisce anche risultati di documento (`kind: "document"`,
   `doc_id`, `page`, snippet a parti) e il link a `/corsi/<key>/documenti/<id>?p=<page>&q=`; la
   pagina dei risultati li mostra con nome file e pagina; il lettore documento evidenzia il
@@ -140,7 +142,7 @@ riscrivono prima di partire.
   verify: segmento di 12 parole al centro di una lezione → passaggio di 230-270 parole che lo
   contiene; due segmenti vicini → una sola finestra; budget di parole rispettato.
 - [x] **T024** Misura del recupero (non delegabile: giudizio). Con l'utente: 30+ domande su un
-  corso reale con il passaggio atteso annotato in `specs/001-course-workspace/eval-retrieval.md`;
+  corso reale con il passaggio atteso annotato in `specs/001-course-workspace/eval.md`;
   `recall@8` e `recall@15`. `BUDGET: 3 iterazioni di query_builder | ranking: recall@8 > recall@15
   > numero di passaggi`. Rischio: alto (R2).
   verify: tabella dei tentativi e riga `SPEDITO:`; se recall@8 < 0,7 la decisione D2 torna
@@ -169,11 +171,11 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   inesistente → `QUOTE_NOT_FOUND`; passaggio non fornito → `PASSAGE_NOT_GIVEN`; test di
   `study_citations` invariati e verdi.
 - [x] **T031** `generation_models.py`: `GenerationRequest(format: multiple_choice|open|oral|
-  summary, count 1-20, topic ≤ 200 caratteri, sources)`; dataclass di domande, opzioni,
+  summary, count 1-10, topic ≤ 200 caratteri, sources)`; dataclass di domande, opzioni,
   soluzioni separate, riassunto a sezioni; schema pydantic della risposta LLM per formato
   (crocette: esattamente 4 opzioni, una `correct`); JSON I/O di `generations/<id>.json` (D5).
   Rischio: medio.
-  verify: crocette con 3 opzioni o due corrette → rifiutate dallo schema; `count` 0 o 21 → 422 a
+  verify: crocette con 3 opzioni o due corrette → rifiutate dallo schema; `count` 0 o 11 → 422 a
   livello API (T034); round-trip JSON identico.
 - [x] **T032** Prompt `compito-v1.md` (un file con sezioni per formato o un file per formato,
   scelto in `prompt-master`) e `riassunto-v1.md`: passaggi numerati come dato delimitato, regola
@@ -194,7 +196,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   verify: con Ollama finto: domanda con soluzione non citata → scartata e contata; argomento senza
   passaggi → `NO_MATERIAL` senza chiamare il modello; `compito.md` non contiene mai il testo delle
   soluzioni (test che cerca la risposta corretta nel file delle domande).
-- [ ] **T034** (D3, D5) Azione `generation` nella coda: `WorkItem` con bersaglio di corso
+- [x] **T034** (D3, D5) Azione `generation` nella coda: `WorkItem` con bersaglio di corso
   (`work_items.py`, `supervisor.py`, `stage_runner.py generation <course_dir> <gen_id>`), stato
   `queued|running|done|failed|interrupted` nel file della generazione, recupero al boot come per
   `study`, cancel; `api_generations.py` POST (202, 422 per campo), GET elenco paginato e dettaglio
@@ -204,13 +206,16 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   esatto cercando la citazione nella trascrizione (come `api_study` con `locate_quote`). Rischio: alto (coda condivisa).
   verify: runner fittizio: trascrizione A poi generazione B → mai due figli insieme; riavvio
   simulato con generazione `running` → `interrupted`; `supervisor.py` e `stage_runner.py` ≤ 300
-  righe (dividere prima se serve); test esistenti della coda verdi.
-- [ ] **T035** UI generazioni nel corso: form (formato, numero, argomento, fonti), avanzamento SSE,
-  elenco generazioni, vista con domande e soluzioni separate (sezione chiusa di default), link
-  delle citazioni, contatori di scarto, download `compito.md`/`soluzioni.md`, elimina; stati
-  loading/empty/error/edge (Ollama non raggiungibile, "8 su 10", nessun materiale). Rischio: medio.
+  righe (dividere prima se serve); test esistenti della coda verdi. Implementato nel commit
+  `45cca53`.
+- [x] **T035** UI generazioni nel corso: form (formato, numero, argomento, fonti), avanzamento via
+  polling (come la coda delle trascrizioni, non SSE), elenco generazioni, vista con domande e
+  soluzioni separate (sezione chiusa di default), link delle citazioni, contatori di scarto,
+  download `compito.md`/`soluzioni.md`, elimina; stati loading/empty/error/edge (Ollama non
+  raggiungibile, "8 su 10", nessun materiale). Rischio: medio.
   verify: click-through registrato di ogni controllo; render 375/1280; `a11y-gate`; XSS con
-  `<script>` nella risposta LLM finta → nessuna esecuzione.
+  `<script>` nella risposta LLM finta → nessuna esecuzione. Prove fatte in sessione, commit
+  `d3a4668`.
 
 - [x] **T036** Misura reale (non delegabile: giudizio). `BUDGET: 4 iterazioni del prompt |
   ranking: domande sbagliate (meno) > soluzioni sbagliate (meno) > domande scartate (meno) >
@@ -292,7 +297,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
 ## F5 - OCR dei PDF scansionati (U1 = OCR)
 
 - [x] **T050** Misura (non delegabile): 5 pagine scansionate con `qwen2.5vl:7b`, tempo per pagina,
-  VRAM, qualità del testo a vista. verify: tabella in `adr.md`; decisione su risoluzione e prompt.
+  VRAM, qualità del testo a vista. verify: tabella in `eval.md`; decisione su risoluzione e prompt.
 - [x] **T051** Azione di coda `ocr` (GPU, come lo studio): pagine renderizzate a immagine
   (`pypdfium2` o equivalente da T001c), una chiamata per pagina, testo in `text.json` con
   `source: "ocr"`; documento da `ready_no_text` a `ready`. Prompt `ocr-v1.md` via prompt-master.
@@ -302,3 +307,29 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   testo OCR marcato come tale nel lettore. verify: click-through, a11y-gate, render 375/1280.
 - [ ] **T059** Gate F5. verify: suite, ruff, format, mypy; run reale su un PDF scansionato con
   `nvidia-smi` → mai Whisper e OCR insieme.
+
+## Remediation /analyze (2026-10-03)
+
+Una riga per finding, verso i task sopra.
+
+- [x] **A1** Test di generazione e citazioni divisi sotto le 300 righe (`test_generation_budget.py`, `test_api_generations_document_citations.py`). Commit `45343e9`.
+- [x] **A2** `app.css` diviso in 10 fogli per area. Commit `f535471`.
+- [x] **A3** Fonti delle generazioni registrate con `sha256` (documenti) o revisione (lezioni);
+  una citazione la cui fonte è cambiata arriva con `changed: true` e la pagina mostra " · fonte
+  modificata dopo la generazione" (vedi adr.md § D5). Commit `06f41ca`.
+- [x] **A4** Limiti al processo OCR: figlio sotto lo stesso `RLIMIT_AS` dell'estrazione
+  (`web/child_limits.py`); il supervisore lo uccide dopo `ocr_process_timeout_s` (3600 s) con
+  `OCR_TIMEOUT`; rendering della pagina limitato a 2500 px sul lato lungo (vedi adr.md § D4).
+  Commit `c0d0255`.
+- [x] **A5** Page rifiuta pagine OCR senza testo. Commit `8164609`.
+- [x] **A7** 409 `DOCUMENT_EXISTS` su upload duplicato (stesso `sha256`). Commit `faae876`.
+- [x] **A8** Test che l'output del modello arriva alla pagina come testo, non eseguito. Commit
+  `074dd77`.
+- [x] **A10/A18** Avvisi in UI quando il polling o il cancel dell'OCR falliscono (commit
+  `a39bdfa`) e warning sulla pagina OCR vuota (commit `8164609`).
+- [x] **A16** Motivi degli scarti mostrati in pagina ("N su M richieste", riga per motivo).
+  Commit `d36482c`.
+- [x] **A19** `discarded >= 0` (mai negativo) loggato e verificato. Commit `8164609`. Seconda
+  metà del finding (controllo che `question_id` esista) scartata: nessun chiamante può produrre
+  una risposta senza la sua domanda, la risposta è scritta da `chat_turn.ask` subito dopo la
+  domanda nello stesso turno.

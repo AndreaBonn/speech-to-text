@@ -66,9 +66,10 @@ automatico: una voce senza citazione valida non arriva allo studente. Niente las
 ### C3 - Compiti d'esame e riassunti (fase F3)
 
 - [ ] Form nel corso: formato (crocette, domande aperte, domande da orale), numero di domande
-      (1-20), argomento facoltativo (testo libero, vuoto = tutto il corso), fonti (tutte, oppure
+      (1-10), argomento facoltativo (testo libero, vuoto = tutto il corso), fonti (tutte, oppure
       una selezione di lezioni e documenti). `POST /api/v1/courses/<key>/generations` → 202, la
-      generazione entra nella coda GPU esistente (mai insieme a Whisper, D3), avanzamento via SSE.
+      generazione entra nella coda GPU esistente (mai insieme a Whisper, D3), avanzamento via
+      polling (come la coda delle trascrizioni, non SSE).
 - [ ] Formati, ciascuno con un esempio nel test:
       - crocette: domanda, 4 opzioni, una sola corretta; la soluzione indica la lettera e cita la
         fonte che la giustifica. Le opzioni errate non portano citazione.
@@ -82,11 +83,14 @@ automatico: una voce senza citazione valida non arriva allo studente. Niente las
 - [ ] Riassunto per argomento: Given l'argomento "causa del contratto"; Then un riassunto in
       sezioni con frasi citate; se il recupero non trova passaggi pertinenti → "Nel materiale del
       corso non trovo questo argomento", mai un testo inventato.
-- [ ] Citazioni: stessa regola di `study_citations.py` estesa ai documenti. Valida solo se il
-      passaggio era fra quelli dati al modello e il testo citato (3-40 parole, normalizzato)
-      compare contiguo nel passaggio. Domanda o voce con citazione non valida → scartata, e la
-      pagina dice "N domande scartate perché la fonte non è stata trovata". Se dopo gli scarti
-      restano meno domande di quelle chieste, lo dice (es. "8 su 10").
+- [ ] Citazioni: stessa regola di `study_citations.py` estesa ai documenti. Una citazione il cui
+      testo compare in un altro passaggio dato al modello è riattribuita a quel passaggio
+      (`source_citations.resolve_citation`); è inventata, e scartata da sola, solo se non compare
+      in nessun passaggio dato. La voce resta se almeno una citazione regge; è scartata solo se
+      nessuna regge o se il numero di citazioni è fuori da 1-3. La pagina mostra "N su M
+      richieste" e una riga per motivo di scarto (es. "2 scartate perché la fonte citata non è
+      stata trovata nel materiale"); con un argomento senza materiale, "Nel materiale del corso
+      non trovo questo argomento."
 - [ ] Ogni citazione è un link: lezione → lettore al minuto; documento → pagina nel lettore
       documento.
 - [ ] Generazioni salvate nel corso, rileggibili ed eliminabili; documento cancellato dopo la
@@ -118,6 +122,22 @@ automatico: una voce senza citazione valida non arriva allo studente. Niente las
       di risposta (streaming senza JSON, D3/D5).
 - [ ] Fedeltà misurata sulle stesse 10 domande: risposta corretta / parziale / sbagliata a mano.
 
+### C5 - OCR dei PDF scansionati (fase F5, U1)
+
+- [ ] Un PDF scansionato (stato `ready_no_text`) mostra il pulsante "Estrai il testo con OCR".
+- [ ] L'OCR gira come azione del supervisore in coda, una pagina alla volta, annullabile.
+- [ ] Le pagine lette via OCR sono marcate: avviso nel lettore documento, " · testo da OCR" sulle
+      citazioni che le usano.
+- [ ] Con Ollama spento, l'errore lo dice (`OLLAMA_UNAVAILABLE`), file originale intatto.
+- [ ] Mai due processi GPU insieme: OCR e Whisper non girano in parallelo (gate T059).
+- [ ] Il documento non si cancella mentre l'OCR è in coda o in corso: 409 `OCR_IN_PROGRESS`.
+- [ ] Il figlio OCR gira sotto lo stesso `RLIMIT_AS` dell'estrazione (`web/child_limits.py`); oltre
+      `ocr_process_timeout_s` (3600 s) il supervisore lo uccide con `OCR_TIMEOUT`; il rendering
+      della pagina è limitato a 2500 px sul lato lungo.
+- [ ] Se l'OCR cambia il testo di un documento già citato in una generazione, la citazione arriva
+      con `changed: true` (fonte tracciata per `sha256`/revisione) e la pagina mostra " · fonte
+      modificata dopo la generazione".
+
 ### Trasversali
 
 - [ ] `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`,
@@ -132,7 +152,8 @@ automatico: una voce senza citazione valida non arriva allo studente. Niente las
       avversariale con `<script>` e `<img onerror>` dentro un PDF, una citazione valida e una
       risposta della chat → nessuna esecuzione.
 - [ ] Ogni prompt nuovo è un file versionato in `src/sbobina/prompts/` ed è passato da
-      `prompt-master` prima del commit (feedback dell'utente).
+      `prompt-master` prima del commit (feedback dell'utente). Fatto per `compito-v2.md`,
+      `chat-v2.md`, `riassunto-v1.md`, `ocr-v1.md`.
 - [ ] `CLAUDE.md` del progetto aggiornato su layout e confini nuovi (estrazione, recupero, chat).
 - [ ] Dipendenze nuove solo con licenza compatibile con Apache-2.0, dichiarate nel commit.
 
