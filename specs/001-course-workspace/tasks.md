@@ -266,7 +266,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
 
 **[B-9] T043-T044**
 
-- [ ] **T043** UI chat nel corso: elenco conversazioni, thread, invio con stato "sto cercando nel
+- [x] **T043** UI chat nel corso: elenco conversazioni, thread, invio con stato "sto cercando nel
   materiale / sto scrivendo", fonti cliccabili sotto ogni risposta, messaggio GPU occupata con la
   stima, input preservato su errore, stati loading/empty/error/edge (domanda lunga, risposta
   lunga, 50 messaggi). Rischio: medio.

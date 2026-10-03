@@ -186,6 +186,44 @@
 
       <nav id="generations-pagination" class="pagination" aria-label="Pagine delle generazioni" hidden></nav>
     </section>
+
+    <section id="corsi-chat" class="chat" aria-labelledby="corsi-chat-title">
+      <h3 id="corsi-chat-title" class="section-title">Domande sul corso</h3>
+
+      <div class="chat__layout">
+        <div class="chat__sidebar">
+          <button type="button" id="chat-new" class="btn btn--primary chat__new">Nuova conversazione</button>
+
+          <div id="chat-list-status" class="history__status" role="alert" hidden></div>
+
+          <ul id="chat-list" class="chat__list" hidden></ul>
+
+          <div id="chat-list-empty" class="empty-state" hidden>
+            <p class="empty-state__text">
+              Nessuna conversazione: fai una domanda sul materiale di questo corso.
+            </p>
+            <button type="button" id="chat-empty-new" class="btn btn--primary">Nuova conversazione</button>
+          </div>
+        </div>
+
+        <div id="chat-thread-wrap" class="chat__thread-wrap" hidden>
+          <div id="chat-thread-status" class="history__status" role="alert" hidden></div>
+
+          <ol id="chat-thread" class="chat__thread" aria-live="polite"></ol>
+
+          <form id="chat-form" class="chat__form" novalidate>
+            <div class="field">
+              <label class="field__label" for="chat-question">Domanda</label>
+              <textarea id="chat-question" class="text-input chat__textarea" name="question"
+                        maxlength="1000" rows="3"></textarea>
+              <p id="chat-question-error" class="field__error" role="alert" hidden></p>
+            </div>
+            <div id="chat-waiting" class="chat__waiting" role="status" aria-live="polite" hidden></div>
+            <button type="submit" id="chat-submit" class="btn btn--primary">Invia</button>
+          </form>
+        </div>
+      </div>
+    </section>
   </div>
 </div>
 {% endblock %}
@@ -198,6 +236,8 @@
 <script src="/static/js/corso-generazioni-form.js" defer></script>
 <script src="/static/js/corso-generazioni-azioni.js" defer></script>
 <script src="/static/js/corso-generazioni.js" defer></script>
+<script src="/static/js/corso-chat-thread.js" defer></script>
+<script src="/static/js/corso-chat.js" defer></script>
 <script src="/static/js/corso-dettaglio.js" defer></script>
 <script src="/static/js/corsi.js" defer></script>
 <script src="/static/js/search.js" defer></script>

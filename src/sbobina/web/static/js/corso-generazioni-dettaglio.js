@@ -194,5 +194,7 @@
     load: load,
     downloadLinks: downloadLinks,
     el: el,
+    citationNode: citationNode,
+    citationsList: citationsList,
   };
 })();
