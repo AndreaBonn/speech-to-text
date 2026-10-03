@@ -12,6 +12,8 @@ You record a lecture with your phone, drop the file into a page in your browser,
 
 Under the hood it runs [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper large-v3 on an NVIDIA GPU, large-v3-turbo on the CPU). An optional second pass sends the text to a local LLM through [Ollama](https://ollama.com) to fix misheard words; the LLM may only substitute short word spans, and every edit is listed in a corrections report. The web UI and the command line share the same pipeline.
 
+Lectures are grouped by course. Each course has a page where you add the course material (book, slides, notes as PDF, DOCX, PPTX, TXT or Markdown), search lectures and material together, generate practice exams and summaries, and ask questions about the course. Everything the local LLM writes comes with the sentence of the lecture or the page of the document it is taken from, and items whose quote cannot be found in the material are dropped.
+
 **Not a technical user?** Read the [user guide](./docs/user-guide.md): it covers installation and everyday use on Windows, macOS and Linux, step by step.
 
 ## In practice
@@ -27,21 +29,30 @@ INFO Interfaccia su http://127.0.0.1:8765
 
 The browser then opens on the upload page. Messages are in Italian because the intended users are Italian students.
 
-Measured on this project's hardware (from `src/sbobina/model_catalog.py`):
+Measured on this project's hardware (transcription and correction from `src/sbobina/model_catalog.py`, course features from `specs/001-course-workspace/eval*.md`):
 
 | Step | Hardware | Time |
 | --- | --- | --- |
 | Transcription, 85-min lecture, large-v3 | NVIDIA RTX 4060 8 GB | about 6.5 min |
 | Transcription, 90-min lecture, large-v3-turbo | Intel Core i7, 13th gen (CPU only) | about 30 min |
 | LLM correction, 85-min lecture, qwen3.5:9b | NVIDIA RTX 4060 8 GB | about 18 min |
+| Practice exam (10 questions) or summary, qwen3.5:9b | NVIDIA RTX 4060 8 GB | 33 to 84 s |
+| Course question, qwen3.5:9b, model already loaded | NVIDIA RTX 4060 8 GB | median 10 s, slowest 17 s |
+| OCR of one scanned page, qwen2.5vl:7b | same machine; the model does not fit in 8 GB and runs on the CPU | 4 to 5 min |
 
 ## Features
 
-- Web UI on `127.0.0.1`: upload, job queue with live progress, history, model downloads
+- Web UI on `127.0.0.1`: upload, job queue with live progress, history, model downloads, light and dark theme
 - Reader: click a word to play the audio from that point; uncertain words highlighted; list of passages to re-listen
 - Manual correction in the reader: select a word or a phrase, type the fix, save
 - Exports: Markdown, JSON, DOCX and plain text (the DOCX/TXT copy has no timestamps or review marks)
 - Optional Ollama correction with substitution-only guards and a corrections report
+- Courses: lectures grouped by the **Materia** typed at upload, editable later from the reader
+- Course material: upload PDF, DOCX, PPTX, TXT and Markdown files; the file type is checked from its content, not its name; scanned PDFs can be read with a local vision model (OCR), one document at a time
+- Full-text search over every lecture and document, filtered by course; a lecture hit opens the reader at that second
+- Practice exams (multiple choice, open questions, oral) and summaries generated from the course, with citations, downloadable as Markdown and DOCX (exam and solutions as separate files)
+- Course questions: chat in which every sentence of the answer cites a passage of the material; if the material does not cover the question, the answer says so
+- Study notes per lecture: summary, key concepts and likely exam questions, each linked to the lecture time it comes from
 - Word Error Rate (WER) comparison against a hand-made reference transcript
 - Automatic device choice: CUDA when an NVIDIA GPU and its libraries are available, CPU otherwise
 
@@ -50,33 +61,39 @@ Measured on this project's hardware (from `src/sbobina/model_catalog.py`):
 | Area | Components |
 | --- | --- |
 | Speech recognition | faster-whisper 1.2 (CTranslate2), CUDA 12 libraries from pip wheels (`cuda` extra) |
-| Text correction | Ollama client, local model `qwen3.5:9b` by default |
+| Local LLM | Ollama client; `qwen3.5:9b` for correction, study notes, exams, summaries and chat; `qwen2.5vl:7b` for OCR |
+| Documents | pypdfium2 (PDF text and page rendering), python-docx, python-pptx, Pillow |
+| Search | SQLite FTS5 index with BM25 ranking, rebuilt from the files on disk |
 | Web | FastAPI, Uvicorn, Jinja2 templates, vanilla JavaScript, Server-Sent Events for progress |
 | Exports and metrics | python-docx, jiwer |
 | Configuration | pydantic-settings (`SBOBINA_*` environment variables or `.env`) |
-| Tooling | uv, pytest, ruff, mypy (strict) |
+| Tooling | uv, pytest, ruff, mypy (strict), GitHub Actions |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
     browser["Browser"] --> server["FastAPI server<br/>127.0.0.1:8765"]
-    server --> supervisor["Job supervisor"]
-    supervisor --> runner["Child process<br/>stage_runner"]
+    server --> supervisor["Queue supervisor"]
+    supervisor --> runner["Child process<br/>one job at a time"]
     runner --> whisper["faster-whisper"]
-    runner --> ollama["Ollama<br/>(optional)"]
-    runner --> data[("data/ folder<br/>audio, JSON, MD")]
-    server --> data
+    runner --> ollama["Ollama"]
+    server -- "course chat" --> ollama
+    server --> extractor["Extraction child<br/>memory and time limits"]
+    runner --> data[("data/ folder<br/>lectures, courses")]
+    extractor --> data
+    server --> index[("SQLite FTS5<br/>search index")]
+    index --> data
 ```
 
-Each job runs in a child process, so a crash or a cancel does not take the web server down. On restart, jobs left running are marked as interrupted. All state lives in plain files under `data/`.
+Transcriptions, study notes, exams, summaries and OCR runs share one queue and run one at a time in a child process, so a crash or a cancel does not take the web server down. On restart, jobs left running are marked as interrupted. Text extraction from uploaded documents runs in a separate child with a timeout and, outside Windows, a memory limit. Course chat runs in the web process; a readers-writer lock keeps it and the transcription stage from using the GPU at the same time. All state lives in plain files under `data/`; the search index can be deleted and is rebuilt on the next search.
 
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/). The launch scripts offer to install it if missing; uv then installs Python 3.12 by itself.
 - Optional: an NVIDIA GPU with a working driver (Linux or Windows). Without it, transcription runs on the CPU.
-- Optional: [Ollama](https://ollama.com/download) for the correction pass.
-- About 8 GB of free disk space for the environment and the models.
+- Optional: [Ollama](https://ollama.com/download), needed for correction, study notes, exams, summaries, course questions and OCR. Transcription, reader, search and exports work without it. Ollama models can be downloaded from the **Modelli** page; correction, exams, summaries and OCR also download their model on first use.
+- About 8 GB of free disk space for the environment and the Whisper model, plus the space of each Ollama model you use (about 6 GB for `qwen3.5:9b`).
 
 Development and testing happen on Linux. The Windows and macOS paths are implemented but have not yet been run on real machines; [docs/checklist-windows-macos.md](./docs/checklist-windows-macos.md) is the checklist for the first test.
 
@@ -126,23 +143,28 @@ Every setting has a default. To change one, copy `.env.example` to `.env` and ed
 | `SBOBINA_VAD_FILTER` | ⚠️ | Silero VAD, `false` by default (it dropped words on long phone recordings) |
 | `SBOBINA_CONDITION_ON_PREVIOUS_TEXT` | ⚠️ | `false` by default, to avoid repetition loops on hour-long audio |
 | `SBOBINA_UNCERTAIN_THRESHOLD` | ⚠️ | Words below this confidence are flagged, default `0.7` |
-| `SBOBINA_OLLAMA_MODEL` | ⚠️ | Correction model, default `qwen3.5:9b` |
+| `SBOBINA_OLLAMA_MODEL` | ⚠️ | Text model for correction, study notes, exams, summaries and chat, default `qwen3.5:9b` |
 | `SBOBINA_OLLAMA_HOST` | ⚠️ | Default `http://localhost:11434` |
+| `SBOBINA_OCR_MODEL` | ⚠️ | Vision model for scanned PDFs, default `qwen2.5vl:7b` |
+| `SBOBINA_OCR_SCALE` | ⚠️ | Page render scale for OCR, default `1.0` (at `2.0` a page took over 10 min on the CPU) |
+| `SBOBINA_CHAT_TIMEOUT_S` | ⚠️ | Maximum wait for a chat answer, default `120` |
 | `SBOBINA_WEB_PORT` | ⚠️ | Default `8765` |
-| `SBOBINA_DATA_DIR` | ⚠️ | Where jobs are stored, default `data` |
-| `SBOBINA_WEB_MAX_UPLOAD_MB` | ⚠️ | Upload limit, default `1024` |
+| `SBOBINA_DATA_DIR` | ⚠️ | Where lectures and courses are stored, default `data` |
+| `SBOBINA_WEB_MAX_UPLOAD_MB` | ⚠️ | Audio upload limit, default `1024` |
+| `SBOBINA_COURSE_DOC_MAX_MB` | ⚠️ | Course document upload limit, default `200` |
 
 `SBOBINA_WEB_HOST` accepts only `127.0.0.1`, `::1` or `localhost`: the server cannot be exposed on the network.
 
 ## Command line
 
-The same pipeline runs without the web UI:
+The transcription pipeline runs without the web UI. Course features (material, search, exams, chat, OCR) are available only in the web UI.
 
 | Command | What it does |
 | --- | --- |
 | `uv run sbobina trascrivi lezione.m4a -o sbobine/` | Transcribe; writes `lezione.json` and `lezione.md` |
 | `uv run sbobina rendi sbobine/lezione.json --soglia 0.8` | Rebuild the `.md` with another uncertainty threshold, without transcribing again |
 | `uv run sbobina correggi sbobine/lezione.json --materia "diritto privato"` | Ollama correction; writes the corrected files and a report |
+| `uv run sbobina studio sbobine/lezione.json` | Study notes with citations; writes `lezione.studio.json` and `lezione.studio.md` |
 | `uv run sbobina wer riferimento.txt sbobine/lezione.json` | Word Error Rate against a reference transcript |
 | `uv run sbobina web [--port N] [--no-browser]` | Start the web UI |
 
@@ -152,12 +174,12 @@ In the reference text for `wer`, write numbers as digits ("10 minuti"), as the m
 
 ```text
 speech-to-text/
-├── src/sbobina/          # package: pipeline, CLI, correction, exports
+├── src/sbobina/          # package: pipeline, CLI, correction, retrieval, generations, exports
 │   ├── prompts/          # versioned LLM prompts
-│   └── web/              # FastAPI app, job supervisor, templates, static files
+│   └── web/              # FastAPI app, queue supervisor, stores, templates, static files
 ├── tests/                # pytest suite, mirrors src/ (web/ for the UI)
 ├── docs/                 # user guides, cross-platform checklist, activity report
-├── specs/                # design and plan of the web UI
+├── specs/                # design, plans and measurements (web UI, study notes, course workspace)
 ├── avvia.sh / avvia.bat  # one-step launchers
 └── .env.example          # optional settings
 ```
@@ -165,16 +187,16 @@ speech-to-text/
 ## Testing
 
 ```bash
-uv run pytest            # 478 tests
+uv run pytest            # 1585 tests
 uv run ruff check .
 uv run mypy src tests
 ```
 
-The tests replace faster-whisper and Ollama with fakes, so they run in a few seconds without transcribing real audio.
+The tests replace faster-whisper and Ollama with fakes, so they run without transcribing real audio or loading a model. GitHub Actions runs lint, format check, mypy and the tests on every push and pull request to `main`.
 
 ## Security
 
-The server listens only on the loopback interface and checks the `Host` and `Origin` headers. To report a vulnerability, see [SECURITY.md](./SECURITY.md).
+The server listens only on the loopback interface and checks the `Host` and `Origin` headers. Uploaded documents are parsed in a child process with size, memory and time limits. To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 
 ## License
 

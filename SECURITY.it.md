@@ -21,25 +21,31 @@ Indica:
 
 ## Modello di minaccia
 
-Transcriber è uno strumento per un solo utente che gira sul suo computer. L'interfaccia web non ha autenticazione per scelta: è raggiungibile solo dalla stessa macchina. I rischi principali da cui si difende sono un sito malevolo, aperto nello stesso browser, che manda richieste al server locale, e input troppo grandi o malformati.
+Transcriber è uno strumento per un solo utente che gira sul suo computer. L'interfaccia web non ha autenticazione per scelta: è raggiungibile solo dalla stessa macchina. I rischi principali da cui si difende sono un sito malevolo, aperto nello stesso browser, che manda richieste al server locale, e input troppo grandi o malformati, compresi documenti del corso costruiti per esaurire memoria o disco, e testo dentro i documenti o nelle risposte dell'LLM che prova a entrare nella pagina come markup.
 
 ## Misure di sicurezza implementate
 
-- **Server solo su loopback**: l'host configurato deve essere `127.0.0.1`, `::1` o `localhost`; qualsiasi altro valore viene rifiutato all'avvio (`src/sbobina/settings.py:59`).
-- **Controllo dell'header Host**: `TrustedHostMiddleware` di Starlette accetta solo nomi di loopback, il che blocca il DNS rebinding (`src/sbobina/web/app.py:73`).
-- **Controllo dell'Origin sulle richieste che modificano lo stato**: `POST`, `PUT`, `PATCH` e `DELETE` con un header `Origin` diverso da quello del server ricevono un 403 (`src/sbobina/web/middleware.py:19`).
-- **Limite di dimensione prima di leggere il corpo**: i caricamenti oltre `SBOBINA_WEB_MAX_UPLOAD_MB` (1024 MB di default), o senza `Content-Length`, vengono rifiutati prima di scrivere qualsiasi cosa su disco (`src/sbobina/web/upload_limit.py:17`).
-- **Identificativi dei lavori validati prima di toccare il file system**: l'ID di un lavoro deve essere un UUID versione 4 prima di diventare un percorso, il che esclude il path traversal (`src/sbobina/web/job_store.py:62`).
+- **Server solo su loopback**: l'host configurato deve essere `127.0.0.1`, `::1` o `localhost`; qualsiasi altro valore viene rifiutato all'avvio (`src/sbobina/settings.py:75`).
+- **Controllo dell'header Host**: `TrustedHostMiddleware` di Starlette accetta solo nomi di loopback, il che blocca il DNS rebinding (`src/sbobina/web/app.py:139`).
+- **Controllo dell'Origin sulle richieste che modificano lo stato**: `POST`, `PUT`, `PATCH` e `DELETE` con un header `Origin` diverso da quello del server ricevono un 403 (`src/sbobina/web/middleware.py:24`).
+- **Limite di dimensione prima di leggere il corpo**: l'audio oltre `SBOBINA_WEB_MAX_UPLOAD_MB` (1024 MB di default), i documenti del corso oltre `SBOBINA_COURSE_DOC_MAX_MB` (200 MB di default) e i caricamenti senza `Content-Length` vengono rifiutati prima di scrivere qualsiasi cosa su disco (`src/sbobina/web/upload_limit.py:58`, limiti impostati in `src/sbobina/web/app.py:150`).
+- **Tipo del documento controllato dal contenuto**: il tipo di un documento del corso si ricava dai primi byte (firma PDF, struttura dell'archivio ZIP per DOCX e PPTX), non dall'estensione (`src/sbobina/document_sniff.py:75`).
+- **Limiti sugli archivi Office**: un DOCX o PPTX con più di 10.000 voci o più di 500 MB decompressi viene rifiutato con un 413 prima di aprirlo, il che blocca le zip bomb (`src/sbobina/document_sniff.py:33`).
+- **Lettura dei documenti in un processo figlio limitato**: l'estrazione del testo gira in un processo separato con un limite allo spazio di indirizzamento (`RLIMIT_AS`, `SBOBINA_EXTRACTION_MAX_MEMORY_MB`, 2048 MB di default; non disponibile su Windows) e un tempo massimo, superato il quale viene terminato (`src/sbobina/web/extraction_runner.py:26`, `src/sbobina/web/extraction_worker.py:218`).
+- **OCR limitato in memoria, tempo e dimensione del rendering**: il figlio dell'OCR ha lo stesso limite di memoria (`src/sbobina/web/ocr_runner.py:123`), ogni pagina viene renderizzata con il lato lungo al massimo di 2500 pixel (`src/sbobina/pdf_text.py:10`) e un'esecuzione ancora in corso dopo `SBOBINA_OCR_PROCESS_TIMEOUT_S` (un'ora di default) viene terminata, così non blocca la coda (`src/sbobina/web/ocr_supervisor.py:126`).
+- **Identificativi validati prima di toccare il file system**: l'ID di un lavoro deve essere un UUID versione 4 prima di diventare un percorso, il che esclude il path traversal (`src/sbobina/web/job_store.py:73`); gli ID delle conversazioni devono essere UUID in forma canonica (`src/sbobina/web/api_chat.py:86`).
+- **Le query di ricerca non raggiungono la sintassi FTS5**: i termini dell'utente vengono quotati come stringhe letterali (`src/sbobina/search_text.py:36`) e passati a `MATCH` come parametro bindato (`src/sbobina/web/search_index.py:101`).
+- **Output dell'LLM trattato come non fidato**: le citazioni di esercitazioni, riassunti e chat vengono controllate contro i passaggi dati al modello, e una voce con una citazione non trovata viene scartata (`src/sbobina/generation_validation.py:67`, `src/sbobina/source_citations.py:81`). Le pagine dei corsi costruiscono il DOM solo con `createElement` e `textContent`, così nomi dei corsi, nomi dei file, testo dei documenti e risposte dell'LLM non possono iniettare markup (`src/sbobina/web/static/js/dom.js:2`).
 - **Nomi dei modelli validati**: i modelli Whisper devono essere nell'elenco noto; i nomi Ollama devono rispettare un pattern e una lunghezza precisi (`src/sbobina/web/downloads.py:53`).
-- **Validazione delle richieste**: gli input delle API passano da modelli Pydantic; gli errori restituiscono 422 con i dettagli per campo (`src/sbobina/web/responses.py:33`).
+- **Validazione delle richieste**: gli input delle API passano da modelli Pydantic; gli errori restituiscono 422 con i dettagli per campo (`src/sbobina/web/responses.py:37`).
 - **Escape HTML nella coda dei lavori**: le stringhe fornite dal server vengono sottoposte a escape prima di entrare nella pagina (`src/sbobina/web/static/js/jobs.js:426`).
-- **Dipendenze bloccate**: `uv.lock` è nel repository.
+- **Dipendenze bloccate e CI**: `uv.lock` è nel repository e la CI installa con `uv sync --locked`; le GitHub Actions sono fissate allo SHA del commit, girano con permesso `contents` in sola lettura e senza credenziali persistenti (`.github/workflows/ci.yml`).
 
-Non implementato: autenticazione, rate limiting, header di sicurezza (CSP, `X-Frame-Options`), scansione automatica delle dipendenze in CI (non c'è CI).
+Non implementato: autenticazione, rate limiting, header di sicurezza (CSP, `X-Frame-Options`), scansione automatica delle dipendenze in CI.
 
 ## Trattamento dei dati
 
-File audio e trascrizioni vengono elaborati sulla macchina locale e salvati nella cartella `data/` (`SBOBINA_DATA_DIR`). La correzione manda il testo della trascrizione al server Ollama indicato in `SBOBINA_OLLAMA_HOST`, `http://localhost:11434` di default. Se quella variabile punta a un'altra macchina, il testo esce dal tuo computer.
+File audio, trascrizioni, documenti del corso, esercitazioni e riassunti generati e conversazioni della chat vengono elaborati sulla macchina locale e salvati nella cartella `data/` (`SBOBINA_DATA_DIR`). Correzione, materiali di studio, esercitazioni, riassunti e chat mandano testo delle trascrizioni e dei documenti al server Ollama indicato in `SBOBINA_OLLAMA_HOST`, `http://localhost:11434` di default; l'OCR manda allo stesso server le immagini delle pagine scansionate. Se quella variabile punta a un'altra macchina, quel contenuto esce dal tuo computer.
 
 ## Best practice per gli utenti
 

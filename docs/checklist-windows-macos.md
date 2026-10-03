@@ -41,8 +41,26 @@ Sistema: ______________ (es. Windows 11, macOS 14 su M2) · Scheda NVIDIA: sì /
 | 16 | Ollama installato ma chiuso | Messaggio "non è avviato" con l'azione da fare | |
 | 17 | Ollama aperto, trascrizione con correzione su 30 secondi | Completata, con il report delle correzioni scaricabile | |
 
+## Corsi e materiale
+
+| # | Prova | Atteso | Esito |
+| --- | --- | --- | --- |
+| 18 | Trascrivere con **Materia** compilata, poi aprire **Corsi** | Il corso compare con la lezione dentro | |
+| 19 | Nella pagina del corso, caricare un PDF con testo e un `.docx` | Entrambi passano a "Pronto"; **Apri** mostra il testo con le lettere accentate corrette | |
+| 20 | Cercare una parola presente nella lezione e nel PDF | Escono entrambi; il clic sull'orario apre il Lettore in quel punto | |
+| 21 | Se compare "La ricerca non è disponibile su questo computer" | Annota sistema e versione di Python: il modulo FTS5 di SQLite manca | |
+
+## Funzioni di studio con Ollama (facoltativo)
+
+| # | Prova | Atteso | Esito |
+| --- | --- | --- | --- |
+| 22 | **Esercitazioni e riassunti**: Crocette, 3 domande, **Genera** | Completata; `compito.docx` e `soluzioni.docx` si aprono in Word | |
+| 23 | **Domande sul corso**: una domanda sul PDF caricato | Risposta con la fonte cliccabile, oppure "Non trovo la risposta nel materiale di questo corso." | |
+| 24 | Dal Lettore, **Materiali di studio** e poi **Genera** su una lezione breve | Compaiono riassunto, concetti chiave e domande con l'orario | |
+| 25 | Caricare un PDF scansionato di 1-2 pagine, poi **Estrai il testo con OCR** | "OCR: pagina 1 di 2", poi "Pronto"; annota il tempo per pagina: ______ | |
+
 ## Per chi sviluppa (facoltativo)
 
 | # | Prova | Atteso | Esito |
 | --- | --- | --- | --- |
-| 18 | `uv run pytest` nella cartella del progetto | Tutti i test passano | |
+| 26 | `uv run pytest` nella cartella del progetto | Tutti i test passano | |
