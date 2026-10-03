@@ -282,7 +282,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   (meno) > latenza`. Rischio: alto (R7).
   verify: `specs/001-course-workspace/eval-chat.md` con tabella e `SPEDITO:`; se p50 > 30 s a
   modello caldo, la decisione sul formato in streaming va all'utente con i numeri.
-- [ ] **T047** Prova GPU reale: trascrizione avviata con una chat in corso e domanda inviata
+- [x] **T047** Prova GPU reale: trascrizione avviata con una chat in corso e domanda inviata
   durante una trascrizione; `nvidia-smi --query-compute-apps` ogni 5 s. Rischio: alto (R3).
   verify: mai Whisper e Ollama insieme nei campioni; 409 osservato nella pagina; job di
   trascrizione completato.

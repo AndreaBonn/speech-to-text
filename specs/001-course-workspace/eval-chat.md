@@ -45,6 +45,25 @@ all'utente.
 
 SPEDITO: iter 2/3 - `chat-v2` con C1 e C2.
 
+## T047 - Chat e trascrizione sulla stessa GPU (2026-10-03)
+
+Server di misura, pagina del corso pilotata con Playwright, `nvidia-smi --query-compute-apps`
+ogni 2 s. Una domanda in chat, poi una trascrizione (clip di 5 minuti) accodata mentre la chat è
+dentro Ollama, poi una seconda domanda durante la trascrizione, poi la stessa domanda dopo.
+
+| t | Evento | Processi sulla GPU |
+|---|---|---|
+| 2-20 s | turno di chat; la trascrizione aspetta in coda | ollama |
+| 20 s | la chat risponde; parte la trascrizione (Ollama scaricato) | - |
+| 20 s | seconda domanda: 409 nella pagina, domanda rimasta nel campo | - |
+| 22-44 s | trascrizione | figlio Python di Whisper |
+| 46-63 s | la domanda ripetuta riceve risposta | ollama |
+
+32 campioni, **0 con più di un processo**; trascrizione `done`. La prima prova mostrava il
+messaggio "occupata da una trascrizione (transcribing): riprova tra poco. None": lo stadio interno
+e una stima assente serializzata come testo. Corretti (server: niente dettaglio `estimate_s` se la
+stima manca; pagina: niente nome dello stadio, stima in minuti solo se è un numero) e riprovato.
+
 ## Limite aperto
 
 La validazione controlla che una citazione esista nel materiale, non che sostenga la frase: C3
