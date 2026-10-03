@@ -6,6 +6,7 @@ from study_fixtures import FakeChat
 from sbobina.correction import CorrectorUnavailableError
 from sbobina.course_registry import get_or_create
 from sbobina.generation_models import (
+    MAX_QUESTION_COUNT,
     GenerationFormat,
     GenerationRequest,
     GenerationSources,
@@ -31,7 +32,7 @@ from sbobina.web.job_store import JobStore
 def test_compute_options_scales_num_predict_with_count() -> None:
     few = compute_options(count=1, format_=GenerationFormat.MULTIPLE_CHOICE, model="m")
     many = compute_options(
-        count=20, format_=GenerationFormat.MULTIPLE_CHOICE, model="m"
+        count=MAX_QUESTION_COUNT, format_=GenerationFormat.MULTIPLE_CHOICE, model="m"
     )
 
     assert many.num_predict > few.num_predict
@@ -46,7 +47,7 @@ def test_compute_options_summary_num_predict_is_fixed_regardless_of_count() -> N
     one = compute_options(count=1, format_=GenerationFormat.SUMMARY, model="m")
     many = compute_options(count=20, format_=GenerationFormat.SUMMARY, model="m")
 
-    assert one.num_predict == many.num_predict == SUMMARY_NUM_PREDICT == 2048
+    assert one.num_predict == many.num_predict == SUMMARY_NUM_PREDICT == 2560
 
 
 def test_compute_budget_words_for_summary_keeps_a_usable_material_budget() -> None:
@@ -56,14 +57,14 @@ def test_compute_budget_words_for_summary_keeps_a_usable_material_budget() -> No
 
     # Documents the actual number so a future change to the constants above
     # shows up here instead of silently shrinking the material budget.
-    assert budget == 1905
+    assert budget == 1681
     assert budget >= BUDGET_MIN_WORDS
 
 
 def test_compute_budget_words_shrinks_as_num_predict_grows_but_keeps_floor() -> None:
     few = compute_options(count=1, format_=GenerationFormat.MULTIPLE_CHOICE, model="m")
     many = compute_options(
-        count=20, format_=GenerationFormat.MULTIPLE_CHOICE, model="m"
+        count=MAX_QUESTION_COUNT, format_=GenerationFormat.MULTIPLE_CHOICE, model="m"
     )
 
     budget_few = compute_budget_words(
@@ -291,3 +292,23 @@ def test_execute_generation_with_topic_restricts_retrieval_to_selected_source(
     user_message = fake_chat.requests[0].user_message
     assert "bianco" not in user_message
     assert "nero" in user_message
+
+
+MIN_MATERIAL_WORDS = 1000
+
+
+@pytest.mark.parametrize(
+    "format_",
+    [GenerationFormat.MULTIPLE_CHOICE, GenerationFormat.OPEN, GenerationFormat.ORAL],
+)
+def test_largest_allowed_exam_still_leaves_real_material(
+    format_: GenerationFormat,
+) -> None:
+    # Above the floor the whole prompt fits in num_ctx; at the floor (200
+    # words) Ollama would silently cut the input and the exam would rest on
+    # almost no material. The maximum count must stay clear of it.
+    options = compute_options(count=MAX_QUESTION_COUNT, format_=format_, model="m")
+
+    budget = compute_budget_words(format_=format_, options=options)
+
+    assert budget >= MIN_MATERIAL_WORDS

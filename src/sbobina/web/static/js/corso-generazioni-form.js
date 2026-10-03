@@ -15,7 +15,7 @@
   };
   // Pydantic messages are English; the bounds mirror generation_models.py.
   var FIELD_MESSAGES = {
-    count: "Scegli un numero di domande tra 1 e 20.",
+    count: "Scegli un numero di domande tra 1 e 10.",
     topic: "L'argomento può avere al massimo 200 caratteri.",
   };
 

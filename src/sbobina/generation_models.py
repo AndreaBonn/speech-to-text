@@ -12,7 +12,9 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
 
 MIN_QUESTION_COUNT = 1
-MAX_QUESTION_COUNT = 20
+# num_ctx is fixed at 8192: past 10 items the reply budget leaves under
+# ~1000 words of material (T036 measurements).
+MAX_QUESTION_COUNT = 10
 MAX_TOPIC_LENGTH = 200
 EXPECTED_OPTION_COUNT = 4
 _PASSAGE_PATTERN = r"^P[0-9]+$"

@@ -139,7 +139,7 @@ def test_summary_response_accepts_empty_sections() -> None:
     assert SummaryResponse.model_validate({"sezioni": []}).sections == []
 
 
-@pytest.mark.parametrize("count", [0, 21])
+@pytest.mark.parametrize("count", [0, 11])
 def test_generation_request_rejects_out_of_range_count(count: int) -> None:
     with pytest.raises(ValidationError) as excinfo:
         GenerationRequest.model_validate({"format": "multiple_choice", "count": count})
@@ -147,7 +147,7 @@ def test_generation_request_rejects_out_of_range_count(count: int) -> None:
 
 
 def test_generation_request_accepts_boundary_counts() -> None:
-    for count in (1, 20):
+    for count in (1, 10):
         request = GenerationRequest.model_validate({"format": "open", "count": count})
         assert request.count == count
 

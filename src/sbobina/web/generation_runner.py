@@ -48,18 +48,22 @@ from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import SearchIndex
 from sbobina.web.search_service import search_session
 
+# Measured on qwen3.5:9b (T036, specs/001-course-workspace/eval-generations.md):
+# 10 multiple-choice items were cut at 1756 tokens (over 175 each), 10 oral
+# items used 2251 (225 each), 10 open items 1068 (about 107 each).
 NUM_PREDICT_PER_ITEM: dict[GenerationFormat, int] = {
-    GenerationFormat.MULTIPLE_CHOICE: 150,
+    GenerationFormat.MULTIPLE_CHOICE: 260,
     GenerationFormat.OPEN: 200,
-    GenerationFormat.ORAL: 220,
+    GenerationFormat.ORAL: 280,
 }
 NUM_PREDICT_MARGIN_TOKENS = 256
 NUM_PREDICT_MIN = 512
 # A summary is one item regardless of requested_count (there is no "count" of
 # sections), so the per-item formula starved it at 556 tokens: Ollama
 # truncated the real reply (done_reason=length), which validate() then
-# rejected as INVALID_RESPONSE. Fixed instead of scaled with count.
-SUMMARY_NUM_PREDICT = 2048
+# rejected as INVALID_RESPONSE. Fixed instead of scaled with count; a
+# summary of one lecture then still reached 2048 (T036), hence 2560.
+SUMMARY_NUM_PREDICT = 2560
 BUDGET_MARGIN_TOKENS = 512
 BUDGET_MIN_WORDS = 200
 SEARCH_INDEX_FILENAME = "search.sqlite3"
