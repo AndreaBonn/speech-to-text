@@ -1,6 +1,5 @@
 import json
 import logging
-from types import SimpleNamespace
 
 import httpx
 import ollama
@@ -195,8 +194,10 @@ class _AnsweringClient:
     def __init__(self, host: str) -> None:
         pass
 
-    def chat(self, **kwargs: object) -> object:
-        return SimpleNamespace(message=SimpleNamespace(content=self.content))
+    def chat(self, **kwargs: object) -> ollama.ChatResponse:
+        return ollama.ChatResponse(
+            message=ollama.Message(role="assistant", content=self.content)
+        )
 
 
 def test_ollama_corrector_returns_edits_from_the_model_answer(
