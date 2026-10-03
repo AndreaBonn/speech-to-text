@@ -27,7 +27,9 @@ UNTRUSTED_TEXT_SCRIPTS = (
     "documento.js",
     "studio.js",
 )
-HTML_SINK = re.compile(r"\.(innerHTML|outerHTML)\s*=|insertAdjacentHTML|document\.write")
+HTML_SINK = re.compile(
+    r"\.(innerHTML|outerHTML)\s*=|insertAdjacentHTML|document\.write"
+)
 
 
 def _markup_answer(request: ChatRequest) -> str:
