@@ -2,11 +2,18 @@ from contextlib import closing
 from pathlib import Path
 
 from sbobina.course_registry import get_or_create
+from sbobina.document_passages import DocumentPassage
 from sbobina.models import Segment, Transcript, Word, save_transcript
-from sbobina.retrieval import LectureSource, RetrievalScope
+from sbobina.retrieval import DocumentSource, LectureSource, RetrievalScope
 from sbobina.search_text import Passage
 from sbobina.web.api_files import TRANSCRIPT_FILES
-from sbobina.web.course_retrieval import WindowedQuery, course_scope, retrieve_windows
+from sbobina.web.course_retrieval import (
+    WindowedQuery,
+    course_scope,
+    retrieve_windows,
+    sample_course,
+)
+from sbobina.web.document_index import DocumentState
 from sbobina.web.job_models import JobConfig, LectureMeta
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import LectureState, open_index
@@ -140,3 +147,142 @@ def test_retrieve_windows_cuts_budget_on_expanded_window_not_raw_segment(
         )
 
     assert windows == []
+
+
+def _write_plain_lecture(
+    store: JobStore, job_id: str, segment_count: int, words_per_segment: int
+) -> None:
+    """A lecture with uniform segments, for deterministic windowing in sampling."""
+    segments = [
+        Segment(
+            start=float(i),
+            end=float(i) + 1,
+            words=(
+                Word(
+                    start=float(i),
+                    end=float(i) + 1,
+                    text="parola " * words_per_segment,
+                    probability=0.99,
+                ),
+            ),
+        )
+        for i in range(segment_count)
+    ]
+    transcript = Transcript(
+        source="lezione.m4a",
+        model="large-v3",
+        language="it",
+        duration=float(segment_count),
+        segments=tuple(segments),
+    )
+    directory = store.jobs_dir / job_id
+    directory.mkdir(parents=True, exist_ok=True)
+    save_transcript(
+        transcript=transcript, path=directory / TRANSCRIPT_FILES["original"]
+    )
+
+
+def test_sample_course_covers_every_document_when_topic_is_empty(
+    tmp_path: Path,
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    course = get_or_create(courses_dir=store.courses_dir, key="corso", label="Corso")
+
+    with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
+        state = DocumentState(course_id=course.id, text_mtime_ns=1, text_size=1)
+        index.replace_document(
+            doc_id="doc1",
+            state=state,
+            passages=[
+                DocumentPassage(
+                    passage_id="doc1:p1:c0", page=1, chunk=0, text="alfa beta"
+                )
+            ],
+        )
+        index.replace_document(
+            doc_id="doc2",
+            state=state,
+            passages=[
+                DocumentPassage(
+                    passage_id="doc2:p1:c0", page=1, chunk=0, text="gamma delta"
+                )
+            ],
+        )
+        scope = RetrievalScope(course_id=course.id, job_ids=frozenset())
+
+        sampled = sample_course(store=store, index=index, scope=scope, budget_words=100)
+
+    doc_ids = {
+        source.doc_id
+        for source in (passage.source for passage in sampled)
+        if isinstance(source, DocumentSource)
+    }
+    assert doc_ids == {"doc1", "doc2"}
+
+
+def test_sample_course_windows_a_whole_lecture_without_a_question(
+    tmp_path: Path,
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig(subject="Fisica"))
+    job_id = str(record.id)
+    _write_plain_lecture(
+        store=store, job_id=job_id, segment_count=60, words_per_segment=20
+    )
+
+    with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
+        scope = RetrievalScope(course_id="fisica", job_ids=frozenset({job_id}))
+        sampled = sample_course(
+            store=store, index=index, scope=scope, budget_words=10_000
+        )
+
+    assert len(sampled) > 1
+    assert all(
+        isinstance(passage.source, LectureSource) and passage.source.job_id == job_id
+        for passage in sampled
+    )
+    assert sum(len(passage.text.split()) for passage in sampled) == 1200
+
+
+def test_sample_course_respects_selected_scope(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    course = get_or_create(courses_dir=store.courses_dir, key="corso", label="Corso")
+
+    with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
+        state = DocumentState(course_id=course.id, text_mtime_ns=1, text_size=1)
+        index.replace_document(
+            doc_id="doc1",
+            state=state,
+            passages=[
+                DocumentPassage(passage_id="doc1:p1:c0", page=1, chunk=0, text="alfa")
+            ],
+        )
+        index.replace_document(
+            doc_id="doc2",
+            state=state,
+            passages=[
+                DocumentPassage(passage_id="doc2:p1:c0", page=1, chunk=0, text="beta")
+            ],
+        )
+        scope = RetrievalScope(
+            course_id=course.id, job_ids=frozenset(), selected=frozenset({"doc1"})
+        )
+
+        sampled = sample_course(store=store, index=index, scope=scope, budget_words=100)
+
+    doc_ids = {
+        source.doc_id
+        for source in (passage.source for passage in sampled)
+        if isinstance(source, DocumentSource)
+    }
+    assert doc_ids == {"doc1"}
+
+
+def test_sample_course_empty_course_returns_no_passages(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+
+    with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
+        scope = RetrievalScope(course_id="vuoto", job_ids=frozenset())
+        sampled = sample_course(store=store, index=index, scope=scope, budget_words=100)
+
+    assert sampled == []

@@ -6,7 +6,7 @@ never mix: a ``Proposed*`` class is never written to disk, a domain dataclass
 is never fed directly to ``chat_json``.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
@@ -172,6 +172,9 @@ class GenerationRecord:
     questions: tuple[GenerationQuestion, ...]
     sections: tuple[SummarySection, ...]
     error: str | None
+    # Appended last, defaulted: a record saved before T034 has no such key
+    # in its JSON and must still load (see test_generation_models.py).
+    requested_sources: GenerationSources = field(default_factory=GenerationSources)
 
     def __post_init__(self) -> None:
         self._validate_status()

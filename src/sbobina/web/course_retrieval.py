@@ -11,20 +11,29 @@ sbobina.lecture_windows.expand_lecture_windows.
 
 import logging
 from dataclasses import dataclass
+from itertools import groupby
 
 from sbobina.course_registry import find_by_key
 from sbobina.courses import course_key, effective_course
-from sbobina.lecture_windows import WINDOW_WORDS, expand_lecture_windows
+from sbobina.lecture_windows import (
+    WINDOW_WORDS,
+    expand_lecture_windows,
+    partition_lecture_segments,
+)
 from sbobina.models import load_transcript
 from sbobina.retrieval import (
+    DocumentSource,
     LectureSource,
     RetrievalScope,
     RetrievedPassage,
     cut_to_budget,
     fuse_candidates,
+    scoped_job_ids,
 )
 from sbobina.search_text import Passage, passages_from_transcript
+from sbobina.source_sampling import sample_across_sources
 from sbobina.web.api_files import TRANSCRIPT_FILES
+from sbobina.web.document_index import DocumentScope
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import SearchIndex
 from sbobina.web.search_service import PREFERRED_VARIANTS
@@ -107,3 +116,74 @@ def retrieve_windows(
         hits=fused, segments_by_job=segments_by_job, window_words=WINDOW_WORDS
     )
     return cut_to_budget(ranked=windows, budget_words=query.budget_words)
+
+
+def _document_groups(
+    index: SearchIndex, scope: RetrievalScope
+) -> list[list[RetrievedPassage]]:
+    """One group per document, each in page/chunk reading order."""
+    rows = index.course_document_passages(
+        scope=DocumentScope(course_id=scope.course_id, doc_ids=scope.selected)
+    )
+    return [
+        [
+            RetrievedPassage(
+                text=row.text,
+                source=DocumentSource(
+                    doc_id=row.doc_id, page=row.page, chunk=row.chunk
+                ),
+                passage_id=row.passage_id,
+            )
+            for row in doc_rows
+        ]
+        for _doc_id, doc_rows in groupby(rows, key=lambda row: row.doc_id)
+    ]
+
+
+def _lecture_windows(job_id: str, segments: list[Passage]) -> list[RetrievedPassage]:
+    """One RetrievedPassage per consecutive window of this lecture's transcript."""
+    spans = partition_lecture_segments(segments=segments, window_words=WINDOW_WORDS)
+    windows = []
+    for first, last in spans:
+        anchor = segments[first]
+        windows.append(
+            RetrievedPassage(
+                text=" ".join(segment.text for segment in segments[first : last + 1]),
+                source=LectureSource(
+                    job_id=job_id,
+                    segment_index=anchor.segment_index,
+                    start=anchor.start,
+                ),
+                passage_id=f"L{job_id}-S{anchor.segment_index}",
+            )
+        )
+    return windows
+
+
+def _lecture_groups(
+    store: JobStore, job_ids: frozenset[str]
+) -> list[list[RetrievedPassage]]:
+    """One group per lecture, each lecture split into reading-order windows."""
+    groups = []
+    for job_id in sorted(job_ids):
+        segments = _segments_for_job(store=store, job_id=job_id)
+        windows = _lecture_windows(job_id=job_id, segments=segments) if segments else []
+        if windows:
+            groups.append(windows)
+    return groups
+
+
+def sample_course(
+    store: JobStore, index: SearchIndex, scope: RetrievalScope, budget_words: int
+) -> list[RetrievedPassage]:
+    """Course-wide sample across every source, used when the topic is empty.
+
+    Unlike retrieve_windows (which needs a question to match), this reads
+    every document and every lecture of the scope and spreads the budget
+    across them with source_sampling.sample_across_sources, so a generation
+    without a topic still sees material from the whole course.
+    """
+    groups = _document_groups(index=index, scope=scope) + _lecture_groups(
+        store=store, job_ids=scoped_job_ids(scope=scope)
+    )
+    return sample_across_sources(groups=groups, budget_words=budget_words)

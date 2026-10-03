@@ -137,3 +137,28 @@ def expand_lecture_windows(
                 passage_id=anchor.passage_id,
             )
     return [by_rank[rank] for rank in sorted(by_rank)]
+
+
+def partition_lecture_segments(
+    segments: list[Passage], window_words: int
+) -> list[tuple[int, int]]:
+    """Whole transcript split into consecutive, non-overlapping [first, last] spans.
+
+    Unlike _grow_window (which expands around one matched segment), this
+    walks the transcript once from the start: a span closes as soon as it
+    reaches window_words, then the next one starts right after it. Used by
+    sbobina.web.course_retrieval.sample_course to turn an unmatched lecture
+    into citable windows when there is no question to search for.
+    """
+    spans: list[tuple[int, int]] = []
+    start = 0
+    total = 0
+    for index, segment in enumerate(segments):
+        total += len(segment.text.split())
+        if total >= window_words:
+            spans.append((start, index))
+            start = index + 1
+            total = 0
+    if start < len(segments):
+        spans.append((start, len(segments) - 1))
+    return spans

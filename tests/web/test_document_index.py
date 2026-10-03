@@ -6,7 +6,7 @@ import pytest
 
 from sbobina.document_passages import DocumentPassage
 from sbobina.search_text import SnippetPart
-from sbobina.web.document_index import DocumentState
+from sbobina.web.document_index import DocumentScope, DocumentState
 from sbobina.web.search_index import SCHEMA_VERSION, SearchIndex, open_index
 
 STATE = DocumentState(course_id="course-1", text_mtime_ns=111, text_size=222)
@@ -112,3 +112,49 @@ def test_search_documents_returns_a_short_snippet_of_a_long_page(
     text = "".join(part.text for part in page.items[0].snippet)
     assert "vincolo" in text
     assert len(text.split()) <= 40
+
+
+def test_course_document_passages_returns_every_passage_in_reading_order(
+    index: SearchIndex,
+) -> None:
+    second_page = DocumentPassage(
+        passage_id="doc1:p2:c0", page=2, chunk=0, text="altra pagina"
+    )
+    index.replace_document(doc_id="doc1", state=STATE, passages=[PASSAGE, second_page])
+
+    rows = index.course_document_passages(scope=DocumentScope(course_id="course-1"))
+
+    assert [row.passage_id for row in rows] == ["doc1:p1:c0", "doc1:p2:c0"]
+    assert rows[0].text == PASSAGE.text
+
+
+def test_course_document_passages_is_scoped_to_course(index: SearchIndex) -> None:
+    other = DocumentState(course_id="course-2", text_mtime_ns=1, text_size=1)
+    index.replace_document(doc_id="doc1", state=STATE, passages=[PASSAGE])
+    index.replace_document(doc_id="doc2", state=other, passages=[PASSAGE])
+
+    rows = index.course_document_passages(scope=DocumentScope(course_id="course-1"))
+
+    assert [row.doc_id for row in rows] == ["doc1"]
+
+
+def test_course_document_passages_filters_to_selected_doc_ids(
+    index: SearchIndex,
+) -> None:
+    other = DocumentPassage(passage_id="doc2:p1:c0", page=1, chunk=0, text="altro doc")
+    index.replace_document(doc_id="doc1", state=STATE, passages=[PASSAGE])
+    index.replace_document(doc_id="doc2", state=STATE, passages=[other])
+
+    rows = index.course_document_passages(
+        scope=DocumentScope(course_id="course-1", doc_ids=frozenset({"doc2"}))
+    )
+
+    assert [row.doc_id for row in rows] == ["doc2"]
+
+
+def test_course_document_passages_empty_course_returns_nothing(
+    index: SearchIndex,
+) -> None:
+    assert (
+        index.course_document_passages(scope=DocumentScope(course_id="nessuno")) == []
+    )

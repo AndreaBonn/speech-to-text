@@ -174,7 +174,8 @@ class RetrievalScope:
     selected: frozenset[str] | None = None
 
 
-def _scoped_job_ids(scope: RetrievalScope) -> frozenset[str]:
+def scoped_job_ids(scope: RetrievalScope) -> frozenset[str]:
+    """Scope's lecture ids, narrowed to scope.selected when the user picked some."""
     if scope.selected is None:
         return scope.job_ids
     return scope.job_ids & scope.selected
@@ -183,7 +184,7 @@ def _scoped_job_ids(scope: RetrievalScope) -> frozenset[str]:
 def _ranked_lecture_passages(
     index: SearchIndex, scope: RetrievalScope, match: str
 ) -> list[tuple[float, RetrievedPassage]]:
-    job_ids = _scoped_job_ids(scope=scope)
+    job_ids = scoped_job_ids(scope=scope)
     if not job_ids:
         return []
     rows = index.lecture_passages_for_retrieval(

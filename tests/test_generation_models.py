@@ -11,6 +11,7 @@ from sbobina.generation_models import (
     GenerationQuestion,
     GenerationRecord,
     GenerationRequest,
+    GenerationSources,
     GenerationSourceUsed,
     GenerationStatus,
     MultipleChoiceResponse,
@@ -241,6 +242,21 @@ def _base_record() -> GenerationRecord:
     )
 
 
+def test_generation_record_defaults_requested_sources_when_omitted() -> None:
+    assert _base_record().requested_sources == GenerationSources()
+
+
+def test_load_generation_accepts_json_without_requested_sources() -> None:
+    # Backward compat: a record saved before T034 has no requested_sources
+    # key at all, not an explicit empty one.
+    payload = json.loads(dump_generation(record=_base_record()))
+    del payload["requested_sources"]
+
+    loaded = load_generation(content=json.dumps(payload))
+
+    assert loaded.requested_sources == GenerationSources()
+
+
 def _mc_question(citations: tuple[GenerationCitation, ...] = ()) -> GenerationQuestion:
     return GenerationQuestion(
         question="q",
@@ -436,7 +452,12 @@ def test_generation_record_json_round_trip_is_identical() -> None:
     dumped = dump_generation(record=record)
     reloaded = load_generation(content=dumped)
     assert reloaded == record
-    assert json.loads(dumped) == json.loads(json.dumps(asdict(record), default=str))
+    # requested_sources is a pydantic model, not a dataclass: asdict() leaves
+    # it as an object instead of recursing into it like it does for the
+    # GenerationSourceUsed/GenerationCitation dataclasses above.
+    expected = asdict(record)
+    expected["requested_sources"] = record.requested_sources.model_dump()
+    assert json.loads(dumped) == json.loads(json.dumps(expected, default=str))
 
 
 def test_generation_record_rejects_multiple_choice_question_without_options() -> None:

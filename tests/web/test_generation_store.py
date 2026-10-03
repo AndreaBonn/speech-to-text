@@ -4,6 +4,7 @@ from pathlib import Path
 from sbobina.generation_models import (
     GenerationFormat,
     GenerationRequest,
+    GenerationSources,
     GenerationStatus,
 )
 from sbobina.web.generation_store import (
@@ -14,6 +15,26 @@ from sbobina.web.generation_store import (
 )
 
 REQUEST = GenerationRequest(format=GenerationFormat.MULTIPLE_CHOICE, count=1)
+
+
+def test_create_generation_persists_requested_sources(tmp_path: Path) -> None:
+    request = GenerationRequest(
+        format=GenerationFormat.MULTIPLE_CHOICE,
+        count=1,
+        sources=GenerationSources(doc_ids=("doc1",), job_ids=("job1",)),
+    )
+
+    record = create_generation(courses_dir=tmp_path, course_id="corso", request=request)
+
+    assert record.requested_sources == request.sources
+
+
+def test_create_generation_defaults_requested_sources_when_none_given(
+    tmp_path: Path,
+) -> None:
+    record = create_generation(courses_dir=tmp_path, course_id="corso", request=REQUEST)
+
+    assert record.requested_sources == GenerationSources()
 
 
 def test_find_running_skips_corrupt_sibling_record(tmp_path: Path) -> None:

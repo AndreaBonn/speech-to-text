@@ -71,6 +71,7 @@ def create_generation(
         questions=(),
         sections=(),
         error=None,
+        requested_sources=request.sources,
     )
     save_generation(courses_dir=courses_dir, course_id=course_id, record=record)
     return record

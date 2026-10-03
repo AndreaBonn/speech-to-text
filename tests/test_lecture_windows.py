@@ -1,4 +1,4 @@
-from sbobina.lecture_windows import expand_lecture_windows
+from sbobina.lecture_windows import expand_lecture_windows, partition_lecture_segments
 from sbobina.retrieval import DocumentSource, LectureSource, RetrievedPassage
 from sbobina.search_text import Passage
 
@@ -148,3 +148,39 @@ def test_expand_window_bridge_merges_every_window_it_touches() -> None:
     assert len(windows) == 1
     assert windows[0].passage_id == hits[0].passage_id
     assert windows[0].text.split() == [f"w{i}" for i in range(25)]
+
+
+def test_partition_lecture_segments_covers_every_segment_without_overlap() -> None:
+    segments = _segments(count=60, words_per_segment=10)
+
+    spans = partition_lecture_segments(segments=segments, window_words=25)
+
+    covered = [index for first, last in spans for index in range(first, last + 1)]
+    assert covered == list(range(60))
+
+
+def test_partition_lecture_segments_each_span_reaches_the_target_except_the_tail() -> (
+    None
+):
+    segments = _segments(count=60, words_per_segment=10)
+
+    spans = partition_lecture_segments(segments=segments, window_words=25)
+
+    for first, last in spans[:-1]:
+        words = sum(len(segments[i].text.split()) for i in range(first, last + 1))
+        assert words >= 25
+    last_first, last_last = spans[-1]
+    assert last_last == 59
+    assert last_first <= last_last
+
+
+def test_partition_lecture_segments_short_transcript_is_one_span() -> None:
+    segments = _segments(count=3, words_per_segment=10)
+
+    spans = partition_lecture_segments(segments=segments, window_words=250)
+
+    assert spans == [(0, 2)]
+
+
+def test_partition_lecture_segments_empty_transcript_returns_no_spans() -> None:
+    assert partition_lecture_segments(segments=[], window_words=250) == []

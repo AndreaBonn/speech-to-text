@@ -163,6 +163,48 @@ class DocumentScope:
     doc_ids: frozenset[str] | None = None
 
 
+@dataclass(frozen=True)
+class CourseDocumentPassage:
+    """One doc_passages row with its full text, in reading order (no score).
+
+    For sbobina.web.course_retrieval.sample_course, which groups a course's
+    documents into sources for source_sampling.sample_across_sources: there
+    is no question to rank against, just the material in reading order.
+    """
+
+    doc_id: str
+    page: int
+    chunk: int
+    passage_id: str
+    text: str
+
+
+def course_document_passages(
+    connection: sqlite3.Connection, scope: DocumentScope
+) -> list[CourseDocumentPassage]:
+    """Every passage of one course's documents, ordered by doc_id, page, chunk."""
+    clause = "course_id = ?"
+    parameters: list[object] = [scope.course_id]
+    if scope.doc_ids is not None:
+        clause += f" AND doc_id IN ({', '.join('?' for _ in scope.doc_ids)})"
+        parameters.extend(scope.doc_ids)
+    rows = connection.execute(
+        "SELECT doc_id, page, chunk, passage_id, text FROM doc_passages "
+        f"WHERE {clause} ORDER BY doc_id, page, chunk",
+        parameters,
+    )
+    return [
+        CourseDocumentPassage(
+            doc_id=row["doc_id"],
+            page=row["page"],
+            chunk=row["chunk"],
+            passage_id=row["passage_id"],
+            text=row["text"],
+        )
+        for row in rows
+    ]
+
+
 def ranked_document_passages(
     connection: sqlite3.Connection, match: str, scope: DocumentScope, limit: int
 ) -> list[RankedDocumentPassage]:
@@ -195,3 +237,47 @@ def ranked_document_passages(
         )
         for row in rows
     ]
+
+
+class DocumentIndexMixin:
+    """SearchIndex's document-table methods, split out to keep that file under
+    the size limit (T021): SearchIndex(DocumentIndexMixin) gets these for free.
+    """
+
+    _connection: sqlite3.Connection
+
+    def replace_document(
+        self, doc_id: str, state: DocumentState, passages: Iterable[DocumentPassage]
+    ) -> None:
+        replace_document(
+            connection=self._connection, doc_id=doc_id, state=state, passages=passages
+        )
+
+    def remove_document(self, doc_id: str) -> None:
+        remove_document(connection=self._connection, doc_id=doc_id)
+
+    def indexed_documents(self) -> dict[str, DocumentState]:
+        return indexed_documents(connection=self._connection)
+
+    def search_documents(
+        self, match: str, course_id: str | None, limit: int, offset: int
+    ) -> DocumentSearchPage:
+        return search_documents(
+            connection=self._connection,
+            match=match,
+            course_id=course_id,
+            limit=limit,
+            offset=offset,
+        )
+
+    def document_passages_for_retrieval(
+        self, match: str, scope: DocumentScope, limit: int
+    ) -> list[RankedDocumentPassage]:
+        return ranked_document_passages(
+            connection=self._connection, match=match, scope=scope, limit=limit
+        )
+
+    def course_document_passages(
+        self, scope: DocumentScope
+    ) -> list[CourseDocumentPassage]:
+        return course_document_passages(connection=self._connection, scope=scope)

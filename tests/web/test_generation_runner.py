@@ -1,12 +1,14 @@
 from pathlib import Path
 
 import pytest
+from study_fixtures import FakeChat
 
 from sbobina.correction import CorrectorUnavailableError
 from sbobina.course_registry import get_or_create
 from sbobina.generation_models import (
     GenerationFormat,
     GenerationRequest,
+    GenerationSources,
     GenerationStatus,
 )
 from sbobina.models import Segment, Transcript, Word, save_transcript
@@ -15,6 +17,7 @@ from sbobina.web.api_files import TRANSCRIPT_FILES
 from sbobina.web.generation_runner import (
     BUDGET_MIN_WORDS,
     NUM_PREDICT_MIN,
+    SUMMARY_NUM_PREDICT,
     GenerationJob,
     compute_budget_words,
     compute_options,
@@ -35,6 +38,28 @@ def test_compute_options_scales_num_predict_with_count() -> None:
     assert few.num_predict >= NUM_PREDICT_MIN
 
 
+def test_compute_options_summary_num_predict_is_fixed_regardless_of_count() -> None:
+    # B3 regression: a summary has no per-item count (one set of sections,
+    # not `count` questions); the old formula gave count=1 only 556 tokens
+    # and Ollama truncated the real reply (done_reason=length), which
+    # validate() then rejected as INVALID_RESPONSE.
+    one = compute_options(count=1, format_=GenerationFormat.SUMMARY, model="m")
+    many = compute_options(count=20, format_=GenerationFormat.SUMMARY, model="m")
+
+    assert one.num_predict == many.num_predict == SUMMARY_NUM_PREDICT == 2048
+
+
+def test_compute_budget_words_for_summary_keeps_a_usable_material_budget() -> None:
+    options = compute_options(count=1, format_=GenerationFormat.SUMMARY, model="m")
+
+    budget = compute_budget_words(format_=GenerationFormat.SUMMARY, options=options)
+
+    # Documents the actual number so a future change to the constants above
+    # shows up here instead of silently shrinking the material budget.
+    assert budget == 1905
+    assert budget >= BUDGET_MIN_WORDS
+
+
 def test_compute_budget_words_shrinks_as_num_predict_grows_but_keeps_floor() -> None:
     few = compute_options(count=1, format_=GenerationFormat.MULTIPLE_CHOICE, model="m")
     many = compute_options(
@@ -52,7 +77,7 @@ def test_compute_budget_words_shrinks_as_num_predict_grows_but_keeps_floor() -> 
     assert budget_many >= BUDGET_MIN_WORDS
 
 
-def _write_lecture(store: JobStore, job_id: str) -> None:
+def _write_lecture_with_text(store: JobStore, job_id: str, text: str) -> None:
     transcript = Transcript(
         source="lezione.m4a",
         model="large-v3",
@@ -62,14 +87,7 @@ def _write_lecture(store: JobStore, job_id: str) -> None:
             Segment(
                 start=0.0,
                 end=1.0,
-                words=(
-                    Word(
-                        start=0.0,
-                        end=1.0,
-                        text="il gatto nero dorme sul tappeto rosso ogni sera tranquilla",
-                        probability=0.99,
-                    ),
-                ),
+                words=(Word(start=0.0, end=1.0, text=text, probability=0.99),),
             ),
         ),
     )
@@ -77,6 +95,14 @@ def _write_lecture(store: JobStore, job_id: str) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     save_transcript(
         transcript=transcript, path=directory / TRANSCRIPT_FILES["original"]
+    )
+
+
+def _write_lecture(store: JobStore, job_id: str) -> None:
+    _write_lecture_with_text(
+        store=store,
+        job_id=job_id,
+        text="il gatto nero dorme sul tappeto rosso ogni sera tranquilla",
     )
 
 
@@ -181,3 +207,87 @@ def test_execute_generation_propagates_ollama_unavailable(tmp_path: Path) -> Non
 
     with pytest.raises(CorrectorUnavailableError):
         execute_generation(job=job, chat=_unreachable, model="qwen-test")
+
+
+def test_execute_generation_with_empty_topic_samples_the_whole_course(
+    tmp_path: Path,
+) -> None:
+    # B1 regression: an empty topic used to mean an empty FTS match, so the
+    # course's own material never reached the chat even with lectures to cite.
+    store = JobStore(data_dir=tmp_path)
+    lecture = store.create(config=JobConfig(subject="Fisica"))
+    _write_lecture(store=store, job_id=str(lecture.id))
+    course = get_or_create(courses_dir=store.courses_dir, key="fisica", label="Fisica")
+    request = GenerationRequest(format=GenerationFormat.MULTIPLE_CHOICE, count=1)
+    job = _job(store=store, course_id=course.id, course_key="fisica", request=request)
+    fake_chat = FakeChat(responses=[VALID_REPLY])
+
+    execute_generation(job=job, chat=fake_chat, model="qwen-test")
+
+    saved = load_generation(
+        courses_dir=store.courses_dir, course_id=course.id, gen_id=job.record.id
+    )
+    assert len(fake_chat.requests) == 1
+    assert saved.status == GenerationStatus.DONE
+    assert len(saved.questions) == 1
+
+
+def test_execute_generation_with_empty_topic_restricts_sampling_to_selected_source(
+    tmp_path: Path,
+) -> None:
+    # B2 regression: request.sources was never persisted nor applied, so an
+    # explicit source selection was silently ignored.
+    store = JobStore(data_dir=tmp_path)
+    lecture_a = store.create(config=JobConfig(subject="Fisica"))
+    lecture_b = store.create(config=JobConfig(subject="Fisica"))
+    _write_lecture(store=store, job_id=str(lecture_a.id))
+    _write_lecture_with_text(
+        store=store,
+        job_id=str(lecture_b.id),
+        text="balena blu nuota nell'oceano profondo e silenzioso",
+    )
+    course = get_or_create(courses_dir=store.courses_dir, key="fisica", label="Fisica")
+    request = GenerationRequest(
+        format=GenerationFormat.MULTIPLE_CHOICE,
+        count=1,
+        sources=GenerationSources(job_ids=(str(lecture_a.id),)),
+    )
+    job = _job(store=store, course_id=course.id, course_key="fisica", request=request)
+    fake_chat = FakeChat(responses=[VALID_REPLY])
+
+    execute_generation(job=job, chat=fake_chat, model="qwen-test")
+
+    user_message = fake_chat.requests[0].user_message
+    assert "balena" not in user_message
+    assert "gatto" in user_message
+
+
+def test_execute_generation_with_topic_restricts_retrieval_to_selected_source(
+    tmp_path: Path,
+) -> None:
+    # B2, the question path: both lectures match "gatto", only lecture_a is
+    # selected.
+    store = JobStore(data_dir=tmp_path)
+    lecture_a = store.create(config=JobConfig(subject="Fisica"))
+    lecture_b = store.create(config=JobConfig(subject="Fisica"))
+    _write_lecture(store=store, job_id=str(lecture_a.id))
+    _write_lecture_with_text(
+        store=store,
+        job_id=str(lecture_b.id),
+        text="il gatto bianco dorme sul divano blu ogni notte silenziosa",
+    )
+    course = get_or_create(courses_dir=store.courses_dir, key="fisica", label="Fisica")
+    request = GenerationRequest(
+        format=GenerationFormat.MULTIPLE_CHOICE,
+        count=1,
+        topic="gatto",
+        sources=GenerationSources(job_ids=(str(lecture_a.id),)),
+    )
+    job = _job(store=store, course_id=course.id, course_key="fisica", request=request)
+    fake_chat = FakeChat(responses=[VALID_REPLY])
+
+    execute_generation(job=job, chat=fake_chat, model="qwen-test")
+
+    user_message = fake_chat.requests[0].user_message
+    assert "bianco" not in user_message
+    assert "nero" in user_message

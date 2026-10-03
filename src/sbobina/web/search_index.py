@@ -7,19 +7,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
-from sbobina.document_passages import DocumentPassage
 from sbobina.search_text import (
     MATCH_END,
     MATCH_START,
     Passage,
     snippet_parts,
 )
-from sbobina.web import document_index
 from sbobina.web.document_index import (
-    DocumentScope,
+    DocumentIndexMixin,
     DocumentSearchPage,
     DocumentState,
-    RankedDocumentPassage,
 )
 from sbobina.web.search_schema import (
     CORRUPTION_CODES,
@@ -141,7 +138,7 @@ def _ranked_lecture_passage(row: sqlite3.Row) -> RankedLecturePassage:
     )
 
 
-class SearchIndex:
+class SearchIndex(DocumentIndexMixin):
     def __init__(self, connection: sqlite3.Connection) -> None:
         self._connection = connection
 
@@ -252,30 +249,6 @@ class SearchIndex:
             [MATCH_START, MATCH_END, *parameters, *page],
         )
 
-    def replace_document(
-        self, doc_id: str, state: DocumentState, passages: Iterable[DocumentPassage]
-    ) -> None:
-        document_index.replace_document(
-            connection=self._connection, doc_id=doc_id, state=state, passages=passages
-        )
-
-    def remove_document(self, doc_id: str) -> None:
-        document_index.remove_document(connection=self._connection, doc_id=doc_id)
-
-    def indexed_documents(self) -> dict[str, DocumentState]:
-        return document_index.indexed_documents(connection=self._connection)
-
-    def search_documents(
-        self, match: str, course_id: str | None, limit: int, offset: int
-    ) -> DocumentSearchPage:
-        return document_index.search_documents(
-            connection=self._connection,
-            match=match,
-            course_id=course_id,
-            limit=limit,
-            offset=offset,
-        )
-
     def lecture_passages_for_retrieval(
         self, match: str, job_ids: Collection[str], limit: int
     ) -> list[RankedLecturePassage]:
@@ -288,10 +261,3 @@ class SearchIndex:
             [*parameters, limit],
         )
         return [_ranked_lecture_passage(row=row) for row in rows]
-
-    def document_passages_for_retrieval(
-        self, match: str, scope: DocumentScope, limit: int
-    ) -> list[RankedDocumentPassage]:
-        return document_index.ranked_document_passages(
-            connection=self._connection, match=match, scope=scope, limit=limit
-        )
