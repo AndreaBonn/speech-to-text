@@ -4,7 +4,7 @@ import pytest
 
 from sbobina.chat_pipeline import ChatAnswer, ChatOutcome, ChatSentence
 from sbobina.web import chat_store
-from sbobina.web.chat_records import AnswerTo
+from sbobina.web.chat_records import AnswerTo, ChatAnswerRecord
 from sbobina.web.chat_store import (
     TITLE_MAX_CHARS,
     append_answer,
@@ -111,3 +111,15 @@ def test_title_is_empty_before_any_question(tmp_path: Path) -> None:
     [meta] = list_chats(courses_dir=tmp_path, course_id=COURSE)
 
     assert meta.title == ""
+
+
+def test_answer_record_rejects_negative_discarded_count() -> None:
+    with pytest.raises(ValueError, match="discarded"):
+        ChatAnswerRecord(
+            question_id="q",
+            outcome=ChatOutcome.DONE,
+            sentences=(),
+            discarded=-1,
+            error=None,
+            created_at="2026-10-03T00:00:00+00:00",
+        )

@@ -21,6 +21,12 @@ class Page:
     no_text: bool
     ocr: bool = False
 
+    def __post_init__(self) -> None:
+        # OCR only replaces a page when text came back (ocr_pipeline), so an
+        # OCR page without text would be a page the reader labels as read.
+        if self.ocr and (self.no_text or not self.text.strip()):
+            raise ValueError("An OCR page must carry text and not be no_text")
+
 
 @dataclass(frozen=True)
 class ExtractedText:

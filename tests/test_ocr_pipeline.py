@@ -59,6 +59,23 @@ def test_ocr_page_with_empty_result_stays_no_text() -> None:
     assert result.status == DocumentStatus.READY_NO_TEXT
 
 
+def test_ocr_page_with_empty_result_logs_a_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    extracted = _extracted((Page(text="", no_text=True), Page(text="", no_text=True)))
+    texts = {0: "Testo letto", 1: "   "}
+
+    with caplog.at_level("WARNING", logger="sbobina.ocr_pipeline"):
+        ocr_missing_pages(
+            extracted=extracted,
+            read_page=lambda index: texts[index],
+            on_progress=lambda d, t: None,
+        )
+
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    assert warnings == ["OCR returned no text for page 2"]
+
+
 def test_progress_reports_only_pages_actually_read() -> None:
     extracted = _extracted(
         (

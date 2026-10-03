@@ -1,5 +1,6 @@
 """Pure orchestration for filling in no-text pages with OCR (F5)."""
 
+import logging
 from collections.abc import Callable
 from dataclasses import replace
 
@@ -9,10 +10,13 @@ from sbobina.extracted_text import ExtractedText, Page, normalize_pages
 ReadPage = Callable[[int], str]
 OcrProgress = Callable[[int, int], None]
 
+logger = logging.getLogger(__name__)
+
 
 def _ocr_page(page: Page, index: int, read_page: ReadPage) -> Page:
     text = normalize_pages(texts=(read_page(index),))[0]
     if not text.strip():
+        logger.warning("OCR returned no text for page %d", index + 1)
         return page
     return replace(page, text=text, no_text=False, ocr=True)
 

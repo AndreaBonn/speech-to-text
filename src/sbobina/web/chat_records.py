@@ -42,6 +42,10 @@ class ChatAnswerRecord:
     error: str | None
     created_at: str
 
+    def __post_init__(self) -> None:
+        if self.discarded < 0:
+            raise ValueError(f"discarded must be >= 0, got {self.discarded}")
+
 
 ChatRecord = ChatMeta | ChatQuestionRecord | ChatAnswerRecord
 
