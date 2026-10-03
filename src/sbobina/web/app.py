@@ -97,6 +97,22 @@ def create_app(
     app.state.gpu_arbiter = GpuArbiter()
     # None means "build the real Ollama client lazily"; tests set a fake here.
     app.state.chat_client = None
+    _initialize_services(
+        app=app,
+        supervisor_options=supervisor_options,
+        extraction_worker_options=extraction_worker_options,
+    )
+    _add_middleware(app=app, settings=settings)
+    _register_routes(app=app, settings=settings)
+    return app
+
+
+def _initialize_services(
+    app: FastAPI,
+    supervisor_options: SupervisorOptions | None,
+    extraction_worker_options: ExtractionWorkerOptions | None,
+) -> None:
+    settings: Settings = app.state.settings
     app.state.supervisor = Supervisor(
         job_store=app.state.job_store,
         before_transcribe=partial(unload_ollama_models, host=settings.ollama_host),
@@ -113,10 +129,17 @@ def create_app(
         ),
     )
     app.state.download_manager = DownloadManager(settings=settings)
-    app.add_middleware(OriginMiddleware, origin=web_origin(settings=settings))
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=_TRUSTED_HOSTS)
+
+
+def _add_middleware(app: FastAPI, settings: Settings) -> None:
     app.add_middleware(
-        UploadLimitMiddleware,
+        middleware_class=OriginMiddleware, origin=web_origin(settings=settings)
+    )
+    app.add_middleware(
+        middleware_class=TrustedHostMiddleware, allowed_hosts=_TRUSTED_HOSTS
+    )
+    app.add_middleware(
+        middleware_class=UploadLimitMiddleware,
         limits={
             "/api/v1/jobs": upload_limit_bytes(
                 max_upload_mb=settings.web_max_upload_mb
@@ -127,8 +150,6 @@ def create_app(
             "/documents": upload_limit_bytes(max_upload_mb=settings.course_doc_max_mb),
         },
     )
-    _register_routes(app=app, settings=settings)
-    return app
 
 
 def _register_routes(app: FastAPI, settings: Settings) -> None:

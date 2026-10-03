@@ -55,17 +55,7 @@ async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
             code=exc.code, message=exc.message, status_code=status.HTTP_404_NOT_FOUND
         )
     if isinstance(exc, GpuBusyError):
-        return error_response(
-            code=exc.code,
-            message=exc.message,
-            status_code=status.HTTP_409_CONFLICT,
-            details=[{"field": "stage", "message": exc.stage}]
-            + (
-                []
-                if exc.estimate_s is None
-                else [{"field": "estimate_s", "message": str(exc.estimate_s)}]
-            ),
-        )
+        return _build_gpu_busy_response(exc=exc)
     if isinstance(exc, ConflictError):
         return error_response(
             code=exc.code, message=exc.message, status_code=status.HTTP_409_CONFLICT
@@ -76,6 +66,24 @@ async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
             message=exc.message,
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
+    return _build_service_error_response(exc=exc)
+
+
+def _build_gpu_busy_response(exc: GpuBusyError) -> JSONResponse:
+    return error_response(
+        code=exc.code,
+        message=exc.message,
+        status_code=status.HTTP_409_CONFLICT,
+        details=[{"field": "stage", "message": exc.stage}]
+        + (
+            []
+            if exc.estimate_s is None
+            else [{"field": "estimate_s", "message": str(exc.estimate_s)}]
+        ),
+    )
+
+
+def _build_service_error_response(exc: AppError) -> JSONResponse:
     if isinstance(
         exc, (SearchUnavailableError, SearchCorruptError, ServiceUnavailableError)
     ):

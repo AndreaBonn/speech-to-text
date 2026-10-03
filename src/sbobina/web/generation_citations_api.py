@@ -69,6 +69,15 @@ def _lecture_changed(
     )
 
 
+def _build_removed_citation(quote: str) -> dict[str, Any]:
+    return {
+        "quote": quote,
+        "source": REMOVED_SOURCE,
+        "href": None,
+        "changed": False,
+    }
+
+
 def _document_citation(
     citation: GenerationCitation, context: CitationContext
 ) -> dict[str, Any]:
@@ -80,12 +89,7 @@ def _document_citation(
             doc_id=citation.doc_id,
         )
     except NotFoundError:
-        return {
-            "quote": citation.quote,
-            "source": REMOVED_SOURCE,
-            "href": None,
-            "changed": False,
-        }
+        return _build_removed_citation(quote=citation.quote)
     href = f"/corsi/{context.key}/documenti/{citation.doc_id}?p={citation.page}"
     return {
         "quote": citation.quote,
@@ -193,12 +197,7 @@ def _lecture_citation(
 ) -> dict[str, Any]:
     assert citation.job_id is not None
     if not (context.store.jobs_dir / citation.job_id).is_dir():
-        return {
-            "quote": citation.quote,
-            "source": REMOVED_SOURCE,
-            "href": None,
-            "changed": False,
-        }
+        return _build_removed_citation(quote=citation.quote)
     loaded = _lecture_transcript(store=context.store, job_id=citation.job_id)
     timestamp = _exact_timestamp(citation=citation, loaded=loaded)
     variant = loaded[1] if loaded is not None else "original"

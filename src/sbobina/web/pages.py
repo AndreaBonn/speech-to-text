@@ -255,6 +255,19 @@ def studio(request: Request, store: JobStoreDep, job_id: str) -> HTMLResponse:
     )
 
 
+def _render_missing_doc(request: Request, store: JobStore, key: str) -> HTMLResponse:
+    return _render(
+        request=request,
+        template_name="documento.html",
+        active="corsi",
+        store=store,
+        status_code=404,
+        page_title="Documento",
+        not_found=True,
+        course_key=key,
+    )
+
+
 @router.get("/corsi/{key:path}/documenti/{doc_id}", response_class=HTMLResponse)
 def documento(
     request: Request, store: JobStoreDep, key: str, doc_id: str
@@ -271,16 +284,7 @@ def documento(
         except NotFoundError:
             document = None
     if course is None or document is None:
-        return _render(
-            request=request,
-            template_name="documento.html",
-            active="corsi",
-            store=store,
-            status_code=404,
-            page_title="Documento",
-            not_found=True,
-            course_key=key,
-        )
+        return _render_missing_doc(request=request, store=store, key=key)
     return _render(
         request=request,
         template_name="documento.html",

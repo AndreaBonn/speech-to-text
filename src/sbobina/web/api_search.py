@@ -165,11 +165,8 @@ def _search_response(
     }
 
 
-@router.get("/search")
-def search_lectures(
-    request: Request, parameters: Annotated[SearchParameters, Query()]
-) -> dict[str, Any]:
-    match = build_match_query(raw=parameters.q)
+def _validate_search_match(raw: str) -> str:
+    match = build_match_query(raw=raw)
     if match is None:
         raise RequestValidationError(
             errors=[
@@ -180,23 +177,16 @@ def search_lectures(
                 }
             ]
         )
-    store: JobStore = request.app.state.job_store
-    path = request.app.state.search_index_path
-    results = search_service.search_lectures(
-        store=store,
-        path=path,
-        query=SearchQuery(
-            match=match,
-            job_ids=_course_job_ids(store=store, course=parameters.course),
-            limit=parameters.per_page,
-            offset=(parameters.page - 1) * parameters.per_page,
-        ),
-        passages_per_lecture=SEARCH_PASSAGES_PER_LECTURE,
-    )
+    return match
+
+
+def _search_documents(
+    store: JobStore, path: Path, match: str, parameters: SearchParameters
+) -> tuple[list[dict[str, Any]], int]:
     document_course_id, documents_searchable = _document_course_filter(
         courses_dir=store.courses_dir, course=parameters.course
     )
-    documents = (
+    return (
         _document_results(
             store=store,
             path=path,
@@ -210,6 +200,29 @@ def search_lectures(
         )
         if documents_searchable
         else ([], 0)
+    )
+
+
+@router.get("/search")
+def search_lectures(
+    request: Request, parameters: Annotated[SearchParameters, Query()]
+) -> dict[str, Any]:
+    match = _validate_search_match(raw=parameters.q)
+    store: JobStore = request.app.state.job_store
+    path = request.app.state.search_index_path
+    results = search_service.search_lectures(
+        store=store,
+        path=path,
+        query=SearchQuery(
+            match=match,
+            job_ids=_course_job_ids(store=store, course=parameters.course),
+            limit=parameters.per_page,
+            offset=(parameters.page - 1) * parameters.per_page,
+        ),
+        passages_per_lecture=SEARCH_PASSAGES_PER_LECTURE,
+    )
+    documents = _search_documents(
+        store=store, path=path, match=match, parameters=parameters
     )
     return _search_response(
         store=store, results=results, parameters=parameters, documents=documents

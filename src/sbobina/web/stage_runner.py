@@ -192,6 +192,19 @@ def _check_outcome(outcome: Path | CorrectionOutcome) -> None:
         )
 
 
+def _run_job_stage(
+    stage: str, job_dir: Path, pipeline: StagePipeline | None, now: Callable[[], float]
+) -> None:
+    progress = _Progress(
+        store=JobStore(data_dir=job_dir.parent.parent),
+        job_id=job_dir.name,
+        stage=STAGES[stage],
+        now=now,
+    )
+    _execute_with_notices(job_dir=job_dir, pipeline=pipeline, progress=progress)
+    progress.finish()
+
+
 def run_stage(
     stage: str,
     job_dir: Path,
@@ -213,14 +226,7 @@ def run_stage(
         if stage == OCR_STAGE:
             run_ocr_stage(document_dir=job_dir)
             return 0
-        progress = _Progress(
-            store=JobStore(data_dir=job_dir.parent.parent),
-            job_id=job_dir.name,
-            stage=STAGES[stage],
-            now=now,
-        )
-        _execute_with_notices(job_dir=job_dir, pipeline=pipeline, progress=progress)
-        progress.finish()
+        _run_job_stage(stage=stage, job_dir=job_dir, pipeline=pipeline, now=now)
         return 0
     except CorrectorUnavailableError:
         logger.exception(
