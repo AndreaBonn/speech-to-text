@@ -7,6 +7,16 @@
 
   var dom = window.SbobinaDom;
   var clearChildren = dom.clearChildren;
+  // Discard reasons (generation_validation.DiscardReason and
+  // source_citations.SourceRejectionReason) -> why the items were dropped.
+  var NOT_FOUND = "la fonte citata non è stata trovata nel materiale";
+  var DISCARD_REASONS = {
+    QUOTE_NOT_FOUND: NOT_FOUND,
+    PASSAGE_NOT_GIVEN: NOT_FOUND,
+    QUOTE_LENGTH: "la citazione era troppo corta o troppo lunga",
+    CITATION_COUNT: "le citazioni erano assenti o troppe",
+    INVALID_OPTIONS: "le opzioni di risposta non erano valide",
+  };
 
   function el(tag, className, text) {
     var node = document.createElement(tag);
@@ -121,23 +131,42 @@
     }, 0);
   }
 
+  function emptyMessage(record) {
+    return record.topic
+      ? "Nel materiale del corso non trovo questo argomento."
+      : "Nessun materiale disponibile per generare: carica documenti o lezioni in questo corso.";
+  }
+
+  // Questions are measured against what was asked ("8 su 10 richieste");
+  // a summary has no requested count, so against what the model wrote.
+  function counterText(record, kept, discarded) {
+    if (record.requested_count) {
+      return kept + " su " + record.requested_count + " richieste";
+    }
+    return kept + " su " + (kept + discarded) + " tenute";
+  }
+
   function render(container, record) {
     clearChildren(container);
     var kept = countKept(record);
     var discarded = countDiscarded(record);
     if (kept === 0 && discarded === 0) {
-      container.appendChild(
-        el(
-          "p",
-          "banner banner--warning",
-          "Nessun materiale disponibile per generare: carica documenti o lezioni in questo corso."
-        )
-      );
+      container.appendChild(el("p", "banner banner--warning", emptyMessage(record)));
       return;
     }
-    container.appendChild(
-      el("p", "generations__counter", kept + " su " + (kept + discarded) + " tenute")
-    );
+    container.appendChild(el("p", "generations__counter", counterText(record, kept, discarded)));
+    record.discarded.forEach(function (item) {
+      if (item.count > 0) {
+        var why = DISCARD_REASONS[item.reason] || "non superavano i controlli";
+        container.appendChild(
+          el(
+            "p",
+            "generations__discarded",
+            item.count + (item.count === 1 ? " scartata" : " scartate") + " perché " + why + "."
+          )
+        );
+      }
+    });
     if (record.format === "summary") {
       record.sections.forEach(function (section) {
         container.appendChild(renderSection(section));

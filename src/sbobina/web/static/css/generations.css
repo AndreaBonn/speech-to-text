@@ -62,7 +62,8 @@
   border-top: var(--rule-hair) solid var(--color-rule);
 }
 
-.generations__counter {
+.generations__counter,
+.generations__discarded {
   font-size: var(--text-sm);
   color: var(--color-ink-3);
   margin: 0 0 var(--space-sm);
