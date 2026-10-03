@@ -13,6 +13,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from sbobina.settings import LOOPBACK_HOSTS, Settings
 from sbobina.web import search_service
+from sbobina.web.api_chat import router as chat_router
 from sbobina.web.api_corrected import router as corrected_router
 from sbobina.web.api_courses import router as courses_router
 from sbobina.web.api_documents import router as documents_router
@@ -93,6 +94,8 @@ def create_app(
     )
     app.state.search_index_path = app.state.job_store.jobs_dir.parent / "search.sqlite3"
     app.state.gpu_arbiter = GpuArbiter()
+    # None means "build the real Ollama client lazily"; tests set a fake here.
+    app.state.chat_client = None
     app.state.supervisor = Supervisor(
         job_store=app.state.job_store,
         before_transcribe=partial(unload_ollama_models, host=settings.ollama_host),
@@ -135,6 +138,7 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(create_models_router(settings=settings))
     app.include_router(jobs_router)
     app.include_router(courses_router)
+    app.include_router(chat_router)
     app.include_router(documents_router)
     app.include_router(generations_router)
     app.include_router(search_router)

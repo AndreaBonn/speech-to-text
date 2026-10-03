@@ -232,7 +232,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
 
 **[B-8] T040-T042**
 
-- [ ] **T040** (D3) `web/gpu_lock.py`: lock condiviso nel processo server; la chat lo prende con
+- [x] **T040** (D3) `web/gpu_lock.py`: lock condiviso nel processo server; la chat lo prende con
   `try_acquire` e risponde 409 `GPU_BUSY` (con lo stadio corrente e la stima) se il supervisor
   sta trascrivendo; il supervisor lo prende prima di `before_transcribe` (che scarica i modelli
   Ollama) e attende la fine del turno di chat in corso. Rischio: alto (R3, concorrenza).
@@ -251,7 +251,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   questo corso" senza (o dopo) la chiamata. Rischio: medio.
   verify: con Ollama finto: domanda fuori corso → messaggio di non trovato; frase con citazione
   inventata → rimossa; storia di 10 scambi → solo gli ultimi 2 nel prompt.
-- [ ] **T042** `web/api_chat.py` (D5): `POST /api/v1/courses/<key>/chats` crea, `POST
+- [x] **T042** `web/api_chat.py` (D5): `POST /api/v1/courses/<key>/chats` crea, `POST
   .../chats/<id>/messages` (domanda ≤ 1000 caratteri, 422 per campo), `GET` elenco e dettaglio,
   `DELETE`; persistenza `chats/<id>.jsonl` append-only come da ADR D5 (una riga per messaggio,
   append sotto lock per conversazione; niente riscrittura intera, che con due schede perde un

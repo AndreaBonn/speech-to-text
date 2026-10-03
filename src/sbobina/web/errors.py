@@ -19,6 +19,14 @@ class ConflictError(AppError):
     """The request clashes with the current state of the resource (HTTP 409)."""
 
 
+class ServiceUnavailableError(AppError):
+    """A dependency the request needs is unreachable (HTTP 503)."""
+
+
+class GatewayTimeoutError(AppError):
+    """An external call exceeded its time budget (HTTP 504)."""
+
+
 class JobNotCancellableError(ConflictError):
     def __init__(self, job_id: str) -> None:
         super().__init__(

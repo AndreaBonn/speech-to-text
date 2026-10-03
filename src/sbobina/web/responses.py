@@ -11,9 +11,12 @@ from starlette.responses import JSONResponse
 from sbobina.web.errors import (
     AppError,
     ConflictError,
+    GatewayTimeoutError,
     NotFoundError,
+    ServiceUnavailableError,
     ValidationError,
 )
+from sbobina.web.gpu_lock import GpuBusyError
 from sbobina.web.search_index import SearchCorruptError, SearchUnavailableError
 
 logger = logging.getLogger(__name__)
@@ -51,6 +54,16 @@ async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
         return error_response(
             code=exc.code, message=exc.message, status_code=status.HTTP_404_NOT_FOUND
         )
+    if isinstance(exc, GpuBusyError):
+        return error_response(
+            code=exc.code,
+            message=exc.message,
+            status_code=status.HTTP_409_CONFLICT,
+            details=[
+                {"field": "stage", "message": exc.stage},
+                {"field": "estimate_s", "message": str(exc.estimate_s)},
+            ],
+        )
     if isinstance(exc, ConflictError):
         return error_response(
             code=exc.code, message=exc.message, status_code=status.HTTP_409_CONFLICT
@@ -61,11 +74,19 @@ async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
             message=exc.message,
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
-    if isinstance(exc, (SearchUnavailableError, SearchCorruptError)):
+    if isinstance(
+        exc, (SearchUnavailableError, SearchCorruptError, ServiceUnavailableError)
+    ):
         return error_response(
             code=exc.code,
             message=exc.message,
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    if isinstance(exc, GatewayTimeoutError):
+        return error_response(
+            code=exc.code,
+            message=exc.message,
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
         )
     logger.error("Web application failure", exc_info=exc)
     return error_response(

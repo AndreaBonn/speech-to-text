@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     extraction_timeout_s: float = Field(default=120.0, gt=0.0)
     extraction_max_memory_mb: int = Field(default=2048, gt=0)
     course_doc_max_mb: int = Field(default=200, gt=0)
+    chat_timeout_s: float = Field(default=120.0, gt=0.0)
 
     @field_validator("web_host")
     @classmethod

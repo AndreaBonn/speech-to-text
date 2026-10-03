@@ -157,7 +157,7 @@ def _lecture_citation(
     }
 
 
-def _resolved_citation(
+def resolve_citation(
     citation: GenerationCitation, context: CitationContext
 ) -> dict[str, Any]:
     if citation.doc_id is not None:
@@ -170,7 +170,7 @@ def _question_payload(
 ) -> dict[str, Any]:
     payload: dict[str, Any] = jsonable_encoder(obj=question)
     payload["citations"] = [
-        _resolved_citation(citation=citation, context=context)
+        resolve_citation(citation=citation, context=context)
         for citation in question.citations
     ]
     return payload
@@ -181,7 +181,7 @@ def _sentence_payload(
 ) -> dict[str, Any]:
     payload: dict[str, Any] = jsonable_encoder(obj=sentence)
     payload["citations"] = [
-        _resolved_citation(citation=citation, context=context)
+        resolve_citation(citation=citation, context=context)
         for citation in sentence.citations
     ]
     return payload
