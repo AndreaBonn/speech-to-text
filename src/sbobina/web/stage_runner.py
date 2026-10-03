@@ -17,6 +17,7 @@ from sbobina.pipeline import (
     transcribe_to_dir,
 )
 from sbobina.settings import Settings, settings
+from sbobina.web.generation_runner import run_generation_stage
 from sbobina.web.job_models import JobRecord, JobStage
 from sbobina.web.job_store import JobStore
 from sbobina.web.study_stage import generate_study_files
@@ -25,6 +26,7 @@ from sbobina.web.supervisor import OLLAMA_UNAVAILABLE_EXIT
 logger = logging.getLogger("sbobina")
 PROGRESS_INTERVAL_S = 1.0
 NON_AUDIO_SUFFIXES = frozenset({".part", ".json", ".md", ".tmp"})
+GENERATION_STAGE = "generation"
 STAGES = {
     "transcribe": JobStage.TRANSCRIBING,
     "correct": JobStage.CORRECTING,
@@ -195,8 +197,17 @@ def run_stage(
     pipeline: StagePipeline | None = None,
     now: Callable[[], float] = time.monotonic,
 ) -> int:
-    """Run a stage and write progress; job state belongs to the supervisor."""
+    """Run a stage and write progress; job state belongs to the supervisor.
+
+    For "generation" job_dir is actually courses/<course_id>: there is no
+    per-job progress to write (a single blocking call, no JobRecord), so it
+    bypasses _Progress entirely and run_generation_stage persists the whole
+    result itself.
+    """
     try:
+        if stage == GENERATION_STAGE:
+            run_generation_stage(course_dir=job_dir)
+            return 0
         progress = _Progress(
             store=JobStore(data_dir=job_dir.parent.parent),
             job_id=job_dir.name,
@@ -210,7 +221,8 @@ def run_stage(
         logger.exception(
             "Stage %s fallito per il job %s: Ollama irraggiungibile", stage, job_dir
         )
-        return OLLAMA_UNAVAILABLE_EXIT if stage in ("correct", "study") else 1
+        ollama_stages = ("correct", "study", GENERATION_STAGE)
+        return OLLAMA_UNAVAILABLE_EXIT if stage in ollama_stages else 1
     except Exception:
         logger.exception("Stage %s fallito per il job %s", stage, job_dir)
         return 1
@@ -240,7 +252,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
     parser = argparse.ArgumentParser(description="Esegue uno stage di un job locale")
-    parser.add_argument("stage", choices=tuple(STAGES))
+    parser.add_argument("stage", choices=(*STAGES, GENERATION_STAGE))
     parser.add_argument("job_dir", type=Path)
     try:
         args = parser.parse_args(args=argv)
