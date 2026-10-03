@@ -10,6 +10,12 @@ def _passage(group: str, index: int, words: int = 1) -> RetrievedPassage:
     )
 
 
+def _doc(passage: RetrievedPassage) -> DocumentSource:
+    # Every passage here is built by _passage: narrow the union for mypy.
+    assert isinstance(passage.source, DocumentSource)
+    return passage.source
+
+
 def test_sample_across_sources_spreads_picks_over_start_middle_and_end() -> None:
     # 2 sources, 100 one-word passages each. Budget for exactly 6 words
     # forces 3 picks per source: with a spread (non-sequential) traversal
@@ -22,9 +28,9 @@ def test_sample_across_sources_spreads_picks_over_start_middle_and_end() -> None
     assert len(sampled) == 6
     for group in (group_a, group_b):
         indices = sorted(
-            int(passage.source.page)  # type: ignore[union-attr]
+            _doc(passage).page
             for passage in sampled
-            if passage.source.doc_id == group[0].source.doc_id  # type: ignore[union-attr]
+            if _doc(passage).doc_id == _doc(group[0]).doc_id
         )
         assert indices[0] <= 5, "manca un prelievo vicino all'inizio"
         assert indices[-1] >= 94, "manca un prelievo vicino alla fine"
@@ -47,8 +53,8 @@ def test_sample_across_sources_output_ordered_by_group_then_source_position() ->
 
     sampled = sample_across_sources(groups=[group_a, group_b], budget_words=10)
 
-    doc_ids = [passage.source.doc_id for passage in sampled]  # type: ignore[union-attr]
-    pages = [passage.source.page for passage in sampled]  # type: ignore[union-attr]
+    doc_ids = [_doc(passage).doc_id for passage in sampled]
+    pages = [_doc(passage).page for passage in sampled]
     assert doc_ids == sorted(doc_ids)
     # within each doc_id's run, pages increase (reading order).
     a_pages = [
@@ -68,7 +74,7 @@ def test_sample_across_sources_skips_empty_groups() -> None:
     sampled = sample_across_sources(groups=[group_a, group_b], budget_words=100)
 
     assert len(sampled) == 3
-    assert all(passage.source.doc_id == "b" for passage in sampled)  # type: ignore[union-attr]
+    assert all(_doc(passage).doc_id == "b" for passage in sampled)
 
 
 def test_sample_across_sources_zero_budget_returns_nothing() -> None:
