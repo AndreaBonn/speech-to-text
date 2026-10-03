@@ -26,6 +26,7 @@ from sbobina.generation_models import (
 )
 from sbobina.generation_pipeline import ITALIAN_TOKENS_PER_WORD as TOKENS_PER_WORD
 from sbobina.generation_pipeline import (
+    PROMPT_FILES,
     GenerationChat,
     GenerationOptions,
     GenerationOutcome,
@@ -47,12 +48,6 @@ from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import SearchIndex
 from sbobina.web.search_service import search_session
 
-_PROMPT_FILES: dict[GenerationFormat, str] = {
-    GenerationFormat.MULTIPLE_CHOICE: "compito-v1.md",
-    GenerationFormat.OPEN: "compito-v1.md",
-    GenerationFormat.ORAL: "compito-v1.md",
-    GenerationFormat.SUMMARY: "riassunto-v1.md",
-}
 NUM_PREDICT_PER_ITEM: dict[GenerationFormat, int] = {
     GenerationFormat.MULTIPLE_CHOICE: 150,
     GenerationFormat.OPEN: 200,
@@ -90,7 +85,7 @@ def compute_budget_words(format_: GenerationFormat, options: GenerationOptions) 
     """Passage word budget left after the system prompt and the reply."""
     prompt_text = (
         resources.files("sbobina.prompts")
-        .joinpath(_PROMPT_FILES[format_])
+        .joinpath(PROMPT_FILES[format_])
         .read_text(encoding="utf-8")
     )
     available_tokens = (

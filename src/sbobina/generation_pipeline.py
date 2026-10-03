@@ -45,10 +45,10 @@ INVALID_RESPONSE_ERROR = "INVALID_RESPONSE"
 
 type GenerationChat = Callable[[ChatRequest], str]
 
-_PROMPT_FILES: dict[GenerationFormat, str] = {
-    GenerationFormat.MULTIPLE_CHOICE: "compito-v1.md",
-    GenerationFormat.OPEN: "compito-v1.md",
-    GenerationFormat.ORAL: "compito-v1.md",
+PROMPT_FILES: dict[GenerationFormat, str] = {
+    GenerationFormat.MULTIPLE_CHOICE: "compito-v2.md",
+    GenerationFormat.OPEN: "compito-v2.md",
+    GenerationFormat.ORAL: "compito-v2.md",
     GenerationFormat.SUMMARY: "riassunto-v1.md",
 }
 _FORMAT_LABELS: dict[GenerationFormat, str] = {
@@ -124,7 +124,7 @@ def _build_request(
     passages: Sequence[RetrievedPassage],
     options: GenerationOptions,
 ) -> ChatRequest:
-    prompt_file = _PROMPT_FILES[request.format]
+    prompt_file = PROMPT_FILES[request.format]
     system_prompt = (
         resources.files("sbobina.prompts")
         .joinpath(prompt_file)
@@ -191,7 +191,7 @@ def generate(
     result = partial(
         _empty_result,
         options=options,
-        prompt_version=_PROMPT_FILES[request.format].removesuffix(".md"),
+        prompt_version=PROMPT_FILES[request.format].removesuffix(".md"),
         generated_at=datetime.now(tz=UTC).isoformat(),
     )
     if not passages:

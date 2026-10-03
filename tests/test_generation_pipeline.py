@@ -2,7 +2,7 @@ import json
 
 from study_fixtures import FakeChat
 
-from sbobina.generation_models import GenerationRequest
+from sbobina.generation_models import GenerationFormat, GenerationRequest
 from sbobina.generation_pipeline import (
     GenerationOptions,
     GenerationOutcome,
@@ -10,7 +10,8 @@ from sbobina.generation_pipeline import (
     generate,
 )
 from sbobina.ollama_chat import CONTEXT_WINDOW_TOKENS
-from sbobina.retrieval import DocumentSource, RetrievedPassage
+from sbobina.retrieval import DocumentSource, RetrievedPassage, cut_to_budget
+from sbobina.web.generation_runner import compute_budget_words
 
 
 def _doc_passage(
@@ -201,9 +202,17 @@ def test_generate_summary_resolves_citations_and_counts_discards() -> None:
 def test_build_prompt_for_twelve_passages_stays_under_token_budget_with_output_margin() -> (
     None
 ):
+    # The material budget comes from the real system prompt's length
+    # (compute_budget_words), so a longer prompt version shrinks it.
     passage_text = " ".join(f"parola{i}" for i in range(190))
-    passages = [_doc_passage(page=n, text=passage_text) for n in range(1, 13)]
     options = _options(num_predict=1024)
+    budget = compute_budget_words(
+        format_=GenerationFormat.MULTIPLE_CHOICE, options=options
+    )
+    passages = cut_to_budget(
+        ranked=[_doc_passage(page=n, text=passage_text) for n in range(1, 13)],
+        budget_words=budget,
+    )
     chat = FakeChat(responses=['{"domande": []}'])
 
     generate(
