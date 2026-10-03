@@ -445,3 +445,85 @@ Controlli finali dopo il ripristino del mutante (stesso prefisso UV_CACHE_DIR):
 CHECKS: code-reviewer ESEGUITO; test mirati e controlli statici ESEGUITI;
 suite globale NON COMPLETATA; a11y-gate N/A (nessuna UI modificata).
 ESITO: review, implementazione pronta per l'orchestratore, nessun commit.
+
+## 2026-10-03 | Sessione #5 [FEATURE] Spazio del corso (specs/001-course-workspace)
+
+### Richiesta
+
+Implementare l'intero piano `001-course-workspace` con commit atomici su
+`main`. Scelte dell'utente raccolte prima di procedere: OCR con `qwen2.5vl` in
+una fase F5 separata (U1); conversazioni di chat salvate per corso ed
+eliminabili (U2); le fonti citate dalla chat vengono solo dal materiale del
+corso (U3); export anche in DOCX oltre a TXT (U4). Tutto locale, incluso
+Ollama.
+
+### Azioni Eseguite
+
+- **F1-F2**: caricamento nel corso di documenti PDF, DOCX, PPTX e TXT;
+  estrazione del testo in un processo figlio con limite di memoria; ricerca
+  full-text su lezioni e documenti.
+- **F3**: generazione in coda, dal modello locale `qwen3.5:9b`, di compiti
+  d'esame (crocette, domande aperte, orale, massimo dieci domande) e
+  riassunti, con citazioni verificate testualmente sul materiale del corso e
+  i motivi degli scarti mostrati in pagina; export in TXT e DOCX. Misure in
+  `specs/001-course-workspace/eval-generations.md`.
+- **F4**: chat sul corso con risposte composte solo da frasi citate,
+  conversazioni salvate in JSONL; arbitraggio della GPU fra chat e
+  trascrizione con un lock lettori-scrittori, la chat risponde 409 se la GPU
+  è occupata. Misure in `specs/001-course-workspace/eval-chat.md`: 8 risposte
+  corrette su 8 dopo le correzioni, p50 a caldo 10,1 s.
+- **F5**: OCR dei PDF scansionati con `qwen2.5vl:7b`, circa 270 s a pagina su
+  CPU, pagine marcate come testo da OCR. Gate T059 valido al secondo
+  tentativo: Whisper confermato su CUDA, zero campioni GPU sovrapposti su 289
+  (`specs/001-course-workspace/eval.md`).
+- Problema emerso durante F5: un `uv add pillow` lanciato da un agent ha
+  disinstallato le librerie CUDA (extra opzionale `cuda`), e Whisper è
+  passato su CPU senza errori visibili. Ripristinato con
+  `uv sync --extra cuda`; il primo run di T059, eseguito su CPU, è stato
+  dichiarato non valido e rilanciato.
+- Remediation dopo `/analyze` (19 finding nella prima passata, 6 nella
+  seconda): divisi `app.css` e sette file di test oltre le 300 righe; fonti
+  delle generazioni registrate con avviso di "fonte modificata" in lettura;
+  limiti al processo OCR (memoria, timeout a un'ora, render a 2500 px); 409
+  su upload duplicato; avvisi OCR in UI; test che l'output del modello arriva
+  come testo; rimossi cinque `# type: ignore`.
+- Review di codice e sicurezza sul diff: un bug minore corretto (contatore
+  dei poll OCR); nessun finding di sicurezza bloccante.
+
+### Aperto a fine sessione
+
+- Nessun task del piano aperto: T049 chiuso dopo tre passate di `/analyze`, i 43 criteri della
+  Definition of Done spuntati con la prova di ciascuno.
+- Limiti noti, misurati: con argomenti fatti di parole comuni i compiti possono pescare
+  materiale fuori tema (T036); l'OCR costa circa 270 s a pagina su CPU.
+- Nessun push: i commit sono su `main` in locale.
+
+### File Modificati
+
+| Area | Descrizione |
+|---|---|
+| `src/sbobina/course_registry.py`, `document_sniff.py`, `document_extract.py`, `pdf_text.py`, `web/extraction_worker.py`, `web/document_store.py`, `document_passages.py`, `web/document_index.py`, `search_schema.py` | Nuovo: workspace del corso, documenti e indice full-text (F1-F2) |
+| `src/sbobina/retrieval.py`, `lecture_windows.py`, `source_sampling.py`, `web/course_retrieval.py`, `source_citations.py` | Nuovo: retrieval e citazioni sul materiale del corso |
+| `src/sbobina/generation_pipeline.py`, `generation_validation.py`, `generation_render.py`, `docx_export.py`, `web/generation_runner.py`, `web/generation_queue.py`, `generation_supervisor.py`, `web/api_generations.py` | Nuovo: compiti d'esame e riassunti in coda (F3) |
+| `src/sbobina/chat_pipeline.py`, `web/chat_turn.py`, `web/chat_store.py`, `web/api_chat.py`, `web/gpu_lock.py`, `web/transcription_gate.py` | Nuovo: chat sul corso e arbitraggio GPU (F4) |
+| Moduli OCR su `qwen2.5vl:7b` (F5) | Nuovo: OCR dei PDF scansionati con limiti di memoria, timeout e render |
+| `app.css`, sette file di test | Modificato: divisi sotto le 300 righe in remediation post `/analyze` |
+| `specs/001-course-workspace/plan.md`, `tasks.md`, `eval.md`, `eval-chat.md`, `eval-generations.md` | Modificato: piano, task e misure |
+| `CLAUDE.md` | Modificato: layout del progetto aggiornato ai nuovi moduli |
+| `docs/REPORT_ATTIVITA.md` | Modificato: registro della sessione |
+
+### Note per il Cliente
+
+Ogni corso ha ora uno spazio proprio: si possono caricare dispense e slide
+oltre alle lezioni registrate, farsi preparare in automatico simulazioni
+d'esame e riassunti con le fonti verificate, e chattare sul materiale del
+corso ottenendo solo risposte basate su frasi realmente presenti nei
+documenti. Anche le dispense scansionate (foto o scansioni senza testo
+selezionabile) vengono lette automaticamente. Audio, documenti e testi restano
+sul computer: i modelli di trascrizione, generazione e OCR girano in locale.
+
+### Riepilogo (Complessità / Stato)
+
+Complessità alta: feature completa su cinque fasi, 81 commit su `main`.
+Suite a 1503+ test verdi, ruff e mypy puliti. Piano completo, gate
+finale T049 chiuso.
