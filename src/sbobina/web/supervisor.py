@@ -6,22 +6,19 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from threading import Condition, Thread
 
-from sbobina.generation_models import (
-    GenerationRecord,
-    GenerationRequest,
-    GenerationStatus,
+from sbobina.generation_models import GenerationRecord, GenerationRequest
+from sbobina.web import course_actions
+from sbobina.web.course_actions import (
+    CLAIM_ACTIONS,
+    EXECUTE_ACTIONS,
+    FINISH_FAILED_ACTIONS,
 )
-from sbobina.web.generation_queue import finish_generation, recover_generations
-from sbobina.web.generation_supervisor import (
-    cancel_generation_item,
-    claim_generation_item,
-    execute_generation_action,
-    mark_generation_interrupted,
-    submit_generation_item,
-)
+from sbobina.web.generation_queue import recover_generations
 from sbobina.web.gpu_lock import GpuArbiter
 from sbobina.web.job_models import JobRecord, JobStage, JobStatus, WorkItem
 from sbobina.web.job_store import JobStore
+from sbobina.web.ocr_queue import recover_ocr_runs
+from sbobina.web.ocr_store import OcrRun
 from sbobina.web.processes import _child_env, _reap, _spawn
 from sbobina.web.transcription_gate import execute_pipeline_action
 from sbobina.web.work_items import (
@@ -90,10 +87,13 @@ class Supervisor:
             if self.is_running():
                 raise RuntimeError("Cannot recover while the worker is running")
             self._queue = recover_queue(store=self._store, page_size=RECOVERY_PAGE_SIZE)
-            generations = recover_generations(courses_dir=self._store.courses_dir)
-            self._queue.extend(
-                item for _, item in sorted(generations, key=lambda entry: entry[0])
-            )
+            for recovered in (
+                recover_generations(courses_dir=self._store.courses_dir),
+                recover_ocr_runs(courses_dir=self._store.courses_dir),
+            ):
+                self._queue.extend(
+                    item for _, item in sorted(recovered, key=lambda entry: entry[0])
+                )
 
     def submit(self, job_id: str) -> None:
         with self._condition:
@@ -130,24 +130,22 @@ class Supervisor:
     def submit_generation(
         self, course_key: str, request: GenerationRequest
     ) -> GenerationRecord:
-        with self._condition:
-            record, item = submit_generation_item(
-                store=self._store, course_key=course_key, request=request
-            )
-            self._queue.append(item)
-            self._condition.notify()
-            return record
+        return course_actions.submit_generation(
+            supervisor=self, course_key=course_key, request=request
+        )
+
+    def submit_ocr(self, course_key: str, doc_id: str) -> OcrRun:
+        return course_actions.submit_ocr(
+            supervisor=self, course_key=course_key, doc_id=doc_id
+        )
 
     def cancel_generation(self, course_key: str, gen_id: str) -> None:
-        with self._condition:
-            item = cancel_generation_item(
-                store=self._store, course_key=course_key, gen_id=gen_id
-            )
-            if item in self._queue:
-                self._queue.remove(item)
-            if self._active == item:
-                self._stop_process(graceful=False)
-            mark_generation_interrupted(store=self._store, item=item)
+        course_actions.cancel_generation(
+            supervisor=self, course_key=course_key, gen_id=gen_id
+        )
+
+    def cancel_ocr(self, course_key: str, doc_id: str) -> None:
+        course_actions.cancel_ocr(supervisor=self, course_key=course_key, doc_id=doc_id)
 
     def stop(self) -> None:
         with self._condition:
@@ -193,10 +191,9 @@ class Supervisor:
 
     def _claim(self, item: WorkItem) -> bool:
         try:
+            claim_fn = CLAIM_ACTIONS.get(item.action)
             claimed = (
-                claim_generation_item(store=self._store, item=item)
-                if item.action == "generation"
-                else self._claim_job(item=item)
+                claim_fn(self._store, item) if claim_fn else self._claim_job(item=item)
             )
         except Exception:
             logger.exception("Job %s non leggibile, saltato", item.job_id)
@@ -228,25 +225,17 @@ class Supervisor:
                     self._active = None
 
     def _finish_failed(self, item: WorkItem, code: str) -> None:
-        if item.action == "generation":
+        finish_fn = FINISH_FAILED_ACTIONS.get(item.action)
+        if finish_fn is not None:
             assert item.course_id is not None
-            finish_generation(
-                courses_dir=self._store.courses_dir,
-                course_id=item.course_id,
-                gen_id=item.job_id,
-                status=GenerationStatus.FAILED,
-                error=code,
-            )
+            finish_fn(self._store.courses_dir, item.course_id, item.job_id, code)
             return
         finish_action(store=self._store, item=item, status=JobStatus.FAILED, code=code)
 
     def _execute(self, item: WorkItem) -> None:
-        if item.action == "generation":
-            execute_generation_action(
-                supervisor=self,
-                item=item,
-                ollama_unavailable_exit=OLLAMA_UNAVAILABLE_EXIT,
-            )
+        execute_fn = EXECUTE_ACTIONS.get(item.action)
+        if execute_fn is not None:
+            execute_fn(self, item, OLLAMA_UNAVAILABLE_EXIT)
             return
         if item.action == "pipeline":
             completed = execute_pipeline_action(supervisor=self, item=item)

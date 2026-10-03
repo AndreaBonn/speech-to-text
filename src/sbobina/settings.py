@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     ocr_model: str = "qwen2.5vl:7b"
     # Measured on CPU (eval.md § T050): ~172s/page at scale 1.0, >600s at 2.0.
     ocr_scale: float = Field(default=1.0, gt=0.0)
+    # One page took ~172 s on CPU (eval.md T050); a hung Ollama must not hold
+    # the single queue worker forever.
+    ocr_timeout_s: float = Field(default=900.0, gt=0.0)
 
     @field_validator("web_host")
     @classmethod
