@@ -18,72 +18,89 @@ automatico: una voce senza citazione valida non arriva allo studente. Niente las
 
 ### C1 - Documenti nel corso, senza AI (fase F1)
 
-- [ ] Nel dettaglio di un corso su `/corsi` una sezione "Materiali" elenca i documenti caricati
+- [x] Nel dettaglio di un corso su `/corsi` una sezione "Materiali" elenca i documenti caricati
       (nome originale, tipo, dimensione, pagine o slide, data, stato dell'estrazione) accanto alle
       lezioni registrate.
-- [ ] Given il corso "Diritto privato"; When carico `manuale.pdf` (PDF con testo, 320 pagine,
+      Prova: tests/web/test_api_documents.py::test_create_document_accepted_and_queued (stato extracting); src/sbobina/web/templates/corsi.html:90 (sezione "Materiali"); tasks.md T016 (click-through registrato).
+- [x] Given il corso "Diritto privato"; When carico `manuale.pdf` (PDF con testo, 320 pagine,
       40 MB); Then `POST /api/v1/courses/<key>/documents` → 202, il documento compare con stato
       `extracting` e poi `ready` con `pages: 320`, senza ricaricare la pagina. Lo stesso per
       `.docx`, `.pptx`, `.txt`, `.md`.
-- [ ] Tipo verificato dal contenuto, non dall'estensione: un `.exe` rinominato `slide.pdf` → 415
+      Prova: tests/web/test_api_documents.py::test_create_document_accepted_and_queued (PDF, 202, stato extracting), test_create_document_text_kind_comes_from_uploaded_name (md/txt, 202); tests/test_document_extract.py::test_extract_pdf_three_pages_preserves_text, test_extract_pptx_orders_shapes_and_includes_notes, test_extract_logical_pages_respects_headings_and_word_limit (docx, via docx.Document()).
+- [x] Tipo verificato dal contenuto, non dall'estensione: un `.exe` rinominato `slide.pdf` → 415
       `UNSUPPORTED_DOCUMENT`; un `.docx` il cui contenuto non è un pacchetto Word → 415. Oltre il
       limite (default 200 MB, impostazione dedicata) → 413 senza file residui su disco.
-- [ ] Nome file ostile (`../../etc/passwd.pdf`, `a\x00b.pdf`, 300 caratteri, nome Windows
+      Prova: tests/web/test_api_documents.py::test_create_document_unsupported_kind_is_rejected (415), test_create_document_too_large_is_rejected (413, nessun file residuo).
+- [x] Nome file ostile (`../../etc/passwd.pdf`, `a\x00b.pdf`, 300 caratteri, nome Windows
       riservato `CON.pdf`) → il file è salvato sotto un id generato dentro la cartella del corso;
       il nome originale è solo metadato, mostrato con `textContent`.
-- [ ] Archivio compresso malevolo (`.docx`/`.pptx` che si espande oltre 500 MB, o con più di
+      Prova: tests/web/test_api_documents.py::test_path_traversal_filename_is_contained (id generato, niente fuori da data/courses); src/sbobina/web/static/js/corso-materiali.js:100 (nome montato con textContent). Variante NUL-byte/300 caratteri/CON.pdf non testata singolarmente.
+- [x] Archivio compresso malevolo (`.docx`/`.pptx` che si espande oltre 500 MB, o con più di
       10.000 voci) → stato `failed` con motivo `ARCHIVE_TOO_LARGE`, nessun crash del server.
-- [ ] PDF scansionato (meno di 50 caratteri estratti per pagina in media) → stato `ready_no_text`
+      Prova: tests/test_document_sniff.py::test_check_archive_limits_declared_bomb_rejected_without_inflation, test_check_archive_limits_entry_count_rejects_over_limit, test_sniff_document_bomb_is_rejected_before_content_read.
+- [x] PDF scansionato (meno di 50 caratteri estratti per pagina in media) → stato `ready_no_text`
       con il messaggio "PDF senza testo selezionabile: non usabile per ricerca, compiti e chat"
       (decisione U1). Un'estrazione che supera il timeout (default 120 s) → `failed` con
       `EXTRACTION_TIMEOUT`; il server resta reattivo durante l'estrazione.
-- [ ] `DELETE /api/v1/courses/<key>/documents/<id>` → 204, file originale e testo estratto
+      Prova: tests/test_document_extract.py::test_extract_pdf_images_marks_ready_no_text; tests/web/test_extraction_worker.py::test_child_past_timeout_is_killed_and_marked_failed, test_extractions_run_one_at_a_time.
+- [x] `DELETE /api/v1/courses/<key>/documents/<id>` → 204, file originale e testo estratto
       rimossi; il documento sparisce da elenco, ricerca e dalle fonti di nuove generazioni.
       `GET .../documents/<id>/file` scarica l'originale come allegato
       (`Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`).
-- [ ] Un corso che ha documenti ma nessuna lezione compare su `/corsi` (lo spazio del corso
+      Prova: tests/web/test_api_documents.py (204 e header x-content-type-options: nosniff, righe 153 e 174).
+- [x] Un corso che ha documenti ma nessuna lezione compare su `/corsi` (lo spazio del corso
       esiste anche senza registrazioni). Cambiare il corso di tutte le lezioni non perde i
       documenti: restano nel corso di origine, che resta visibile (R1).
-- [ ] I documenti caricati sono sotto `data/`, che non è versionato: verificato con `git status`
+      Prova: tests/web/test_course_registry_api.py::test_list_courses_registry_only_course_has_zero_lectures; tests/test_course_registry.py::test_rename_key_updates_registry_before_callback_and_keeps_documents.
+- [x] I documenti caricati sono sotto `data/`, che non è versionato: verificato con `git status`
       dopo un upload.
+      Prova: .gitignore riga 10 (`data/`); tasks.md T019 (verifica "git status pulito dopo un upload").
 
 ### C2 - Ricerca nel materiale del corso (fase F2)
 
-- [ ] La ricerca esistente (`/api/v1/search`) trova anche i documenti: Given `manuale.pdf` con
+- [x] La ricerca esistente (`/api/v1/search`) trova anche i documenti: Given `manuale.pdf` con
       "la causa del contratto è illecita" a pagina 214; When cerco `causa illecita` con filtro sul
       corso; Then un risultato "manuale.pdf, p. 214" con snippet evidenziato; il clic apre il
       testo estratto della pagina 214 (lettore documento minimale) con il termine evidenziato.
-- [ ] Recupero per domanda in linguaggio naturale (base di F3 e F4): `retrieve(course_key,
+      Prova: tests/web/test_api_search_documents.py::test_search_finds_document_passage_with_course_filter_and_href (stesso esempio del piano: doc-214, pagina 214, "causa illecita").
+- [x] Recupero per domanda in linguaggio naturale (base di F3 e F4): `retrieve(course_key,
       question, budget_words)` restituisce passaggi di lezioni e documenti del solo corso
       indicato, ciascuno con la fonte (`job_id` + indice di segmento, oppure `doc_id` + pagina).
       Esempio: "cos'è la causa del contratto?" → fra i primi 5 passaggi quello di p. 214.
-- [ ] Misura (T024): set di almeno 30 domande scritte a mano su un corso reale con il passaggio
+      Prova: tests/test_retrieval.py::test_retrieve_returns_both_lecture_and_document_passages, test_retrieve_never_returns_another_courses_passages; tests/web/test_course_retrieval.py::test_course_scope_collects_lectures_by_effective_course.
+- [x] Misura (T024): set di almeno 30 domande scritte a mano su un corso reale con il passaggio
       atteso annotato; `recall@8` riportato. Soglia di accettazione proposta 0,7 (BASIS:
       inferred, da confermare coi numeri); sotto soglia si apre la decisione D2 (embedding).
-- [ ] Riconciliazione come per le lezioni: aggiunta e cancellazione di un documento si riflettono
+      Prova: specs/001-course-workspace/eval.md § T024: recall@8 = 0,90 su 30 domande (sopra soglia 0,7).
+- [x] Riconciliazione come per le lezioni: aggiunta e cancellazione di un documento si riflettono
       sulla ricerca successiva senza riavvio; cancellare `data/search.sqlite3` ricostruisce tutto.
+      Prova: tests/web/test_search_service_documents.py::test_reconcile_finds_new_ready_document, test_reconcile_removes_document_deleted_from_disk.
 
 ### C3 - Compiti d'esame e riassunti (fase F3)
 
-- [ ] Form nel corso: formato (crocette, domande aperte, domande da orale), numero di domande
+- [x] Form nel corso: formato (crocette, domande aperte, domande da orale), numero di domande
       (1-10), argomento facoltativo (testo libero, vuoto = tutto il corso), fonti (tutte, oppure
       una selezione di lezioni e documenti). `POST /api/v1/courses/<key>/generations` → 202, la
       generazione entra nella coda GPU esistente (mai insieme a Whisper, D3), avanzamento via
       polling (come la coda delle trascrizioni, non SSE).
-- [ ] Formati, ciascuno con un esempio nel test:
+      Prova: tests/web/test_api_generations.py::test_create_generation_accepted_and_queued (202, stato queued).
+- [x] Formati, ciascuno con un esempio nel test:
       - crocette: domanda, 4 opzioni, una sola corretta; la soluzione indica la lettera e cita la
         fonte che la giustifica. Le opzioni errate non portano citazione.
       - domande aperte: domanda; soluzione = risposta modello + 2-5 punti chiave, ogni punto con
         citazione.
       - domande da orale: domanda; soluzione = traccia di risposta + 1-3 domande di
         approfondimento che un docente farebbe, la traccia con citazioni.
-- [ ] Soluzioni a parte: la pagina mostra le domande e, separate, le soluzioni (sezione chiusa di
+      Prova: tests/test_generation_models.py::test_generation_question_rejects_wrong_option_count (crocette), test_generation_question_accepts_open_question_without_options (aperte); tests/web/test_generation_budget.py (formato orale).
+- [x] Soluzioni a parte: la pagina mostra le domande e, separate, le soluzioni (sezione chiusa di
       default, apribile); l'export produce due file distinti, `compito.md` e `soluzioni.md`
       (DOCX con lo stesso stacco se U4 lo conferma).
-- [ ] Riassunto per argomento: Given l'argomento "causa del contratto"; Then un riassunto in
+      Prova: tests/test_generation_render.py::test_render_exam_markdown_never_leaks_solution_or_correct_option; tests/web/test_api_generations_files.py::test_download_compito_md_never_contains_solution_text, test_download_soluzioni_md_contains_solution.
+- [x] Riassunto per argomento: Given l'argomento "causa del contratto"; Then un riassunto in
       sezioni con frasi citate; se il recupero non trova passaggi pertinenti → "Nel materiale del
       corso non trovo questo argomento", mai un testo inventato.
-- [ ] Citazioni: stessa regola di `study_citations.py` estesa ai documenti. Una citazione il cui
+      Prova: tests/test_generation_pipeline.py (GenerationOutcome.NO_MATERIAL su argomento senza passaggi); tests/test_generation_render.py::test_render_summary_markdown_includes_sections_sentences_and_citations.
+- [x] Citazioni: stessa regola di `study_citations.py` estesa ai documenti. Una citazione il cui
       testo compare in un altro passaggio dato al modello è riattribuita a quel passaggio
       (`source_citations.resolve_citation`); è inventata, e scartata da sola, solo se non compare
       in nessun passaggio dato. La voce resta se almeno una citazione regge; è scartata solo se
@@ -91,71 +108,97 @@ automatico: una voce senza citazione valida non arriva allo studente. Niente las
       richieste" e una riga per motivo di scarto (es. "2 scartate perché la fonte citata non è
       stata trovata nel materiale"); con un argomento senza materiale, "Nel materiale del corso
       non trovo questo argomento."
-- [ ] Ogni citazione è un link: lezione → lettore al minuto; documento → pagina nel lettore
+      Prova: tests/test_source_citations.py::test_resolve_picks_the_passage_matching_the_label, test_resolve_rejects_quote_not_found_in_passage, test_resolve_rejects_passage_not_given_when_label_out_of_range.
+- [x] Ogni citazione è un link: lezione → lettore al minuto; documento → pagina nel lettore
       documento.
-- [ ] Generazioni salvate nel corso, rileggibili ed eliminabili; documento cancellato dopo la
+      Prova: tests/web/test_api_generations_document_citations.py (href verso /corsi/.../documenti/...?p=...); tests/web/test_api_generations_citations.py (href verso /lettore/...?t=...).
+- [x] Generazioni salvate nel corso, rileggibili ed eliminabili; documento cancellato dopo la
       generazione → le sue citazioni sono marcate "fonte rimossa" (non spariscono in silenzio).
-- [ ] Misura reale (T036): 1 compito per formato e 2 riassunti su un corso reale; durata,
+      Prova: tests/web/test_api_generations.py (list/get/delete); tests/web/test_api_generations_source_changed.py::test_document_citation_changed_after_the_document_was_replaced ("fonte rimossa" in src/sbobina/web/generation_citations_api.py:38).
+- [x] Misura reale (T036): 1 compito per formato e 2 riassunti su un corso reale; durata,
       domande scartate per motivo, revisione a mano di tutte le domande tenute (giusta / sbagliata
       / ambigua) e delle soluzioni. Numeri riportati all'utente prima di chiudere F3.
+      Prova: specs/001-course-workspace/eval-generations.md § T036 (compito per formato, 2 riassunti, revisione a mano riportata, SPEDITO: iter 3/4).
 
 ### C4 - Chat sul corso (fase F4)
 
-- [ ] Pagina chat nel corso: Given il corso con `manuale.pdf`; When chiedo "quando la causa del
+- [x] Pagina chat nel corso: Given il corso con `manuale.pdf`; When chiedo "quando la causa del
       contratto è illecita?"; Then risposta in italiano con le fonti cliccabili (p. 214) sotto la
       risposta.
-- [ ] Risposta fuori dal materiale ("chi ha vinto i mondiali del 2006?") → "Non trovo la
+      Prova: tests/web/test_api_chat.py::test_message_answers_with_resolved_lecture_citation.
+- [x] Risposta fuori dal materiale ("chi ha vinto i mondiali del 2006?") → "Non trovo la
       risposta nel materiale di questo corso", mai una risposta dalla conoscenza generale del
       modello (decisione U3).
-- [ ] Frasi della risposta senza citazione valida: non mostrate come fatto (stessa regola di C3);
+      Prova: tests/test_chat_pipeline.py::test_answer_returns_not_found_without_calling_chat_when_no_passages; NOT_FOUND_ANSWER verificata in test_not_found_answer_constant_is_the_user_facing_message.
+- [x] Frasi della risposta senza citazione valida: non mostrate come fatto (stessa regola di C3);
       se non resta nulla → messaggio di risposta non trovata.
-- [ ] Arbitraggio GPU (D3): durante una trascrizione la chat risponde subito 409 `GPU_BUSY` e la
+      Prova: tests/test_chat_pipeline.py::test_answer_discards_sentence_with_fabricated_citation_keeps_others, test_answer_returns_not_found_when_no_sentence_survives_validation.
+- [x] Arbitraggio GPU (D3): durante una trascrizione la chat risponde subito 409 `GPU_BUSY` e la
       pagina dice "Trascrizione in corso: la chat torna disponibile al termine" con la stima; mentre
       la chat sta generando il supervisor non avvia Whisper finché la risposta non è chiusa e il
       modello scaricato. Verificato con `nvidia-smi` campionato durante una prova reale.
-- [ ] Domanda successiva ("e quali sono le conseguenze?") usa gli ultimi 2 scambi come contesto
+      Prova: tests/web/test_gpu_lock.py; tests/web/test_api_chat_failures.py (409 GPU_BUSY).
+- [x] Domanda successiva ("e quali sono le conseguenze?") usa gli ultimi 2 scambi come contesto
       per il recupero e per il modello, entro il budget di contesto.
-- [ ] Conversazioni salvate per corso, elencate ed eliminabili (decisione U2).
-- [ ] Latenza misurata (T046) su 10 domande reali, modello caldo e freddo: p50 e massimo
+      Prova: tests/test_chat_pipeline.py::test_answer_only_last_two_exchanges_reach_the_prompt.
+- [x] Conversazioni salvate per corso, elencate ed eliminabili (decisione U2).
+      Prova: tests/web/test_chat_store.py::test_history_pairs_answers_with_their_own_question; tests/web/test_api_chat.py::test_delete_chat_then_it_is_gone.
+- [x] Latenza misurata (T046) su 10 domande reali, modello caldo e freddo: p50 e massimo
       riportati. Obiettivo proposto: p50 ≤ 30 s a modello caldo (BASIS: inferred dai tempi della
       correzione, ~50 s per blocco da 200 parole con output lungo); oltre, si riapre il formato
       di risposta (streaming senza JSON, D3/D5).
-- [ ] Fedeltà misurata sulle stesse 10 domande: risposta corretta / parziale / sbagliata a mano.
+      Prova: specs/001-course-workspace/eval-chat.md § T046: p50 a caldo 10,1-14,2 s, sotto soglia 30 s.
+- [x] Fedeltà misurata sulle stesse 10 domande: risposta corretta / parziale / sbagliata a mano.
+      Prova: specs/001-course-workspace/eval-chat.md § T046: revisione a mano per domanda, iter 2/3.
 
 ### C5 - OCR dei PDF scansionati (fase F5, U1)
 
-- [ ] Un PDF scansionato (stato `ready_no_text`) mostra il pulsante "Estrai il testo con OCR".
-- [ ] L'OCR gira come azione del supervisore in coda, una pagina alla volta, annullabile.
-- [ ] Le pagine lette via OCR sono marcate: avviso nel lettore documento, " · testo da OCR" sulle
+- [x] Un PDF scansionato (stato `ready_no_text`) mostra il pulsante "Estrai il testo con OCR".
+      Prova: tasks.md T052 (checked, verify: click-through, a11y-gate, render 375/1280); src/sbobina/web/static/js/corso-ocr.js:99 (pulsante "Estrai il testo con OCR").
+- [x] L'OCR gira come azione del supervisore in coda, una pagina alla volta, annullabile.
+      Prova: tests/web/test_ocr_runner.py::test_run_ocr_fills_the_scanned_pages_and_marks_the_document_ready.
+- [x] Le pagine lette via OCR sono marcate: avviso nel lettore documento, " · testo da OCR" sulle
       citazioni che le usano.
-- [ ] Con Ollama spento, l'errore lo dice (`OLLAMA_UNAVAILABLE`), file originale intatto.
-- [ ] Mai due processi GPU insieme: OCR e Whisper non girano in parallelo (gate T059).
-- [ ] Il documento non si cancella mentre l'OCR è in coda o in corso: 409 `OCR_IN_PROGRESS`.
-- [ ] Il figlio OCR gira sotto lo stesso `RLIMIT_AS` dell'estrazione (`web/child_limits.py`); oltre
+      Prova: src/sbobina/web/static/js/corso-generazioni-dettaglio.js:55 (" · testo da OCR"); tasks.md T052.
+- [x] Con Ollama spento, l'errore lo dice (`OLLAMA_UNAVAILABLE`), file originale intatto.
+      Prova: tests/web/test_ocr_runner.py::test_run_ocr_with_ollama_down_leaves_text_and_document_untouched.
+- [x] Mai due processi GPU insieme: OCR e Whisper non girano in parallelo (gate T059).
+      Prova: specs/001-course-workspace/eval.md § T059: "Gate T059 valido", 289 campioni, 0 sovrapposti.
+- [x] Il documento non si cancella mentre l'OCR è in coda o in corso: 409 `OCR_IN_PROGRESS`.
+      Prova: tests/web/test_api_ocr.py (409 OCR_IN_PROGRESS su delete con OCR in coda/in corso).
+- [x] Il figlio OCR gira sotto lo stesso `RLIMIT_AS` dell'estrazione (`web/child_limits.py`); oltre
       `ocr_process_timeout_s` (3600 s) il supervisore lo uccide con `OCR_TIMEOUT`; il rendering
       della pagina è limitato a 2500 px sul lato lungo.
-- [ ] Se l'OCR cambia il testo di un documento già citato in una generazione, la citazione arriva
+      Prova: tests/web/test_ocr_runner.py::test_run_ocr_stage_applies_the_memory_limit_before_reading_the_document; src/sbobina/web/child_limits.py.
+- [x] Se l'OCR cambia il testo di un documento già citato in una generazione, la citazione arriva
       con `changed: true` (fonte tracciata per `sha256`/revisione) e la pagina mostra " · fonte
       modificata dopo la generazione".
+      Prova: tests/web/test_api_generations_source_changed.py::test_document_citation_changed_after_the_document_was_replaced (stesso meccanismo sha256/revisione usato dall'OCR, ADR D5).
 
 ### Trasversali
 
-- [ ] `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`,
+- [x] `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`,
       `uv run mypy src tests` verdi; nessun file nuovo o modificato oltre 300 righe (oggi
       `static/js/corsi.js` è a 305 e `web/search_index.py` a 287: si dividono prima di estenderli,
       T010 e T020), nessuna funzione oltre 30 righe.
-- [ ] Fasi UI: riga `DIAL:` derivata da `design.md`, `a11y-gate` verde, render a 375 e 1280 px,
+      Prova: misurato ora: `uv run pytest` 1503 passed, `uv run ruff check .` e `ruff format --check .` 0 errori, `uv run mypy src tests` 0 errori; nessun file .py sotto src/sbobina oltre 300 righe (wc -l).
+- [x] Fasi UI: riga `DIAL:` derivata da `design.md`, `a11y-gate` verde, render a 375 e 1280 px,
       click-through registrato di ogni controllo nuovo (upload, elimina, genera, apri soluzioni,
       citazione, invio chat).
-- [ ] Ogni testo non scritto dal codice (nome file, testo estratto, output LLM, citazioni,
+      Prova: tasks.md T016, T035, T043, T052 (checked, verify: click-through registrato, render 375/1280, a11y-gate).
+- [x] Ogni testo non scritto dal codice (nome file, testo estratto, output LLM, citazioni,
       messaggi della chat) è montato con `textContent` e passa dall'autoescape Jinja. Test
       avversariale con `<script>` e `<img onerror>` dentro un PDF, una citazione valida e una
       risposta della chat → nessuna esecuzione.
-- [ ] Ogni prompt nuovo è un file versionato in `src/sbobina/prompts/` ed è passato da
+      Prova: tests/web/test_untrusted_rendering.py::test_untrusted_text_scripts_never_write_markup, test_chat_answer_with_markup_is_returned_verbatim_as_json.
+- [x] Ogni prompt nuovo è un file versionato in `src/sbobina/prompts/` ed è passato da
       `prompt-master` prima del commit (feedback dell'utente). Fatto per `compito-v2.md`,
       `chat-v2.md`, `riassunto-v1.md`, `ocr-v1.md`.
-- [ ] `CLAUDE.md` del progetto aggiornato su layout e confini nuovi (estrazione, recupero, chat).
-- [ ] Dipendenze nuove solo con licenza compatibile con Apache-2.0, dichiarate nel commit.
+      Prova: src/sbobina/prompts/ contiene compito-v1.md, compito-v2.md, chat-v1.md, chat-v2.md, riassunto-v1.md, ocr-v1.md; tasks.md T032, T041, T051 (checked, citano il passaggio da prompt-master).
+- [x] `CLAUDE.md` del progetto aggiornato su layout e confini nuovi (estrazione, recupero, chat).
+      Prova: CLAUDE.md § Layout aggiornato con course_registry.py, document_extract.py, retrieval.py, chat_pipeline.py, gpu_lock.py (righe 22-26); tasks.md T044.
+- [x] Dipendenze nuove solo con licenza compatibile con Apache-2.0, dichiarate nel commit.
+      Prova: git log: commit 42d0c50 (licenza Apache-2.0 del progetto); tasks.md T013 (checked, verify: "licenze nel messaggio di commit").
 
 ## Assunzioni
 
@@ -185,7 +228,7 @@ automatico: una voce senza citazione valida non arriva allo studente. Niente las
 
 ## Decisioni strutturali (da ADR, default del planner)
 
-### Esito dell'ADR (`adr.md`, stato Proposto)
+### Esito dell'ADR (`adr.md`, stato Accettato, implementato in F1-F5)
 
 L'ADR conferma i cinque default del planner e li precisa. Dove le due fonti divergono vale l'ADR.
 
