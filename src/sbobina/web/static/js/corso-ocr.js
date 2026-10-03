@@ -10,7 +10,10 @@
   var ACTIVE_STATUSES = ["queued", "running"];
   var ERROR_MESSAGES = {
     OLLAMA_UNAVAILABLE: "Ollama non risponde: avvialo e riprova.",
+    OCR_TIMEOUT: "OCR interrotto: ci stava mettendo troppo.",
   };
+  // Consecutive failed polls before the row admits its status may be stale.
+  var MAX_POLL_FAILURES = 3;
   var DEFAULT_ERROR_MESSAGE = "OCR non riuscito.";
 
   // doc_id -> { key, el, status, done, total, error, timer }
@@ -111,15 +114,12 @@
       return;
     }
     dom.clearChildren(run.el);
-    if (run.status === "queued") {
-      run.el.appendChild(statusLine("OCR in coda"));
-      run.el.appendChild(cancelButton(docId));
-      return;
+    if (run.notice) {
+      run.el.appendChild(statusLine(run.notice, "danger"));
     }
-    if (run.status === "running") {
-      run.el.appendChild(
-        statusLine(run.total ? "OCR: pagina " + run.done + " di " + run.total : "OCR in corso")
-      );
+    if (isActive(run.status)) {
+      var label = run.total ? "OCR: pagina " + run.done + " di " + run.total : "OCR in corso";
+      run.el.appendChild(statusLine(run.status === "queued" ? "OCR in coda" : label));
       run.el.appendChild(cancelButton(docId));
       return;
     }
@@ -135,9 +135,6 @@
       run.el.appendChild(startButton(docId));
       return;
     }
-    if (run.notice) {
-      run.el.appendChild(statusLine(run.notice, "danger"));
-    }
     run.el.appendChild(startButton(docId));
     run.el.appendChild(hintLine());
   }
@@ -149,6 +146,7 @@
     }
     var data = body.data;
     run.notice = null;
+    run.failures = 0;
     run.status = data.status;
     run.done = data.done;
     run.total = data.total;
@@ -164,6 +162,13 @@
     }
   }
 
+  function jsonOrThrow(response) {
+    if (!response.ok) {
+      throw new Error("ocr request failed: " + response.status);
+    }
+    return response.json();
+  }
+
   function poll(docId) {
     var run = runs[docId];
     if (!run) {
@@ -171,13 +176,7 @@
     }
     fetch(apiBase(run.key, docId))
       .then(function (response) {
-        if (response.status === 404) {
-          return null;
-        }
-        if (!response.ok) {
-          throw new Error("ocr poll failed");
-        }
-        return response.json();
+        return response.status === 404 ? null : jsonOrThrow(response);
       })
       .then(function (body) {
         if (body && runs[docId]) {
@@ -187,7 +186,16 @@
         }
       })
       .catch(function () {
-        schedulePoll(docId);
+        var failed = runs[docId];
+        if (!failed) {
+          return;
+        }
+        failed.failures = (failed.failures || 0) + 1;
+        if (failed.failures >= MAX_POLL_FAILURES) {
+          failed.notice = "Il server non risponde: stato dell'OCR non aggiornato.";
+          render(docId);
+        }
+        schedulePoll(docId); // keeps trying: the notice clears on the next answer
       });
   }
 
@@ -202,10 +210,7 @@
           poll(docId); // already queued elsewhere (another tab): show that
           return null;
         }
-        if (!response.ok) {
-          throw new Error("ocr start failed");
-        }
-        return response.json();
+        return jsonOrThrow(response);
       })
       .then(function (body) {
         if (body) {
@@ -226,17 +231,15 @@
       return;
     }
     fetch(apiBase(run.key, docId) + "/cancel", { method: "POST" })
-      .then(function (response) {
-        if (!response.ok) {
-          throw new Error("ocr cancel failed");
-        }
-        return response.json();
-      })
+      .then(jsonOrThrow)
       .then(function (body) {
         applyPayload(docId, body);
       })
       .catch(function () {
-        // Leave the state as-is: the next poll tick will reconcile it.
+        if (runs[docId]) {
+          runs[docId].notice = "Annullamento non riuscito: riprova.";
+          render(docId);
+        }
       });
   }
 
