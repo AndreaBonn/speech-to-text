@@ -32,6 +32,7 @@ from sbobina.web.document_upload import discard_upload, store_upload
 from sbobina.web.errors import ConflictError, NotFoundError
 from sbobina.web.extraction_worker import ExtractionWorker
 from sbobina.web.job_store import JobStore
+from sbobina.web.ocr_store import OcrStatus, load_ocr
 from sbobina.web.upload_limit import BYTES_PER_MB
 
 router = APIRouter(prefix="/api/v1/courses")
@@ -200,7 +201,7 @@ def get_document_page(
         raise NotFoundError(entity="Pagina", id=str(n))
     page = stored.pages[n - 1]
     return {
-        "data": {"text": page.text, "no_text": page.no_text},
+        "data": {"text": page.text, "no_text": page.no_text, "ocr": page.ocr},
         "meta": {"page": n, "total_pages": len(stored.pages)},
     }
 
@@ -209,5 +210,14 @@ def get_document_page(
 def delete_document(key: str, doc_id: str, services: Services) -> Response:
     """Remove a document and its files; reject one still being extracted."""
     document = _find_document(key=key, doc_id=doc_id, services=services)
+    # A running OCR child would recreate the folder when it writes its result.
+    run = load_ocr(
+        courses_dir=services.courses_dir, course_id=document.course_id, doc_id=doc_id
+    )
+    if run is not None and run.status in (OcrStatus.QUEUED, OcrStatus.RUNNING):
+        raise ConflictError(
+            message="OCR in corso: annullalo prima di eliminare il documento",
+            code="OCR_IN_PROGRESS",
+        )
     services.worker.remove_if_idle(course_id=document.course_id, doc_id=doc_id)
     return Response(status_code=204)

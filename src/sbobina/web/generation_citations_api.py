@@ -28,7 +28,7 @@ from sbobina.models import Transcript, load_transcript
 from sbobina.study_citations import locate_quote
 from sbobina.study_models import Rejection
 from sbobina.web.api_files import TRANSCRIPT_FILES
-from sbobina.web.document_store import read_document
+from sbobina.web.document_store import document_dir, read_document, read_text
 from sbobina.web.errors import NotFoundError
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_service import PREFERRED_VARIANTS
@@ -63,7 +63,22 @@ def _document_citation(
         "source": document.filename,
         "page": citation.page,
         "href": href,
+        "ocr": _page_is_ocr(
+            context=context, doc_id=citation.doc_id, page=citation.page
+        ),
     }
+
+
+def _page_is_ocr(context: CitationContext, doc_id: str, page: int) -> bool:
+    """Whether the cited page was read by OCR, which can change wording (T050)."""
+    doc_dir = document_dir(
+        courses_dir=context.courses_dir, course_id=context.course_id, doc_id=doc_id
+    )
+    try:
+        pages = read_text(doc_dir=doc_dir).pages
+    except (OSError, ValueError, KeyError):
+        return False
+    return 1 <= page <= len(pages) and pages[page - 1].ocr
 
 
 def _lecture_transcript(store: JobStore, job_id: str) -> tuple[Transcript, str] | None:
