@@ -152,13 +152,16 @@
     return match.length > 0 ? match[0].message : null;
   }
 
+  // The stage name is internal (e.g. "transcribing"): the user only needs
+  // to know a transcription holds the GPU, and for how long when known.
   function gpuBusyMessage(details) {
-    var stage = findDetail(details, "stage");
-    var estimate = findDetail(details, "estimate_s");
-    var message = "La scheda video è occupata da una trascrizione";
-    message += stage ? " (" + stage + ")" : "";
-    message += ": riprova tra poco.";
-    return estimate ? message + " " + estimate : message;
+    var seconds = Number(findDetail(details, "estimate_s"));
+    var message = "La scheda video è occupata da una trascrizione: riprova tra poco.";
+    if (!(seconds > 0)) {
+      return message;
+    }
+    var minutes = Math.max(1, Math.round(seconds / 60));
+    return message + " Tempo stimato: circa " + minutes + " min.";
   }
 
   function errorMessage(status, body) {

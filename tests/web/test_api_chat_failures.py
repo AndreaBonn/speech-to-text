@@ -27,6 +27,8 @@ def test_gpu_busy_is_409_with_stage_and_keeps_the_question(chat_app: ChatApp) ->
     error = response.json()["error"]
     assert error["code"] == "GPU_BUSY"
     assert {"field": "stage", "message": "transcribing"} in error["details"]
+    # No estimate is known: the detail is left out, never sent as "None".
+    assert all(detail["field"] != "estimate_s" for detail in error["details"])
     assert _questions(chat_app=chat_app, chat_id=chat_id) == ["causa del contratto?"]
 
 

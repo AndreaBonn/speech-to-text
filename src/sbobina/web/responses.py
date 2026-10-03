@@ -59,10 +59,12 @@ async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
             code=exc.code,
             message=exc.message,
             status_code=status.HTTP_409_CONFLICT,
-            details=[
-                {"field": "stage", "message": exc.stage},
-                {"field": "estimate_s", "message": str(exc.estimate_s)},
-            ],
+            details=[{"field": "stage", "message": exc.stage}]
+            + (
+                []
+                if exc.estimate_s is None
+                else [{"field": "estimate_s", "message": str(exc.estimate_s)}]
+            ),
         )
     if isinstance(exc, ConflictError):
         return error_response(
