@@ -68,3 +68,5 @@ def test_untrusted_text_scripts_never_write_markup(name: str) -> None:
     source = (SCRIPTS_DIR / name).read_text(encoding="utf-8")
 
     assert HTML_SINK.search(source) is None
+    # Paired positive case: the same source with one sink added must fail.
+    assert HTML_SINK.search(source + "\nrow.innerHTML = text;\n") is not None
