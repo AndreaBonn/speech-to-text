@@ -28,6 +28,7 @@ from sbobina.web.api_wer import router as wer_router
 from sbobina.web.downloads import DownloadManager
 from sbobina.web.errors import AppError
 from sbobina.web.extraction_worker import ExtractionWorker, ExtractionWorkerOptions
+from sbobina.web.gpu_lock import GpuArbiter
 from sbobina.web.gpu_release import unload_ollama_models
 from sbobina.web.job_store import JobStore
 from sbobina.web.middleware import OriginMiddleware, web_origin
@@ -91,10 +92,12 @@ def create_app(
         data_dir=data_dir if data_dir is not None else settings.data_dir
     )
     app.state.search_index_path = app.state.job_store.jobs_dir.parent / "search.sqlite3"
+    app.state.gpu_arbiter = GpuArbiter()
     app.state.supervisor = Supervisor(
         job_store=app.state.job_store,
         before_transcribe=partial(unload_ollama_models, host=settings.ollama_host),
         options=supervisor_options,
+        gpu_arbiter=app.state.gpu_arbiter,
     )
     app.state.extraction_worker = ExtractionWorker(
         courses_dir=app.state.job_store.courses_dir,

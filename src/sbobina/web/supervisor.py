@@ -19,9 +19,11 @@ from sbobina.web.generation_supervisor import (
     mark_generation_interrupted,
     submit_generation_item,
 )
+from sbobina.web.gpu_lock import GpuArbiter
 from sbobina.web.job_models import JobRecord, JobStage, JobStatus, WorkItem
 from sbobina.web.job_store import JobStore
 from sbobina.web.processes import _child_env, _reap, _spawn
+from sbobina.web.transcription_gate import execute_pipeline_action
 from sbobina.web.work_items import (
     action_status,
     cancel_action,
@@ -58,10 +60,12 @@ class Supervisor:
         job_store: JobStore,
         before_transcribe: Callable[[], None] | None = None,
         options: SupervisorOptions | None = None,
+        gpu_arbiter: GpuArbiter | None = None,
     ) -> None:
         self._store = job_store
         self._before_transcribe = before_transcribe
         self._options = options if options is not None else SupervisorOptions()
+        self._gpu_arbiter = gpu_arbiter if gpu_arbiter is not None else GpuArbiter()
         self._condition = Condition()
         self._queue: deque[WorkItem] = deque()
         self._thread: Thread | None = None
@@ -117,6 +121,7 @@ class Supervisor:
             if item in self._queue:
                 self._queue.remove(item)
             if self._active == item:
+                self._gpu_arbiter.cancel_wait()
                 self._stop_process(graceful=False)
             self._store.update(
                 record=transition(record=record, item=item, status=status)
@@ -147,6 +152,7 @@ class Supervisor:
     def stop(self) -> None:
         with self._condition:
             self._stopping = True
+            self._gpu_arbiter.cancel_wait()
             self._stop_process(graceful=True)
             if (item := self._active) is not None:
                 finish_action(
@@ -242,17 +248,12 @@ class Supervisor:
                 ollama_unavailable_exit=OLLAMA_UNAVAILABLE_EXIT,
             )
             return
-        record = self._store.get(job_id=item.job_id)
-        stages = [JobStage.STUDY]
         if item.action == "pipeline":
-            if self._before_transcribe is not None:
-                self._before_transcribe()
-            stages = [JobStage.TRANSCRIBING]
-            if record.config.correct:
-                stages.append(JobStage.CORRECTING)
-        for stage in stages:
-            if not self._run_stage(item=item, stage=stage):
-                return
+            completed = execute_pipeline_action(supervisor=self, item=item)
+        else:
+            completed = self._run_stage(item=item, stage=JobStage.STUDY)
+        if not completed:
+            return
         with self._condition:
             finish_action(store=self._store, item=item, status=JobStatus.DONE)
 

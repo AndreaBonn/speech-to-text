@@ -60,8 +60,7 @@ graph TD
     CH -->|BM25| SQL
     CH -->|chat_json| OL[Ollama qwen3.5:9b]
     B -->|compito o riassunto| Q[Supervisor FIFO]
-    Q -->|CourseWorkItem| ARB
-    Q -->|processo figlio| OL
+    Q -->|processo figlio, già serializzato dalla FIFO: non passa da ARB| OL
     Q -->|pipeline: lease esclusiva + unload| W[Whisper]
 ```
 
