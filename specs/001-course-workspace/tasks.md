@@ -271,7 +271,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   stima, input preservato su errore, stati loading/empty/error/edge (domanda lunga, risposta
   lunga, 50 messaggi). Rischio: medio.
   verify: click-through registrato; render 375/1280; `a11y-gate`; XSS nella risposta finta.
-- [ ] **T044** Aggiornare `CLAUDE.md` del progetto (layout: registro corsi, estrazione, recupero,
+- [x] **T044** Aggiornare `CLAUDE.md` del progetto (layout: registro corsi, estrazione, recupero,
   generazioni, chat, lock GPU). Rischio: basso.
   verify: `git diff CLAUDE.md` limitato alle sezioni Layout e Stack.
 
