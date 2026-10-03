@@ -54,6 +54,12 @@
     if (citation.ocr) {
       wrap.appendChild(el("span", "generations__citation-ocr", " · testo da OCR"));
     }
+    if (citation.changed) {
+      // The source was edited after this generation: the quote may be gone.
+      wrap.appendChild(
+        el("span", "generations__citation-changed", " · fonte modificata dopo la generazione")
+      );
+    }
     return wrap;
   }
 

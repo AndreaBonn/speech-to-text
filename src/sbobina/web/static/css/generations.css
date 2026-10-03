@@ -172,3 +172,8 @@
   }
 }
 
+
+.generations__citation-changed {
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}

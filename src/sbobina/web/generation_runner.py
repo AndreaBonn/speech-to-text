@@ -10,6 +10,7 @@ study_citations.locate_quote call is needed here.
 
 import json
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from importlib import resources
 from pathlib import Path
@@ -22,6 +23,7 @@ from sbobina.generation_models import (
     GenerationRecord,
     GenerationRequest,
     GenerationSources,
+    GenerationSourceUsed,
     GenerationStatus,
 )
 from sbobina.generation_pipeline import ITALIAN_TOKENS_PER_WORD as TOKENS_PER_WORD
@@ -35,14 +37,22 @@ from sbobina.generation_pipeline import (
     generate,
 )
 from sbobina.ollama_chat import CONTEXT_WINDOW_TOKENS
-from sbobina.retrieval import RetrievalScope, RetrievedPassage
+from sbobina.retrieval import (
+    DocumentSource,
+    LectureSource,
+    RetrievalScope,
+    RetrievedPassage,
+)
 from sbobina.settings import settings
 from sbobina.web.course_retrieval import (
     WindowedQuery,
     course_scope,
+    lecture_revision,
     retrieve_windows,
     sample_course,
 )
+from sbobina.web.document_store import read_document
+from sbobina.web.errors import NotFoundError
 from sbobina.web.generation_store import find_running, save_generation
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import SearchIndex
@@ -119,9 +129,11 @@ def _status_for_outcome(outcome: GenerationOutcome) -> GenerationStatus:
     )
 
 
-def _to_record(record: GenerationRecord, result: GenerationResult) -> GenerationRecord:
-    # sources (GenerationSourceUsed, sha256/revision) stays empty here: it
-    # needs per-document hashing not wired into this half of the stage.
+def _to_record(
+    record: GenerationRecord,
+    result: GenerationResult,
+    sources: tuple[GenerationSourceUsed, ...],
+) -> GenerationRecord:
     return replace(
         record,
         status=_status_for_outcome(result.outcome),
@@ -132,6 +144,64 @@ def _to_record(record: GenerationRecord, result: GenerationResult) -> Generation
         sections=result.sections,
         discarded=result.discarded,
         error=result.error,
+        sources=sources,
+    )
+
+
+def build_sources(
+    passages: list[RetrievedPassage],
+    doc_sha256: Callable[[str], str | None],
+    find_lecture_revision: Callable[[str], str | None],
+) -> tuple[GenerationSourceUsed, ...]:
+    """Every distinct source among the passages handed to the model (ADR D5).
+
+    All material given to the model, not only what ends up cited: simpler,
+    and sufficient to flag a changed source in generation_citations_api. A
+    lookup returning None (source gone by the time this runs) drops it.
+    """
+    doc_ids = frozenset(
+        passage.source.doc_id
+        for passage in passages
+        if isinstance(passage.source, DocumentSource)
+    )
+    job_ids = frozenset(
+        passage.source.job_id
+        for passage in passages
+        if isinstance(passage.source, LectureSource)
+    )
+    documents = (
+        GenerationSourceUsed(doc_id=doc_id, sha256=sha256, job_id=None, revision=None)
+        for doc_id in sorted(doc_ids)
+        if (sha256 := doc_sha256(doc_id)) is not None
+    )
+    lectures = (
+        GenerationSourceUsed(doc_id=None, sha256=None, job_id=job_id, revision=revision)
+        for job_id in sorted(job_ids)
+        if (revision := find_lecture_revision(job_id)) is not None
+    )
+    return (*documents, *lectures)
+
+
+def _collect_sources(
+    job: GenerationJob, passages: list[RetrievedPassage]
+) -> tuple[GenerationSourceUsed, ...]:
+    def doc_sha256(doc_id: str) -> str | None:
+        try:
+            return read_document(
+                courses_dir=job.store.courses_dir,
+                course_id=job.course_id,
+                doc_id=doc_id,
+            ).sha256
+        except NotFoundError:
+            return None
+
+    def find_lecture_revision(job_id: str) -> str | None:
+        return lecture_revision(store=job.store, job_id=job_id)
+
+    return build_sources(
+        passages=passages,
+        doc_sha256=doc_sha256,
+        find_lecture_revision=find_lecture_revision,
     )
 
 
@@ -183,10 +253,11 @@ def execute_generation(job: GenerationJob, chat: GenerationChat, model: str) -> 
             job=job, index=index, request=request, budget_words=budget_words
         )
     result = generate(request=request, passages=passages, chat=chat, options=options)
+    sources = _collect_sources(job=job, passages=passages)
     save_generation(
         courses_dir=job.store.courses_dir,
         course_id=job.course_id,
-        record=_to_record(record=job.record, result=result),
+        record=_to_record(record=job.record, result=result, sources=sources),
     )
 
 
@@ -221,6 +292,7 @@ def run_generation_stage(course_dir: Path) -> None:
 
 __all__ = [
     "GenerationJob",
+    "build_sources",
     "compute_budget_words",
     "compute_options",
     "execute_generation",

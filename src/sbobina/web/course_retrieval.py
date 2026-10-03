@@ -32,7 +32,7 @@ from sbobina.retrieval import (
 )
 from sbobina.search_text import Passage, passages_from_transcript
 from sbobina.source_sampling import sample_across_sources
-from sbobina.web.api_files import TRANSCRIPT_FILES
+from sbobina.web.api_files import TRANSCRIPT_FILES, transcript_revision
 from sbobina.web.document_index import DocumentScope
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import SearchIndex
@@ -69,6 +69,24 @@ def course_scope(store: JobStore, key: str) -> RetrievalScope:
         course_id=course.id if course is not None else NO_REGISTERED_COURSE,
         job_ids=job_ids,
     )
+
+
+def lecture_revision(store: JobStore, job_id: str) -> str | None:
+    """Fingerprint of the transcript variant _segments_for_job would read now.
+
+    For GenerationSourceUsed (ADR D5): a generation records which revision of
+    the lecture it actually retrieved from, so a later edit can be detected.
+    """
+    directory = store.jobs_dir / job_id
+    for variant in PREFERRED_VARIANTS:
+        path = directory / TRANSCRIPT_FILES[variant]
+        if not path.is_file():
+            continue
+        try:
+            return transcript_revision(path.read_text(encoding="utf-8"))
+        except OSError:
+            return None
+    return None
 
 
 def _segments_for_job(store: JobStore, job_id: str) -> list[Passage]:

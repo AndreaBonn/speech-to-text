@@ -152,6 +152,7 @@ def get_generation(key: str, gen_id: str, services: Services) -> dict[str, Any]:
         store=services.store,
         course_id=course_id,
         key=key,
+        sources=record.sources,
     )
     return {"data": generation_detail_payload(record=record, context=context)}
 

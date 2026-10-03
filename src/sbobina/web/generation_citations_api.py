@@ -20,6 +20,7 @@ from sbobina.generation_models import (
     GenerationCitation,
     GenerationQuestion,
     GenerationRecord,
+    GenerationSourceUsed,
     SummarySection,
     SummarySentence,
 )
@@ -28,6 +29,7 @@ from sbobina.models import Transcript, load_transcript
 from sbobina.study_citations import locate_quote
 from sbobina.study_models import Rejection
 from sbobina.web.api_files import TRANSCRIPT_FILES
+from sbobina.web.course_retrieval import lecture_revision
 from sbobina.web.document_store import document_dir, read_document, read_text
 from sbobina.web.errors import NotFoundError
 from sbobina.web.job_store import JobStore
@@ -43,6 +45,28 @@ class CitationContext:
     store: JobStore
     course_id: str
     key: str
+    # Default: no record's sources were handed in (the chat path has no
+    # persisted GenerationRecord; an old record has none either), so a
+    # citation resolved through this context is never flagged as changed.
+    sources: tuple[GenerationSourceUsed, ...] = ()
+
+
+def _document_changed(
+    doc_id: str, current_sha256: str, sources: tuple[GenerationSourceUsed, ...]
+) -> bool:
+    return any(
+        source.doc_id == doc_id and source.sha256 != current_sha256
+        for source in sources
+    )
+
+
+def _lecture_changed(
+    job_id: str, current_revision: str, sources: tuple[GenerationSourceUsed, ...]
+) -> bool:
+    return any(
+        source.job_id == job_id and source.revision != current_revision
+        for source in sources
+    )
 
 
 def _document_citation(
@@ -56,7 +80,12 @@ def _document_citation(
             doc_id=citation.doc_id,
         )
     except NotFoundError:
-        return {"quote": citation.quote, "source": REMOVED_SOURCE, "href": None}
+        return {
+            "quote": citation.quote,
+            "source": REMOVED_SOURCE,
+            "href": None,
+            "changed": False,
+        }
     href = f"/corsi/{context.key}/documenti/{citation.doc_id}?p={citation.page}"
     return {
         "quote": citation.quote,
@@ -65,6 +94,11 @@ def _document_citation(
         "href": href,
         "ocr": _page_is_ocr(
             context=context, doc_id=citation.doc_id, page=citation.page
+        ),
+        "changed": _document_changed(
+            doc_id=citation.doc_id,
+            current_sha256=document.sha256,
+            sources=context.sources,
         ),
     }
 
@@ -159,7 +193,12 @@ def _lecture_citation(
 ) -> dict[str, Any]:
     assert citation.job_id is not None
     if not (context.store.jobs_dir / citation.job_id).is_dir():
-        return {"quote": citation.quote, "source": REMOVED_SOURCE, "href": None}
+        return {
+            "quote": citation.quote,
+            "source": REMOVED_SOURCE,
+            "href": None,
+            "changed": False,
+        }
     loaded = _lecture_transcript(store=context.store, job_id=citation.job_id)
     timestamp = _exact_timestamp(citation=citation, loaded=loaded)
     variant = loaded[1] if loaded is not None else "original"
@@ -169,7 +208,17 @@ def _lecture_citation(
         "source": LECTURE_SOURCE,
         "timestamp": timestamp,
         "href": href,
+        "changed": _lecture_source_changed(job_id=citation.job_id, context=context),
     }
+
+
+def _lecture_source_changed(job_id: str, context: CitationContext) -> bool:
+    current_revision = lecture_revision(store=context.store, job_id=job_id)
+    if current_revision is None:
+        return False
+    return _lecture_changed(
+        job_id=job_id, current_revision=current_revision, sources=context.sources
+    )
 
 
 def resolve_citation(
