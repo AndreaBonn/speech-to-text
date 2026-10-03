@@ -212,7 +212,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   verify: click-through registrato di ogni controllo; render 375/1280; `a11y-gate`; XSS con
   `<script>` nella risposta LLM finta → nessuna esecuzione.
 
-- [ ] **T036** Misura reale (non delegabile: giudizio). `BUDGET: 4 iterazioni del prompt |
+- [x] **T036** Misura reale (non delegabile: giudizio). `BUDGET: 4 iterazioni del prompt |
   ranking: domande sbagliate (meno) > soluzioni sbagliate (meno) > domande scartate (meno) >
   durata`. Corso reale: un compito per formato (10 domande) e 2 riassunti; durata,
   `prompt_eval_count` massimo, scarti per motivo, revisione a mano di tutte le domande tenute e
