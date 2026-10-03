@@ -69,23 +69,32 @@ def resolve_citations(
     passages: Sequence[RetrievedPassage],
     counts: Counter[str],
 ) -> tuple[GenerationCitation, ...] | None:
-    """None discards the whole item: one bad citation voids its solution."""
+    """The citations found in the material; None (item discarded) if none is.
+
+    An invented citation is dropped, not the item: T046 lost a correct
+    definition because its second citation was made up while the first one
+    held. Counts record discarded items, by the first reason found.
+    """
     if not MIN_CITATIONS <= len(proposed) <= MAX_CITATIONS:
         counts[DiscardReason.CITATION_COUNT] += 1
         return None
-    resolved = []
-    for citation in proposed:
-        result = resolve_citation(
+    results = [
+        resolve_citation(
             passages=passages,
-            citation=ProposedSourceCitation(
-                label=citation.passage, quote=citation.quote
-            ),
+            citation=ProposedSourceCitation(label=c.passage, quote=c.quote),
         )
-        if isinstance(result, SourceRejection):
-            counts[result.reason] += 1
-            return None
-        resolved.append(to_generation_citation(resolved=result))
-    return tuple(resolved)
+        for c in proposed
+    ]
+    resolved = tuple(
+        to_generation_citation(resolved=r)
+        for r in results
+        if not isinstance(r, SourceRejection)
+    )
+    if not resolved:
+        first = next(r for r in results if isinstance(r, SourceRejection))
+        counts[first.reason] += 1
+        return None
+    return resolved
 
 
 def _has_valid_options(options: Sequence[str]) -> bool:

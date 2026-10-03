@@ -258,7 +258,9 @@ def test_not_found_answer_constant_is_the_user_facing_message() -> None:
     assert NOT_FOUND_ANSWER == "Non trovo la risposta nel materiale di questo corso."
 
 
-def test_answer_discards_sentence_when_one_of_its_citations_is_fabricated() -> None:
+def test_answer_keeps_sentence_dropping_only_its_fabricated_citation() -> None:
+    # Measured (T046): the correct definition of "avviamento" was lost because
+    # its second citation was invented; the first one still supports it.
     payload = json.dumps(
         {
             "frasi": [
@@ -283,8 +285,10 @@ def test_answer_discards_sentence_when_one_of_its_citations_is_fabricated() -> N
         options=_options(),
     )
 
-    assert result.outcome == ChatOutcome.NOT_FOUND
-    assert result.discarded == 1
+    assert result.outcome == ChatOutcome.DONE
+    assert result.discarded == 0
+    [sentence] = result.sentences
+    assert [c.quote for c in sentence.citations] == ["la causa e' illecita quando"]
 
 
 def test_build_retrieval_question_blank_question_reuses_previous_one_stripped() -> None:
