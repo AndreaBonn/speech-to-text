@@ -1,0 +1,255 @@
+/* ---------- Models (modelli) ---------- */
+
+.models__notice {
+  max-width: var(--measure-reading);
+  color: var(--color-ink-2);
+  margin: 0 0 var(--space-lg);
+}
+
+.models__tags {
+  margin: var(--space-3xs) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+
+/* Rows with a tags note under the badge are taller than the action cell:
+   center every cell on the row instead of hugging the top, so the row's
+   bottom border reads as one straight line instead of offset per cell. */
+.models-table td {
+  vertical-align: middle;
+}
+
+.models__ollama {
+  margin-top: var(--space-2xl);
+  max-width: var(--content-max);
+}
+
+.models__ollama-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+
+.models__ollama-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.models__ollama-row .cell-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: var(--weight-medium);
+}
+
+.models__ollama-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.models__ollama-form .field {
+  width: 100%;
+  max-width: 28rem;
+  margin-bottom: 0;
+}
+
+@media (min-width: 640px) {
+  .models__ollama-form {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .models__ollama-form .field {
+    flex: 0 1 28rem;
+  }
+}
+
+/* ---------- WER comparison (confronto) ---------- */
+
+.wer {
+  max-width: 40rem;
+}
+
+.wer__intro {
+  color: var(--color-ink-2);
+  margin: 0 0 var(--space-lg);
+}
+
+.wer__source-fields[hidden] {
+  display: none;
+}
+
+.wer__form .segmented {
+  margin: var(--space-sm) 0 var(--space-md);
+}
+
+.wer__result {
+  margin-top: var(--space-xl);
+  padding: var(--space-lg);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.wer__result[hidden] {
+  display: none;
+}
+
+.wer__score {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.wer__score-value {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-display);
+  color: var(--color-accent);
+}
+
+.wer__score-label {
+  color: var(--color-ink-3);
+}
+
+.wer__counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-md);
+  margin: 0;
+}
+
+.wer__counts dt {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+.wer__counts dd {
+  margin: var(--space-3xs) 0 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---------- Reader: manual correction ---------- */
+
+.reader.is-editing {
+  padding-bottom: calc(var(--player-height) + 11rem);
+}
+
+.reader.is-editing .word {
+  cursor: text;
+}
+
+.word--selected,
+.word--selected.word--uncertain,
+.word--selected.word--current {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.edit-panel {
+  position: fixed;
+  left: var(--rail-width);
+  right: 0;
+  bottom: var(--player-height);
+  z-index: var(--z-sticky);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-surface);
+  border-top: var(--rule-hair) solid var(--color-rule);
+  box-shadow: var(--shadow-raise);
+}
+
+.edit-panel[hidden] {
+  display: none;
+}
+
+.edit-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2xs) var(--space-sm);
+}
+
+.edit-panel__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.edit-panel__selection {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.edit-panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.edit-panel__input {
+  flex: 1 1 16rem;
+  max-width: none;
+  font-family: var(--font-reading);
+}
+
+.edit-panel__help,
+.edit-panel__status,
+.edit-panel__error {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+
+.edit-panel__status {
+  color: var(--color-success);
+}
+
+.edit-panel__error {
+  color: var(--color-danger);
+}
+
+.edit-panel__status:empty,
+.edit-panel__error:empty {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .edit-panel {
+    left: 0;
+    bottom: calc(var(--player-height) * 1.4);
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .reader.is-editing {
+    padding-bottom: calc(var(--player-height) * 1.6 + 14rem);
+  }
+}
+

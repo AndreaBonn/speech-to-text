@@ -1,0 +1,161 @@
+/* ---------- Chat (course detail: /corsi, questions on the course) ---------- */
+
+.chat {
+  margin-top: var(--space-xl);
+}
+
+.chat__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 18rem) minmax(0, 1fr);
+  gap: var(--space-lg);
+  margin-top: var(--space-sm);
+  align-items: start;
+}
+
+.chat__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.chat__new {
+  align-self: flex-start;
+}
+
+.chat__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  /* Many conversations would push the open thread below the fold. */
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.chat__list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+.chat__list-item.is-active .chat__list-item-open {
+  border-color: var(--color-accent);
+}
+
+.chat__list-item-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3xs);
+  text-align: left;
+}
+
+.chat__list-item-title {
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.chat__list-item-date {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+.chat__thread-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.chat__thread {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.chat__message {
+  padding: var(--space-sm);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+  border: var(--rule-hair) solid var(--color-rule);
+}
+
+.chat__message--user {
+  background: var(--color-paper-2);
+}
+
+.chat__message-text {
+  margin: 0 0 var(--space-2xs);
+  overflow-wrap: anywhere;
+}
+
+.chat__message-text:last-child {
+  margin-bottom: 0;
+}
+
+.chat__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.chat__textarea {
+  min-height: 5rem;
+  max-width: none;
+  resize: vertical;
+}
+
+.chat__waiting {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+@media (max-width: 767px) {
+  .chat__layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chat__message--failed {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+  font-style: normal;
+}
+
+/* OCR of scanned documents (T052) */
+.ocr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs) var(--space-sm);
+  margin-top: var(--space-2xs);
+}
+
+.ocr__hint,
+.ocr__status {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+  margin: 0;
+}
+
+.generations__citation-ocr {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+.document__ocr-notice {
+  margin-bottom: var(--space-sm);
+}
+
+.ocr__status--danger {
+  color: var(--color-danger);
+}

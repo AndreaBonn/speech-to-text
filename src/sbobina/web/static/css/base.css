@@ -1,0 +1,245 @@
+/* sbobina · app shell and base styles. Tokens only: see tokens.css; area styles follow in the other css/ files, loaded in order by base.html. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: clip;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  line-height: var(--leading-ui);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: var(--space-sm);
+  z-index: var(--z-toast);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  border-radius: var(--radius-input);
+}
+
+.skip-link:focus {
+  top: var(--space-sm);
+}
+
+/* ---------- Shell ---------- */
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.rail {
+  flex: 0 0 var(--rail-width);
+  background: var(--color-paper-2);
+  border-right: var(--rule-hair) solid var(--color-rule);
+  padding: var(--space-lg) var(--space-md);
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+}
+
+.rail__brand {
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-display);
+  margin-bottom: var(--space-lg);
+}
+
+.rail__scroll {
+  min-width: 0;
+}
+
+.rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+/* Foot of the rail, right above the device indicator. Two classes beat
+   .btn below. */
+.btn.rail__theme {
+  margin-top: auto;
+  font-size: var(--text-sm);
+}
+
+/* Desktop rail stays in view: without it the foot (theme switch, device
+   indicator) scrolls away on long pages such as the history or the reader. */
+@media (min-width: 769px) {
+  .rail {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  /* Only the links scroll when the window is short: brand, theme switch
+     and indicator stay put. */
+  .rail__scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+.rail__indicator {
+  margin-top: var(--space-xs);
+  text-align: center;
+  padding: var(--space-sm) var(--space-sm) 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+  border-top: var(--rule-hair) solid var(--color-rule);
+}
+
+.rail__indicator:empty {
+  display: none;
+}
+
+.rail__link {
+  display: block;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-input);
+  color: var(--color-ink-2);
+  text-decoration: none;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  transition: background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.rail__link:hover {
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+}
+
+.rail__link--active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: var(--weight-medium);
+}
+
+.rail__link--disabled {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--color-ink-3);
+  cursor: not-allowed;
+}
+
+.app-shell__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-lg) var(--space-xl);
+}
+
+.page-title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-display);
+  margin: 0 0 var(--space-lg);
+}
+
+.section-title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  margin: 0 0 var(--space-md);
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .rail {
+    flex: none;
+    flex-direction: row;
+    align-items: center;
+    border-right: none;
+    border-bottom: var(--rule-hair) solid var(--color-rule);
+    padding: var(--space-sm);
+  }
+
+  .rail__brand {
+    flex: none;
+    margin-bottom: 0;
+    margin-right: var(--space-sm);
+  }
+
+  .rail__scroll {
+    flex: 1 1 auto;
+    overflow-x: auto;
+    /* The nav scrolls horizontally, but the scrollbar itself is not part
+       of the design: the brand above stays put either way. */
+    scrollbar-width: none;
+  }
+
+  .rail__scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rail__list {
+    flex-direction: row;
+    gap: var(--space-xs);
+  }
+
+  .rail__link,
+  .rail__link--disabled {
+    white-space: nowrap;
+  }
+
+  .rail__indicator {
+    display: none;
+  }
+
+  .btn.rail__theme {
+    flex: none;
+    margin-top: 0;
+    margin-left: var(--space-xs);
+    min-height: 44px;
+  }
+
+  .rail__theme-prefix {
+    display: none;
+  }
+
+  .app-shell__main {
+    padding: var(--space-md);
+  }
+}
+

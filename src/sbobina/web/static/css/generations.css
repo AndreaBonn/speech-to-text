@@ -1,0 +1,173 @@
+/* ---------- Generations (course detail: /corsi, exercises + summaries) ---------- */
+
+.generations {
+  margin-top: var(--space-xl);
+}
+
+.generations__form {
+  margin-top: var(--space-sm);
+  max-width: 32rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.generations__list {
+  list-style: none;
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.generations__item {
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.generations__item-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.generations__item-title {
+  font-weight: var(--weight-semibold);
+}
+
+.generations__topic {
+  margin: var(--space-2xs) 0 0;
+  color: var(--color-ink-3);
+}
+
+.generations__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  margin-top: var(--space-sm);
+}
+
+.generations__downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  margin-top: var(--space-xs);
+}
+
+.generations__detail {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: var(--rule-hair) solid var(--color-rule);
+}
+
+.generations__counter {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+  margin: 0 0 var(--space-sm);
+}
+
+.generations__questions,
+.generations__sentences {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.generations__question-text,
+.generations__sentence-text {
+  font-weight: var(--weight-medium);
+  margin: 0 0 var(--space-xs);
+}
+
+.generations__options {
+  list-style: none;
+  margin: 0 0 var(--space-xs);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+}
+
+.generations__solution-text {
+  margin: 0 0 var(--space-xs);
+}
+
+.generations__solution-answer {
+  margin: 0 0 var(--space-3xs);
+  font-weight: 600;
+}
+
+.generations__citations {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+  margin: 0;
+}
+
+.generations__citation-removed {
+  font-style: italic;
+}
+
+.generations__section {
+  margin-bottom: var(--space-md);
+}
+
+.generations__section-title {
+  margin: 0 0 var(--space-xs);
+}
+
+/* ---------- Document page (/corsi/<key>/documenti/<id>) ---------- */
+
+.document {
+  max-width: var(--content-max);
+}
+
+.document__text {
+  max-width: var(--measure-reading);
+  font-family: var(--font-reading);
+  line-height: var(--leading-reading);
+}
+
+.document__paragraph {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* Same mark as search snippets: the browser's yellow is not a design token. */
+.document__paragraph mark {
+  background: var(--color-accent-soft);
+  color: inherit;
+  border-radius: var(--radius-mark);
+}
+
+.document__no-text {
+  margin: 0;
+  color: var(--color-ink-3);
+  font-style: italic;
+}
+
+.document__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+  max-width: var(--measure-reading);
+}
+
+.document__page-count {
+  color: var(--color-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 767px) {
+  .document__pagination {
+    flex-wrap: wrap;
+  }
+}
+

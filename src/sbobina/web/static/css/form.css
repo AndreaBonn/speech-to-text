@@ -1,0 +1,237 @@
+/* ---------- Banner ---------- */
+
+.banner-region:empty {
+  margin: 0;
+}
+
+.banner {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-input);
+  margin-bottom: var(--space-md);
+  font-size: var(--text-sm);
+}
+
+.banner--warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  border: var(--rule-hair) solid var(--color-warning);
+}
+
+.banner--danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: var(--rule-hair) solid var(--color-danger);
+}
+
+.banner--info {
+  background: var(--color-surface);
+  color: var(--color-ink-2);
+  border: var(--rule-hair) solid var(--color-rule);
+}
+
+/* ---------- Form error ---------- */
+
+.form-error {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-input);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  margin-bottom: var(--space-md);
+  font-size: var(--text-sm);
+}
+
+/* ---------- Field ---------- */
+
+.nuova-layout {
+  display: flex;
+  flex-direction: column;
+}
+
+.upload-card {
+  max-width: var(--content-max);
+  margin-bottom: var(--space-2xl);
+}
+
+@media (min-width: 1024px) {
+  /* Grid with fixed-width columns: a job row growing new content (a stage
+     name, a progress meta line, an action button) must not reflow the
+     upload card next to it. */
+  .nuova-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 36rem) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-2xl);
+  }
+
+  .upload-card {
+    max-width: none;
+    margin-bottom: 0;
+  }
+
+  .queue-section {
+    min-width: 0;
+  }
+}
+
+.field {
+  margin-bottom: var(--space-md);
+}
+
+.field__label {
+  display: block;
+  font-weight: var(--weight-medium);
+  margin-bottom: var(--space-2xs);
+}
+
+/* ---------- Toggletip: label help on hover, focus and tap ---------- */
+
+.field__label-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-2xs);
+}
+
+.field__label-row .field__label {
+  margin-bottom: 0;
+}
+
+.toggletip__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: var(--rule-hair) solid var(--color-control-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-ink-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  cursor: help;
+}
+
+.toggletip__button:hover {
+  border-color: var(--color-accent);
+  color: var(--color-ink);
+}
+
+/* Anchored to the label row, not the button, so it never runs off a
+   375px screen; touching the row keeps it hoverable (WCAG 1.4.13). */
+.toggletip__bubble {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: var(--z-tooltip);
+  width: min(22rem, 100%);
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--rule-hair) solid var(--color-rule-strong);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: normal;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--dur-fast) var(--ease-out),
+    visibility var(--dur-fast) var(--ease-out);
+}
+
+.toggletip:hover .toggletip__bubble,
+.toggletip:focus-within .toggletip__bubble {
+  opacity: 1;
+  visibility: visible;
+}
+
+.toggletip--dismissed .toggletip__bubble,
+.toggletip--dismissed:hover .toggletip__bubble,
+.toggletip--dismissed:focus-within .toggletip__bubble {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.field__helper {
+  margin: var(--space-2xs) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+.model-other {
+  display: block;
+  margin-top: var(--space-xs);
+}
+
+.model-other[hidden] {
+  display: none;
+}
+
+.model-profile__item {
+  max-width: 28rem;
+  margin: var(--space-xs) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+.model-profile__line {
+  display: block;
+}
+
+.model-profile__line:first-child {
+  font-weight: var(--weight-medium);
+}
+
+.field__error {
+  margin: var(--space-2xs) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}
+
+.text-input,
+.select-input {
+  width: 100%;
+  max-width: 28rem;
+  min-height: 40px;
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--rule-hair) solid var(--color-control-border);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+/* The browser default placeholder grey drops to 3.8:1 on the dark surface. */
+.text-input::placeholder {
+  color: var(--color-ink-3);
+  opacity: 1;
+}
+
+.text-input:disabled,
+.select-input:disabled {
+  color: var(--color-ink-3);
+  background: var(--color-paper-2);
+}
+
+.text-input.is-invalid,
+.select-input.is-invalid {
+  border-color: var(--color-danger);
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+  min-height: 44px;
+}
+
+.checkbox-field input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-accent);
+}
+

@@ -1,0 +1,152 @@
+/* ---------- Progress ---------- */
+
+.progress {
+  margin-top: var(--space-xs);
+}
+
+.progress__track {
+  position: relative;
+  height: var(--rule-progress);
+  border-radius: var(--rule-progress);
+  background: var(--color-paper-3);
+  overflow: hidden;
+}
+
+.progress__fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(var(--progress-value, 0));
+  background: var(--color-accent);
+  border-radius: var(--rule-progress);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.progress--indeterminate .progress__fill {
+  width: 40%;
+  transform: translateX(-100%);
+  animation: progress-indeterminate 1.1s var(--ease-in-out) infinite;
+}
+
+/* transform only: the 40% bar travels from fully left of the track to fully
+   right of it (100% / 40% = 250% of its own width). */
+@keyframes progress-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(250%);
+  }
+}
+
+.progress__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-3xs);
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+/* ---------- Queue ---------- */
+
+.queue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.job-row {
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+}
+
+.job-row__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.job-row__title {
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.job-row__meta {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+.job-row__actions {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.job-row__error {
+  margin-top: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}
+
+.job-row__notice {
+  margin-top: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--color-warning);
+}
+
+/* ---------- Empty / loading / error states ---------- */
+
+.empty-state {
+  padding: var(--space-xl);
+  text-align: center;
+  color: var(--color-ink-2);
+  border: 1px dashed var(--color-rule);
+  border-radius: var(--radius-card);
+}
+
+.empty-state__text {
+  margin: 0;
+  max-width: 48ch;
+  margin-inline: auto;
+}
+
+.queue__error {
+  padding: var(--space-md);
+  border-radius: var(--radius-card);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.skeleton-row {
+  height: 4.5rem;
+  border-radius: var(--radius-card);
+  background: linear-gradient(
+    90deg,
+    var(--color-paper-2) 0%,
+    var(--color-paper-3) 50%,
+    var(--color-paper-2) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
