@@ -10,11 +10,7 @@ import anyio
 from fastapi import HTTPException, UploadFile
 
 from sbobina.document_models import CourseDocument, DocumentKind, DocumentStatus
-from sbobina.document_sniff import (
-    ArchiveTooLargeError,
-    check_archive_limits,
-    sniff_document,
-)
+from sbobina.document_sniff import ArchiveTooLargeError, sniff_document
 from sbobina.web.api_jobs import source_name
 from sbobina.web.document_store import original_path
 from sbobina.web.extraction_worker import ExtractionWorker
@@ -22,7 +18,6 @@ from sbobina.web.extraction_worker import ExtractionWorker
 CHUNK_SIZE = 1024 * 1024
 HEAD_SNIFF_BYTES = 32
 TEMP_UPLOAD_NAME = "upload.part"
-ARCHIVE_KINDS = frozenset({DocumentKind.DOCX, DocumentKind.PPTX})
 
 
 async def _write_upload(file: UploadFile, path: Path, limit: int) -> tuple[int, str]:
@@ -44,18 +39,17 @@ async def _write_upload(file: UploadFile, path: Path, limit: int) -> tuple[int, 
 def _sniff_kind(path: Path, filename: str) -> DocumentKind:
     with path.open("rb") as source:
         head = source.read(HEAD_SNIFF_BYTES)
-    kind = sniff_document(head=head, path=path, filename=filename)
+    try:
+        # Sniffing an Office file checks the archive limits before opening it.
+        kind = sniff_document(head=head, path=path, filename=filename)
+    except ArchiveTooLargeError as error:
+        raise HTTPException(
+            status_code=413, detail="Il documento supera i limiti consentiti"
+        ) from error
     if kind is None:
         raise HTTPException(
             status_code=415, detail="Formato del documento non supportato"
         )
-    if kind in ARCHIVE_KINDS:
-        try:
-            check_archive_limits(path=path)
-        except ArchiveTooLargeError as error:
-            raise HTTPException(
-                status_code=413, detail="Il documento supera i limiti consentiti"
-            ) from error
     return kind
 
 

@@ -1,7 +1,9 @@
+import io
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+import docx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -16,6 +18,12 @@ BASE_URL = "http://127.0.0.1:8765"
 COURSES_URL = "/api/v1/courses"
 PDF_BYTES = b"%PDF-1.4\n%%EOF"
 EXE_BYTES = b"MZ\x90\x00\x03\x00\x00\x00" + b"\x00" * 64
+
+
+def docx_bytes() -> bytes:
+    buffer = io.BytesIO()
+    docx.Document().save(buffer)
+    return buffer.getvalue()
 
 
 def make_client(tmp_path: Path, settings: Settings | None = None) -> TestClient:
@@ -258,3 +266,23 @@ def test_document_routes_reject_ids_that_are_not_generated_ids(
 
     assert statuses <= {404, 405}
     assert list((tmp_path / "courses").glob("*/course.json")) != []
+
+
+def test_create_document_office_archive_within_limits_is_accepted(
+    client: TestClient,
+) -> None:
+    response = upload(client, "fisica", "Dispense.docx", docx_bytes())
+
+    assert response.status_code == 202
+    assert response.json()["data"]["kind"] == "docx"
+
+
+def test_create_document_office_archive_over_limits_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("sbobina.document_sniff.MAX_ARCHIVE_ENTRIES", 2)
+    with make_client(tmp_path=tmp_path) as client:
+        response = upload(client, "fisica", "bomba.docx", docx_bytes())
+
+    assert response.status_code == 413
+    assert list((tmp_path / "courses").glob("*/documents/*")) == []
