@@ -31,6 +31,7 @@
 
   var dom = window.SbobinaDom;
   var materials = window.SbobinaCourseMaterials;
+  var generations = window.SbobinaCourseGenerations;
   var clearChildren = dom.clearChildren;
   var textCell = dom.textCell;
   var showSkeleton = dom.showSkeleton;
@@ -163,6 +164,7 @@
     detailTitleEl.textContent = labelFor(key, knownLabel);
     loadDetail(key, 1);
     materials.show(key);
+    generations.show(key);
   }
 
   function showList() {
@@ -170,6 +172,7 @@
     detailEl.hidden = true;
     listEl.hidden = false;
     materials.hide();
+    generations.hide();
   }
 
   function refreshTitle() {

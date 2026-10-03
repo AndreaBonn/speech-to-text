@@ -126,6 +126,66 @@
 
       <nav id="materials-pagination" class="pagination" aria-label="Pagine dei materiali" hidden></nav>
     </section>
+
+    <section id="corsi-generations" class="generations" aria-labelledby="corsi-generations-title">
+      <h3 id="corsi-generations-title" class="section-title">Esercitazioni e riassunti</h3>
+
+      <form id="generations-form" class="generations__form" novalidate>
+        <div class="field">
+          <label class="field__label" for="generations-format">Formato</label>
+          <select id="generations-format" class="select-input" name="format">
+            <option value="multiple_choice">Crocette</option>
+            <option value="open">Domande aperte</option>
+            <option value="oral">Orale</option>
+            <option value="summary">Riassunto</option>
+          </select>
+        </div>
+
+        <div class="field" id="generations-count-field">
+          <label class="field__label" for="generations-count">Numero di domande</label>
+          <input id="generations-count" class="text-input" type="number" name="count"
+                 min="1" max="20" step="1" value="10">
+          <p id="generations-count-error" class="field__error" role="alert" hidden></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="generations-topic">Argomento (facoltativo)</label>
+          <input id="generations-topic" class="text-input" type="text" name="topic"
+                 maxlength="200" placeholder="Es. leggi di Newton">
+          <p id="generations-topic-error" class="field__error" role="alert" hidden></p>
+        </div>
+
+        <details class="disclosure">
+          <summary>Fonti (facoltativo)</summary>
+          <div class="disclosure__body">
+            <p class="field__helper">Nessuna selezione usa tutto il corso.</p>
+            <div class="field">
+              <label class="field__label" for="generations-sources-docs">Documenti</label>
+              <select id="generations-sources-docs" class="select-input" name="doc_ids" multiple size="4"></select>
+            </div>
+            <div class="field">
+              <label class="field__label" for="generations-sources-lectures">Lezioni</label>
+              <select id="generations-sources-lectures" class="select-input" name="job_ids" multiple size="4"></select>
+            </div>
+          </div>
+        </details>
+
+        <div id="generations-form-error" class="form-error" hidden role="alert"></div>
+        <button type="submit" id="generations-submit" class="btn btn--primary">Genera</button>
+      </form>
+
+      <div id="generations-status" class="history__status" role="alert" hidden></div>
+
+      <ul id="generations-list" class="generations__list" hidden></ul>
+
+      <div id="generations-empty" class="empty-state" hidden>
+        <p class="empty-state__text">
+          Nessuna esercitazione o riassunto ancora: compila il modulo per generarne uno.
+        </p>
+      </div>
+
+      <nav id="generations-pagination" class="pagination" aria-label="Pagine delle generazioni" hidden></nav>
+    </section>
   </div>
 </div>
 {% endblock %}
@@ -134,6 +194,10 @@
 <script src="/static/js/dom.js" defer></script>
 <script src="/static/js/corso-upload.js" defer></script>
 <script src="/static/js/corso-materiali.js" defer></script>
+<script src="/static/js/corso-generazioni-dettaglio.js" defer></script>
+<script src="/static/js/corso-generazioni-form.js" defer></script>
+<script src="/static/js/corso-generazioni-azioni.js" defer></script>
+<script src="/static/js/corso-generazioni.js" defer></script>
 <script src="/static/js/corso-dettaglio.js" defer></script>
 <script src="/static/js/corsi.js" defer></script>
 <script src="/static/js/search.js" defer></script>
