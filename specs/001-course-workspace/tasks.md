@@ -245,7 +245,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   seriali per la FIFO (ADR D3 da correggere: il diagramma fa passare i CourseWorkItem
   dall'arbitro); test di starvation: chat in arrivo continuo mentre la trascrizione aspetta →
   la trascrizione parte dopo il turno in corso (priorità allo scrittore).
-- [x] **T041** `chat_pipeline.py` + prompt `chat-v1.md` (via `prompt-master`): domanda + ultimi 2
+- [x] **T041** `chat_pipeline.py` + prompt `chat-v1.md` (via `prompt-master`; sostituito da `chat-v2.md` in T046, vedi `eval-chat.md`): domanda + ultimi 2
   scambi → `retrieve` → risposta JSON a frasi con citazioni → validazione → frasi non citate
   rimosse; nessun passaggio o nessuna frase valida → "Non trovo la risposta nel materiale di
   questo corso" senza (o dopo) la chiamata. Rischio: medio.
@@ -293,12 +293,12 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
 
 - [x] **T050** Misura (non delegabile): 5 pagine scansionate con `qwen2.5vl:7b`, tempo per pagina,
   VRAM, qualità del testo a vista. verify: tabella in `adr.md`; decisione su risoluzione e prompt.
-- [ ] **T051** Azione di coda `ocr` (GPU, come lo studio): pagine renderizzate a immagine
+- [x] **T051** Azione di coda `ocr` (GPU, come lo studio): pagine renderizzate a immagine
   (`pypdfium2` o equivalente da T001c), una chiamata per pagina, testo in `text.json` con
   `source: "ocr"`; documento da `ready_no_text` a `ready`. Prompt `ocr-v1.md` via prompt-master.
   verify: Ollama finto → pagine scritte e stato `ready`; Ollama giù → `failed` con
   `OLLAMA_UNAVAILABLE`, file originale intatto.
-- [ ] **T052** UI: pulsante "Estrai il testo con OCR" sui documenti senza testo, avanzamento,
+- [x] **T052** UI: pulsante "Estrai il testo con OCR" sui documenti senza testo, avanzamento,
   testo OCR marcato come tale nel lettore. verify: click-through, a11y-gate, render 375/1280.
 - [ ] **T059** Gate F5. verify: suite, ruff, format, mypy; run reale su un PDF scansionato con
   `nvidia-smi` → mai Whisper e OCR insieme.

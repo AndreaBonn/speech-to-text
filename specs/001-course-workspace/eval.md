@@ -56,3 +56,24 @@ Conseguenze per F5:
   prova niente.
 - Perché il modello non usa la GPU: BASIS inferred, la stima di 13 GB supera gli 8 GB e Ollama non
   divide il modello visivo; da verificare nei log di Ollama.
+
+## T051-T052 - OCR reale dalla pagina del corso (2026-10-03)
+
+PDF di sole immagini con le pagine 31-32 del manuale `librib` (la 31 è quella di T050),
+caricato nel corso e passato all'OCR dal pulsante della pagina. `qwen2.5vl:7b`, scala 1.0,
+`num_ctx` 4096, prompt `ocr-v1`.
+
+| | Misura |
+|---|---|
+| Pagina 1 | 265 s |
+| Pagina 2 | 286 s |
+| Parole pagina 1 | 431 (livello di testo del PDF originale: 441) |
+| Frase che in T050 cambiava significato | trascritta corretta: "i piccoli redditi erano cresciuti meno dei grandi" |
+
+Il documento passa a `ready`, il lettore mostra l'avviso sulle pagine OCR, le citazioni portano
+"testo da OCR". Una sola frase controllata a vista: la marcatura come testo non affidabile resta.
+
+Il gate T059 (OCR e Whisper mai insieme) **non è valido**: durante la prova Whisper girava su CPU
+perché `uv add pillow` (commit `7f5b76a`) aveva sincronizzato l'ambiente senza l'extra `cuda`,
+disinstallando `nvidia-cublas-cu12` e `nvidia-cudnn-cu12`. Va ripetuto dopo
+`uv sync --extra cuda`.
