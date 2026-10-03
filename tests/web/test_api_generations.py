@@ -642,3 +642,76 @@ def test_delete_generation_twice_is_not_a_server_error(
 
     assert first.status_code == 204
     assert second.status_code == 404
+
+
+def _write_long_lecture(tmp_path: Path, job_id: str) -> None:
+    """Six segments, 10 s apart: segment n holds "parolaN1 parolaN2 parolaN3"."""
+    segments = tuple(
+        Segment(
+            start=10.0 * n,
+            end=10.0 * n + 3.0,
+            words=tuple(
+                Word(
+                    start=10.0 * n + k,
+                    end=10.0 * n + k + 1.0,
+                    text=f"parola{n}{k} ",
+                    probability=0.99,
+                )
+                for k in range(3)
+            ),
+        )
+        for n in range(6)
+    )
+    transcript = Transcript(
+        source="lezione.m4a",
+        model="large-v3",
+        language="it",
+        duration=60.0,
+        segments=segments,
+    )
+    directory = _store(tmp_path).jobs_dir / job_id
+    directory.mkdir(parents=True, exist_ok=True)
+    save_transcript(
+        transcript=transcript, path=directory / TRANSCRIPT_FILES["original"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("quote", "expected"),
+    [("parola41 parola42 parola50", 41.0), ("parola10 parola11 parola12", 10.0)],
+)
+def test_get_generation_lecture_citation_found_anywhere_in_the_window(
+    client: TestClient, tmp_path: Path, quote: str, expected: float
+) -> None:
+    # Windows start at the anchor (course sampling) or are centred on it
+    # (topic search): the quote can sit several segments after or before it.
+    course_id = _register_course(tmp_path=tmp_path)
+    _write_long_lecture(tmp_path=tmp_path, job_id="lezione-1")
+    question = GenerationQuestion(
+        question="Domanda",
+        options=(),
+        correct_index=None,
+        solution="risposta",
+        citations=(
+            GenerationCitation(
+                passage_id="Llezione-1-S2",
+                quote=quote,
+                doc_id=None,
+                page=None,
+                job_id="lezione-1",
+                timestamp=20.0,
+            ),
+        ),
+    )
+    record = _make_record(
+        tmp_path=tmp_path,
+        course_id=course_id,
+        format_=GenerationFormat.OPEN,
+        status=GenerationStatus.DONE,
+        questions=(question,),
+    )
+
+    response = client.get(f"{COURSES_URL}/fisica/generations/{record.id}")
+    citation = response.json()["data"]["questions"][0]["citations"][0]
+
+    assert citation["timestamp"] == expected

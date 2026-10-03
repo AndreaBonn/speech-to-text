@@ -10,6 +10,7 @@ quote no longer matches.
 """
 
 from dataclasses import dataclass
+from itertools import zip_longest
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,7 @@ from sbobina.generation_models import (
     SummarySection,
     SummarySentence,
 )
+from sbobina.lecture_windows import WINDOW_WORDS
 from sbobina.models import Transcript, load_transcript
 from sbobina.study_citations import locate_quote
 from sbobina.study_models import Rejection
@@ -89,6 +91,31 @@ def _anchor_index(transcript: Transcript, timestamp: float) -> int | None:
     )
 
 
+def _window_starts(transcript: Transcript, anchor: int) -> list[int]:
+    """Segments a passage window around anchor may cover, nearest first.
+
+    Course sampling starts the window at the anchor, topic search centres it
+    on the anchor, and locate_quote only looks at a segment and the next one:
+    so every segment within WINDOW_WORDS of the anchor, on both sides, is a
+    candidate start.
+    """
+    segments = transcript.segments
+
+    def reach(step: int) -> list[int]:
+        found, words, index = [], 0, anchor + step
+        while 0 <= index < len(segments) and words < WINDOW_WORDS:
+            found.append(index)
+            words += len(segments[index].words)
+            index += step
+        return found
+
+    after, before = reach(step=1), reach(step=-1)
+    interleaved = [
+        i for pair in zip_longest(after, before) for i in pair if i is not None
+    ]
+    return [anchor, *interleaved]
+
+
 def _exact_timestamp(
     citation: GenerationCitation, loaded: tuple[Transcript, str] | None
 ) -> float:
@@ -99,13 +126,17 @@ def _exact_timestamp(
     index = _anchor_index(transcript=transcript, timestamp=citation.timestamp)
     if index is None:
         return citation.timestamp
-    match = locate_quote(
-        segments=transcript.segments,
-        segment_index=index,
-        quote=citation.quote,
-        allowed=frozenset(range(len(transcript.segments))),
-    )
-    return citation.timestamp if isinstance(match, Rejection) else match.timestamp
+    allowed = frozenset(range(len(transcript.segments)))
+    for start in _window_starts(transcript=transcript, anchor=index):
+        match = locate_quote(
+            segments=transcript.segments,
+            segment_index=start,
+            quote=citation.quote,
+            allowed=allowed,
+        )
+        if not isinstance(match, Rejection):
+            return match.timestamp
+    return citation.timestamp
 
 
 def _lecture_citation(
