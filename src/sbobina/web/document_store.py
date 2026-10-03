@@ -89,6 +89,16 @@ def iter_documents(courses_dir: Path, course_id: str) -> Iterator[CourseDocument
         yield _document_from_json(json.loads(path.read_text(encoding="utf-8")))
 
 
+def find_duplicate_document(
+    courses_dir: Path, course_id: str, sha256: str
+) -> CourseDocument | None:
+    """An existing, non-failed document in the course with the same hash."""
+    for document in iter_documents(courses_dir=courses_dir, course_id=course_id):
+        if document.sha256 == sha256 and document.status is not DocumentStatus.FAILED:
+            return document
+    return None
+
+
 def iter_extracting_documents(courses_dir: Path) -> Iterator[CourseDocument]:
     """Documents stuck in ``extracting`` across every course, for boot recovery."""
     for path in sorted(courses_dir.glob(f"*/documents/*/{DOCUMENT_FILENAME}")):

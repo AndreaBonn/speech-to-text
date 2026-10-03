@@ -112,7 +112,9 @@ def test_path_traversal_filename_is_contained(
 
 def test_list_documents_paginated_newest_first(client: TestClient) -> None:
     first = upload(client, "fisica", "uno.pdf", PDF_BYTES).json()["data"]["id"]
-    second = upload(client, "fisica", "due.pdf", PDF_BYTES).json()["data"]["id"]
+    second = upload(client, "fisica", "due.pdf", PDF_BYTES + b"\n%extra").json()[
+        "data"
+    ]["id"]
     response = client.get(f"{COURSES_URL}/fisica/documents", params={"per_page": 1})
     body = response.json()
     assert response.status_code == 200

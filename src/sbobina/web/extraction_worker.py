@@ -17,6 +17,7 @@ from threading import Condition, Thread
 from sbobina.document_models import CourseDocument, DocumentStatus
 from sbobina.web.document_store import (
     document_dir,
+    find_duplicate_document,
     iter_extracting_documents,
     mark_extracted,
     mark_extracting,
@@ -101,10 +102,25 @@ class ExtractionWorker:
         """Persist a just-uploaded document as ``extracting`` and queue it.
 
         Writing and queueing under the worker lock leaves no on-disk state in
-        which a concurrent delete could remove a document about to be extracted.
+        which a concurrent delete could remove a document about to be
+        extracted, and no window in which two concurrent uploads of the same
+        file could both pass the duplicate check (adr.md D5).
         """
         stored = replace(document, status=DocumentStatus.EXTRACTING)
         with self._condition:
+            duplicate = find_duplicate_document(
+                courses_dir=self._courses_dir,
+                course_id=stored.course_id,
+                sha256=stored.sha256,
+            )
+            if duplicate is not None:
+                raise ConflictError(
+                    message=(
+                        "Questo file è già nei materiali del corso: "
+                        f"{duplicate.filename}"
+                    ),
+                    code="DOCUMENT_EXISTS",
+                )
             write_document(courses_dir=self._courses_dir, document=stored)
             self._queue.append(
                 ExtractionItem(course_id=stored.course_id, doc_id=stored.id)
