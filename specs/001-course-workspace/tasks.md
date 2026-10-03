@@ -305,8 +305,10 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   `OLLAMA_UNAVAILABLE`, file originale intatto.
 - [x] **T052** UI: pulsante "Estrai il testo con OCR" sui documenti senza testo, avanzamento,
   testo OCR marcato come tale nel lettore. verify: click-through, a11y-gate, render 375/1280.
-- [ ] **T059** Gate F5. verify: suite, ruff, format, mypy; run reale su un PDF scansionato con
+- [x] **T059** Gate F5. verify: suite, ruff, format, mypy; run reale su un PDF scansionato con
   `nvidia-smi` → mai Whisper e OCR insieme.
+  Esito: valido al secondo run (2026-10-03, Whisper su CUDA, 0 campioni sovrapposti su 289), vedi
+  `eval.md`.
 
 ## Remediation /analyze (2026-10-03)
 

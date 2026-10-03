@@ -77,3 +77,18 @@ Il gate T059 (OCR e Whisper mai insieme) **non è valido**: durante la prova Whi
 perché `uv add pillow` (commit `7f5b76a`) aveva sincronizzato l'ambiente senza l'extra `cuda`,
 disinstallando `nvidia-cublas-cu12` e `nvidia-cudnn-cu12`. Va ripetuto dopo
 `uv sync --extra cuda`.
+
+Ripetuto il 2026-10-03 dopo `uv sync --extra cuda`, sul codice con i limiti di A4 (`RLIMIT_AS`,
+timeout del processo, render a 2500 px). Script `t059_ocr.py`: PDF scansionato di 2 pagine,
+OCR avviato dalla pagina del corso, trascrizione di 5 minuti accodata subito dietro.
+
+| Misura | Valore |
+|---|---|
+| Dispositivo di Whisper (`child.log` del lavoro) | `device=cuda compute_type=float16 modello=large-v3` |
+| OCR, 2 pagine | 556 s (pagina 1 a 272 s) |
+| Trascrizione | partita a 558 s, finita a 580 s |
+| Campioni `nvidia-smi` ogni 2 s | 289, con più di un processo GPU: 0 |
+| Parole pagina 1 | 431, come nella prova precedente |
+
+Gate T059 valido: OCR e Whisper non hanno mai occupato la GPU insieme, e il limite di memoria non
+impedisce al processo OCR di leggere le pagine.
