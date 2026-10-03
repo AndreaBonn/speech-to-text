@@ -225,3 +225,23 @@ def test_build_prompt_for_twelve_passages_stays_under_token_budget_with_output_m
     sent = chat.requests[0]
     total = estimate_tokens(sent.system_prompt) + estimate_tokens(sent.user_message)
     assert total + options.num_predict <= CONTEXT_WINDOW_TOKENS
+
+
+def test_generate_keeps_question_dropping_only_its_invented_citation() -> None:
+    # Same rule as the chat (T046): an invented citation goes, the question
+    # stays while one of its citations is in the material.
+    payload = json.loads(_mc_payload("la causa e' illecita quando contraria"))
+    payload["domande"][0]["citazioni"].append(
+        {"passaggio": "P1", "testo": "parole mai scritte nel passaggio"}
+    )
+    chat = FakeChat(responses=[json.dumps(payload)])
+
+    result = generate(
+        request=_mc_request(), passages=[_doc_passage()], chat=chat, options=_options()
+    )
+
+    [question] = result.questions
+    assert [c.quote for c in question.citations] == [
+        "la causa e' illecita quando contraria"
+    ]
+    assert result.discarded == ()
