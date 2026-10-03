@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     extraction_max_memory_mb: int = Field(default=2048, gt=0)
     course_doc_max_mb: int = Field(default=200, gt=0)
     chat_timeout_s: float = Field(default=120.0, gt=0.0)
+    ocr_model: str = "qwen2.5vl:7b"
+    # Measured on CPU (eval.md § T050): ~172s/page at scale 1.0, >600s at 2.0.
+    ocr_scale: float = Field(default=1.0, gt=0.0)
 
     @field_validator("web_host")
     @classmethod

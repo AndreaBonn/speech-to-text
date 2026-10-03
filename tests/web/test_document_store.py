@@ -143,6 +143,32 @@ def test_write_and_read_text_roundtrip(tmp_path: Path) -> None:
     assert stored.encoding == extracted.encoding
 
 
+def test_write_and_read_text_roundtrip_preserves_ocr_flag(tmp_path: Path) -> None:
+    doc_dir = tmp_path / "course-1" / "documents" / "doc-1"
+    doc_dir.mkdir(parents=True)
+    extracted = ExtractedText(
+        pages=(Page(text="Letta con OCR", no_text=False, ocr=True),),
+        status=DocumentStatus.READY,
+        encoding=None,
+    )
+    document_store.write_text(doc_dir=doc_dir, extracted=extracted)
+    stored = document_store.read_text(doc_dir=doc_dir)
+    assert stored.pages == extracted.pages
+    assert stored.pages[0].ocr is True
+
+
+def test_read_text_without_ocr_field_defaults_to_false(tmp_path: Path) -> None:
+    doc_dir = tmp_path / "course-1" / "documents" / "doc-1"
+    doc_dir.mkdir(parents=True)
+    (doc_dir / document_store.TEXT_FILENAME).write_text(
+        '{"pages": [{"text": "Hello", "no_text": false}], '
+        '"status": "ready", "encoding": "utf-8"}',
+        encoding="utf-8",
+    )
+    stored = document_store.read_text(doc_dir=doc_dir)
+    assert stored.pages[0].ocr is False
+
+
 def test_original_path_uses_kind_extension(tmp_path: Path) -> None:
     assert (
         document_store.original_path(doc_dir=tmp_path, kind=DocumentKind.PPTX)

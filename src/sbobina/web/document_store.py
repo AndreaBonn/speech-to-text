@@ -100,7 +100,8 @@ def iter_extracting_documents(courses_dir: Path) -> Iterator[CourseDocument]:
 def write_text(doc_dir: Path, extracted: ExtractedText) -> None:
     values = {
         "pages": [
-            {"text": page.text, "no_text": page.no_text} for page in extracted.pages
+            {"text": page.text, "no_text": page.no_text, "ocr": page.ocr}
+            for page in extracted.pages
         ],
         "status": extracted.status.value,
         "encoding": extracted.encoding,
@@ -113,7 +114,11 @@ def write_text(doc_dir: Path, extracted: ExtractedText) -> None:
 def read_text(doc_dir: Path) -> StoredText:
     raw = json.loads((doc_dir / TEXT_FILENAME).read_text(encoding="utf-8"))
     pages = tuple(
-        Page(text=str(item["text"]), no_text=bool(item["no_text"]))
+        Page(
+            text=str(item["text"]),
+            no_text=bool(item["no_text"]),
+            ocr=bool(item.get("ocr", False)),
+        )
         for item in raw["pages"]
     )
     return StoredText(

@@ -19,6 +19,7 @@ _REPEATED_EDGE_MAJORITY = 0.5
 class Page:
     text: str
     no_text: bool
+    ocr: bool = False
 
 
 @dataclass(frozen=True)
