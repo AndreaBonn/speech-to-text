@@ -291,8 +291,13 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   durante una trascrizione; `nvidia-smi --query-compute-apps` ogni 5 s. Rischio: alto (R3).
   verify: mai Whisper e Ollama insieme nei campioni; 409 osservato nella pagina; job di
   trascrizione completato.
-- [ ] **T049** Gate finale. verify: suite, ruff, format, mypy, `wc -l`; `/analyze` su
+- [x] **T049** Gate finale. verify: suite, ruff, format, mypy, `wc -l`; `/analyze` su
   `specs/001-course-workspace/`; `code-reviewer` e `security-reviewer` sul diff di fase.
+  Esito (2026-10-03): suite 1503 test verdi, ruff, format e mypy puliti; tre passate di
+  `/analyze` (A1-A19, A20-A25, A26: funzioni oltre 30 righe, commit `877d8a3`), nessun file
+  toccato dalla feature oltre 300 righe; `security-reviewer` senza P0/P1 sul diff della
+  remediation, `code-reviewer` con un bug minore corretto (`e9da500`) e refactor A26 senza cambi
+  di comportamento.
 
 ## F5 - OCR dei PDF scansionati (U1 = OCR)
 
