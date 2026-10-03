@@ -106,3 +106,38 @@ def test_chat_json_forwards_study_output_limit() -> None:
         "num_ctx": 8192,
         "num_predict": 321,
     }
+
+
+class CountingClient:
+    def __init__(self, done_reason: str) -> None:
+        self.done_reason = done_reason
+
+    def chat(self, **kwargs: object) -> ollama.ChatResponse:
+        return ollama.ChatResponse(
+            message=ollama.Message(role="assistant", content="{}"),
+            prompt_eval_count=5000,
+            eval_count=900,
+            done_reason=self.done_reason,
+        )
+
+
+def test_chat_json_logs_token_counts(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level("INFO", logger="sbobina")
+
+    chat_json(client=cast(ollama.Client, CountingClient("stop")), request=request())
+
+    assert "prompt_tokens=5000" in caplog.text
+    assert "output_tokens=900" in caplog.text
+    assert not [r for r in caplog.records if r.levelname == "WARNING"]
+
+
+def test_chat_json_warns_when_output_hits_the_limit(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("INFO", logger="sbobina")
+
+    chat_json(client=cast(ollama.Client, CountingClient("length")), request=request())
+
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 1
+    assert "troncata" in warnings[0].getMessage()

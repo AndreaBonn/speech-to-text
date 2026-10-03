@@ -1,11 +1,14 @@
+import logging
 import re
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
-from ollama import Client, ResponseError
+from ollama import ChatResponse, Client, ResponseError
 
 from sbobina.correction import CorrectorUnavailableError, InvalidResponseError
+
+logger = logging.getLogger("sbobina")
 
 CONTEXT_WINDOW_TOKENS = 8192
 # Ollama 0.18 may wrap JSON in a fence when thinking is disabled.
@@ -24,6 +27,19 @@ class ChatRequest:
 def strip_markdown_fence(content: str) -> str:
     fenced = _MARKDOWN_FENCE.match(content)
     return fenced.group(1) if fenced else content
+
+
+def _log_usage(response: ChatResponse) -> None:
+    # Token counts size the material budget (generation_runner); a reply cut at
+    # num_predict is invalid JSON, so the cause must be visible in the log.
+    logger.info(
+        "Ollama: prompt_tokens=%s output_tokens=%s done_reason=%s",
+        response.prompt_eval_count,
+        response.eval_count,
+        response.done_reason,
+    )
+    if response.done_reason == "length":
+        logger.warning("Risposta di Ollama troncata al limite di token in uscita")
 
 
 def chat_json(client: Client, request: ChatRequest) -> str:
@@ -46,4 +62,5 @@ def chat_json(client: Client, request: ChatRequest) -> str:
         raise CorrectorUnavailableError(f"{type(err).__name__}: {err}") from err
     except ValueError as err:
         raise InvalidResponseError(f"{type(err).__name__}: {err}") from err
+    _log_usage(response=response)
     return strip_markdown_fence(content=response.message.content or "")
