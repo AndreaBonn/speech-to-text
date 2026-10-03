@@ -189,6 +189,14 @@
     dom.clearChildren(statusEl);
     statusEl.hidden = true;
     dom.clearChildren(textEl);
+    if (pageData.ocr) {
+      var ocrNotice = document.createElement("p");
+      ocrNotice.className = "banner banner--warning document__ocr-notice";
+      ocrNotice.textContent =
+        "Testo riconosciuto automaticamente da una scansione: può contenere " +
+        "errori, anche di significato. Controlla sul PDF originale.";
+      textEl.appendChild(ocrNotice);
+    }
     if (pageData.no_text) {
       var notice = document.createElement("p");
       notice.className = "document__no-text";

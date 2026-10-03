@@ -119,6 +119,7 @@
     li.appendChild(badge);
 
     li.appendChild(renderActions(doc, key));
+    window.SbobinaCourseOcr.decorate(li, key, doc);
     return li;
   }
 
@@ -256,6 +257,7 @@
 
   function show(key) {
     stopPolling();
+    window.SbobinaCourseOcr.forgetAll();
     var isUncategorized = key === UNCATEGORIZED_KEY;
     form.hidden = isUncategorized;
     uncategorizedNote.hidden = !isUncategorized;
@@ -264,11 +266,19 @@
 
   function hide() {
     stopPolling();
+    window.SbobinaCourseOcr.forgetAll();
     currentKey = null;
+  }
+
+  function refresh() {
+    if (currentKey !== null) {
+      load(currentKey, currentPage);
+    }
   }
 
   window.SbobinaCourseMaterials = {
     show: show,
     hide: hide,
+    refresh: refresh,
   };
 })();

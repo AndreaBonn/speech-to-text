@@ -2234,3 +2234,32 @@ body {
   color: var(--color-ink-3);
   font-style: normal;
 }
+
+/* OCR of scanned documents (T052) */
+.ocr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs) var(--space-sm);
+  margin-top: var(--space-2xs);
+}
+
+.ocr__hint,
+.ocr__status {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+  margin: 0;
+}
+
+.generations__citation-ocr {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+.document__ocr-notice {
+  margin-bottom: var(--space-sm);
+}
+
+.ocr__status--danger {
+  color: var(--color-danger);
+}

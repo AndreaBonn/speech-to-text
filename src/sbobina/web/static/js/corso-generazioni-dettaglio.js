@@ -41,6 +41,9 @@
       wrap.appendChild(el("span", "generations__citation-removed", citation.source));
     }
     wrap.appendChild(document.createTextNode(" «" + citation.quote + "»"));
+    if (citation.ocr) {
+      wrap.appendChild(el("span", "generations__citation-ocr", " · testo da OCR"));
+    }
     return wrap;
   }
 
