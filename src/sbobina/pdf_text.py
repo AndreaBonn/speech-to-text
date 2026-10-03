@@ -5,6 +5,10 @@ from pathlib import Path
 
 import pypdfium2 as pdfium
 
+# A4 (security): an oversized MediaBox rendered at face value can allocate
+# gigabytes. Cap the long side of the rendered image regardless of scale.
+MAX_RENDER_SIDE_PX = 2500
+
 
 def render_pdf_page(path: Path, index: int, scale: float) -> bytes:
     """Render one page as a PNG image, for pages OCR must read (F5)."""
@@ -12,7 +16,8 @@ def render_pdf_page(path: Path, index: int, scale: float) -> bytes:
     try:
         page = pdf[index]
         try:
-            image = page.render(scale=scale).to_pil()
+            capped_scale = _capped_scale(page=page, scale=scale)
+            image = page.render(scale=capped_scale).to_pil()
             buffer = io.BytesIO()
             image.save(buffer, format="PNG")
             return buffer.getvalue()
@@ -20,6 +25,12 @@ def render_pdf_page(path: Path, index: int, scale: float) -> bytes:
             page.close()
     finally:
         pdf.close()
+
+
+def _capped_scale(page: pdfium.PdfPage, scale: float) -> float:
+    width_pt, height_pt = page.get_size()
+    long_side_pt = max(float(width_pt), float(height_pt))
+    return float(min(scale, MAX_RENDER_SIDE_PX / long_side_pt))
 
 
 def extract_pdf_pages(path: Path) -> tuple[str, ...]:

@@ -7,6 +7,7 @@ from ocr_fixtures import COURSE_KEY, DOC_ID, add_scanned_document
 from test_supervisor import Harness, harness, wait_for
 
 from sbobina.document_models import DocumentStatus
+from sbobina.settings import settings
 from sbobina.web import ocr_supervisor, supervisor
 from sbobina.web.errors import ConflictError
 from sbobina.web.job_models import WorkItem
@@ -124,6 +125,31 @@ def test_pipeline_then_ocr_never_overlap_children(
     wait_for(predicate=lambda: all(child.poll() is not None for child in children))
 
     assert active_counts == [1, 1]
+
+
+def test_ocr_process_timeout_kills_the_child_and_marks_the_run_failed(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    course_id, doc_dir = add_scanned_document(courses_dir=harness.store.courses_dir)
+    (doc_dir / "hold").touch()
+    monkeypatch.setattr(settings, "ocr_process_timeout_s", 0.05)
+    second_job_id = harness.create()
+    harness.supervisor.submit_ocr(course_key=COURSE_KEY, doc_id=DOC_ID)
+    harness.supervisor.submit(job_id=second_job_id)
+    harness.supervisor.start()
+
+    wait_for(
+        predicate=lambda: (
+            _status(harness=harness, course_id=course_id) is OcrStatus.FAILED
+        )
+    )
+
+    run = load_ocr(
+        courses_dir=harness.store.courses_dir, course_id=course_id, doc_id=DOC_ID
+    )
+    assert run is not None
+    assert run.error == "OCR_TIMEOUT"
+    wait_for(predicate=lambda: harness.finished(job_id=second_job_id))
 
 
 def test_recover_keeps_a_run_whose_text_was_already_written(harness: Harness) -> None:

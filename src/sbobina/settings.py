@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     # One page took ~172 s on CPU (eval.md T050); a hung Ollama must not hold
     # the single queue worker forever.
     ocr_timeout_s: float = Field(default=900.0, gt=0.0)
+    # A4 (security): the supervisor's only worker thread must not block
+    # forever behind a hung or looping OCR child.
+    ocr_process_timeout_s: float = Field(default=3600.0, gt=0.0)
 
     @field_validator("web_host")
     @classmethod

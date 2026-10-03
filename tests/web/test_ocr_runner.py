@@ -89,6 +89,32 @@ def test_ocr_text_reaches_the_search_index(tmp_path: Path) -> None:
         assert DOC_ID in index.indexed_documents()
 
 
+def test_run_ocr_stage_applies_the_memory_limit_before_reading_the_document(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, doc_dir = add_scanned_document(courses_dir=tmp_path)
+    calls: list[str] = []
+    monkeypatch.setattr(
+        ocr_runner, "_apply_memory_limit", lambda max_memory_mb: calls.append("limit")
+    )
+    original_read_document_in = ocr_runner.read_document_in
+
+    def spy_read_document_in(doc_dir: Path) -> object:
+        calls.append("read_document")
+        return original_read_document_in(doc_dir=doc_dir)
+
+    monkeypatch.setattr(ocr_runner, "read_document_in", spy_read_document_in)
+    monkeypatch.setattr(
+        ocr_runner,
+        "_build_read_page",
+        lambda document_dir, document: lambda index: "testo ocr",
+    )
+
+    ocr_runner.run_ocr_stage(document_dir=doc_dir)
+
+    assert calls == ["limit", "read_document"]
+
+
 def test_ocr_client_has_a_timeout(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

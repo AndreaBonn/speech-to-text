@@ -11,19 +11,21 @@ from typing import TYPE_CHECKING
 
 from sbobina.course_registry import find_by_key
 from sbobina.document_models import DocumentKind, DocumentStatus
+from sbobina.settings import settings
 from sbobina.web.document_store import document_dir, read_document
 from sbobina.web.errors import ConflictError, NotFoundError
 from sbobina.web.job_models import WorkItem
 from sbobina.web.job_store import JobStore
 from sbobina.web.ocr_queue import cancel_ocr_action, require_cancellable, transition_ocr
 from sbobina.web.ocr_store import OcrRun, OcrStatus, create_ocr, load_ocr, save_ocr
-from sbobina.web.processes import _spawn
+from sbobina.web.processes import _reap, _spawn
 
 if TYPE_CHECKING:
     from sbobina.web.supervisor import Supervisor
 
 OCR_COMMAND = "ocr"
 CHILD_LOG_NAME = "ocr_child.log"
+OCR_TIMEOUT_CODE = "OCR_TIMEOUT"
 
 
 def _require_course_id(store: JobStore, course_key: str) -> str:
@@ -118,16 +120,42 @@ def launch_ocr_process(
     return process
 
 
+def _wait_for_ocr_process(process: subprocess.Popen[bytes]) -> int | None:
+    """Exit code, or None if the child is still running after the timeout."""
+    try:
+        return process.wait(timeout=settings.ocr_process_timeout_s)
+    except subprocess.TimeoutExpired:
+        return None
+
+
+def _finish_timed_out_ocr(
+    supervisor: "Supervisor", item: WorkItem, process: subprocess.Popen[bytes]
+) -> None:
+    _reap(
+        process=process,
+        timeout_s=supervisor._options.terminate_timeout_s,
+        graceful=False,
+    )
+    with supervisor._condition:
+        supervisor._release_process(process=process)
+        supervisor._finish_failed(item=item, code=OCR_TIMEOUT_CODE)
+
+
 def execute_ocr_action(
     supervisor: "Supervisor", item: WorkItem, ollama_unavailable_exit: int
 ) -> None:
     """The child persists its own ocr.json/text.json/document.json on success;
-    a crash (non-zero exit) is the only case the supervisor finalizes here."""
+    a crash (non-zero exit) or a timeout (A4, security: the single queue
+    worker must not block forever behind a hung or looping child) are the
+    only cases the supervisor finalizes here."""
     with supervisor._condition:
         if supervisor._stopping:
             return
         process = launch_ocr_process(supervisor=supervisor, item=item)
-    return_code = process.wait()
+    return_code = _wait_for_ocr_process(process=process)
+    if return_code is None:
+        _finish_timed_out_ocr(supervisor=supervisor, item=item, process=process)
+        return
     with supervisor._condition:
         supervisor._release_process(process=process)
         if return_code != 0:

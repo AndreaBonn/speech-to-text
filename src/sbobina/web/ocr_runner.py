@@ -17,6 +17,7 @@ from sbobina.ocr_pipeline import ReadPage, ocr_missing_pages
 from sbobina.ollama_vision import read_page_image
 from sbobina.pdf_text import render_pdf_page
 from sbobina.settings import settings
+from sbobina.web.child_limits import _apply_memory_limit
 from sbobina.web.document_store import (
     StoredText,
     mark_extracted,
@@ -113,10 +114,16 @@ def _build_read_page(document_dir: Path, document: CourseDocument) -> ReadPage:
 
 
 def run_ocr_stage(document_dir: Path) -> None:
-    """Production entry point: document_dir is courses/<course_id>/documents/<doc_id>."""
+    """Production entry point: document_dir is courses/<course_id>/documents/<doc_id>.
+
+    Applies the same memory limit as extraction (A4, security) before
+    touching the document directory: the PDF this reads page by page is
+    just as untrusted as the one extraction parses.
+    """
+    _apply_memory_limit(max_memory_mb=settings.extraction_max_memory_mb)
     document = read_document_in(doc_dir=document_dir)
     read_page = _build_read_page(document_dir=document_dir, document=document)
     run_ocr(document_dir=document_dir, read_page=read_page)
 
 
-__all__ = ["run_ocr", "run_ocr_stage"]
+__all__ = ["read_document_in", "run_ocr", "run_ocr_stage"]

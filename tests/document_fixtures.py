@@ -39,6 +39,20 @@ def write_pdf(path: Path, texts: tuple[str, ...], image_only: bool = False) -> N
     path.write_bytes(_encode_pdf(objects=objects))
 
 
+def write_pdf_with_mediabox(path: Path, width_pt: float, height_pt: float) -> None:
+    """Build a minimal one-page PDF with a custom MediaBox, no text or font."""
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width_pt} {height_pt}] "
+            f"/Resources << >> /Contents 4 0 R >>"
+        ).encode("ascii"),
+        b"<< /Length 0 >>\nstream\n\nendstream",
+    ]
+    path.write_bytes(_encode_pdf(objects=objects))
+
+
 def _encode_pdf(objects: list[bytes]) -> bytes:
     result = bytearray(b"%PDF-1.4\n")
     offsets = [0]

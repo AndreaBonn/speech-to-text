@@ -12,26 +12,13 @@ import sys
 from pathlib import Path
 
 from sbobina.document_extract import extract
+from sbobina.web.child_limits import _apply_memory_limit
 from sbobina.web.document_store import original_path, read_document_in, write_text
-
-try:
-    import resource
-
-    HAS_RESOURCE_LIMIT = True
-except ImportError:  # Windows has no RLIMIT_AS; the parent's timeout still applies.
-    HAS_RESOURCE_LIMIT = False
 
 __all__ = ["_apply_memory_limit", "extract", "main", "run_extraction"]
 
 logger = logging.getLogger("sbobina")
 EXTRACT_COMMAND = "extract"
-
-
-def _apply_memory_limit(max_memory_mb: int) -> None:
-    if not HAS_RESOURCE_LIMIT:
-        return
-    limit_bytes = max_memory_mb * 1024 * 1024
-    resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, limit_bytes))
 
 
 def run_extraction(doc_dir: Path, max_memory_mb: int) -> None:
