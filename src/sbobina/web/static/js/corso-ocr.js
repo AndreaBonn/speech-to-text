@@ -86,26 +86,25 @@
     return p;
   }
 
-  function startButton(docId) {
+  function actionButton(className, label, onClick) {
     var button = document.createElement("button");
     button.type = "button";
-    button.className = "btn btn--secondary ocr__start";
-    button.textContent = "Estrai il testo con OCR";
-    button.addEventListener("click", function () {
-      start(docId);
-    });
+    button.className = className;
+    button.textContent = label;
+    button.addEventListener("click", onClick);
     return button;
   }
 
+  function startButton(docId) {
+    return actionButton("btn btn--secondary ocr__start", "Estrai il testo con OCR", function () {
+      start(docId);
+    });
+  }
+
   function cancelButton(docId) {
-    var button = document.createElement("button");
-    button.type = "button";
-    button.className = "btn btn--ghost ocr__cancel";
-    button.textContent = "Annulla";
-    button.addEventListener("click", function () {
+    return actionButton("btn btn--ghost ocr__cancel", "Annulla", function () {
       cancel(docId);
     });
-    return button;
   }
 
   function render(docId) {
@@ -176,7 +175,11 @@
     }
     fetch(apiBase(run.key, docId))
       .then(function (response) {
-        return response.status === 404 ? null : jsonOrThrow(response);
+        if (response.status === 404) {
+          run.failures = 0; // a real answer ends a run of failures
+          return null;
+        }
+        return jsonOrThrow(response);
       })
       .then(function (body) {
         if (body && runs[docId]) {
@@ -186,13 +189,10 @@
         }
       })
       .catch(function () {
-        var failed = runs[docId];
-        if (!failed) {
-          return;
-        }
-        failed.failures = (failed.failures || 0) + 1;
-        if (failed.failures >= MAX_POLL_FAILURES) {
-          failed.notice = "Il server non risponde: stato dell'OCR non aggiornato.";
+        // render and schedulePoll both no-op once the run has been forgotten.
+        run.failures = (run.failures || 0) + 1;
+        if (run.failures >= MAX_POLL_FAILURES) {
+          run.notice = "Il server non risponde: stato dell'OCR non aggiornato.";
           render(docId);
         }
         schedulePoll(docId); // keeps trying: the notice clears on the next answer
