@@ -275,7 +275,7 @@ misurata a mano sulle generazioni di F3) e T039 (run reale con `nvidia-smi` sull
   generazioni, chat, lock GPU). Rischio: basso.
   verify: `git diff CLAUDE.md` limitato alle sezioni Layout e Stack.
 
-- [ ] **T046** Misura reale (non delegabile: giudizio). 10 domande su un corso reale (incluse 2
+- [x] **T046** Misura reale (non delegabile: giudizio). 10 domande su un corso reale (incluse 2
   fuori dal materiale), modello caldo e freddo: latenza p50 e massima, `prompt_eval_count`,
   risposta corretta / parziale / sbagliata a mano, fuori-materiale riconosciute. `BUDGET: 3
   iterazioni del prompt | ranking: risposte sbagliate (meno) > fuori-materiale non riconosciute
