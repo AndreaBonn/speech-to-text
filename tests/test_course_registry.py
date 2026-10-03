@@ -205,3 +205,17 @@ def test_course_record_accepts_key_matching_label() -> None:
         updated_at=NOW,
     )
     assert record.key == "diritto privato"
+
+
+def test_rename_key_empty_source_key_is_rejected(tmp_path: Path) -> None:
+    calls: list[tuple[str, str]] = []
+
+    with pytest.raises(CourseRequiredError):
+        rename_key(
+            courses_dir=tmp_path,
+            old="  ",
+            new="Fisica",
+            update_lectures=lambda old, new: calls.append((old, new)),
+        )
+
+    assert (calls, list(tmp_path.iterdir())) == ([], [])

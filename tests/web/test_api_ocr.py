@@ -33,7 +33,8 @@ def test_start_ocr_queues_it_and_status_reads_back(
 
     assert started.status_code == 202
     assert started.json()["data"]["status"] == "queued"
-    assert status.json()["data"]["status"] in ("queued", "running")
+    # No lifespan in this client: the supervisor never starts, so the run stays queued.
+    assert status.json()["data"]["status"] == "queued"
 
 
 def test_start_ocr_twice_or_on_a_document_with_text_is_a_conflict(
@@ -108,3 +109,14 @@ def test_page_says_when_its_text_came_from_ocr(
 
     assert first["ocr"] is True
     assert second["ocr"] is False
+
+
+def test_page_past_the_last_one_is_not_found(
+    client: TestClient, tmp_path: Path
+) -> None:
+    add_scanned_document(courses_dir=tmp_path / "courses", status=DocumentStatus.READY)
+
+    last = client.get(f"{DOC_URL}/pages/2")
+    past = client.get(f"{DOC_URL}/pages/3")
+
+    assert (last.status_code, past.status_code) == (200, 404)

@@ -257,3 +257,19 @@ def test_search_lectures_respects_job_ids_and_misses(index: SearchIndex) -> None
     assert page.total == 1
     assert missing.items == []
     assert missing.total == 0
+
+
+def test_index_session_propagates_non_corruption_errors_and_keeps_the_index(
+    tmp_path: Path,
+) -> None:
+    from sbobina.web.search_index import index_session
+
+    path = tmp_path / "search.sqlite3"
+    with index_session(path=path) as index:
+        index.replace_lecture(job_id="job", state=STATE, passages=[PASSAGE])
+
+    with pytest.raises(sqlite3.OperationalError), index_session(path=path) as index:
+        index.search(match='"non chiusa', job_ids=None, limit=1, offset=0)
+
+    with index_session(path=path) as index:
+        assert set(index.indexed_lectures()) == {"job"}

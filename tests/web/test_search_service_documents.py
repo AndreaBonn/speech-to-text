@@ -195,3 +195,29 @@ def test_reconcile_skips_unreadable_text_json_and_keeps_others(
         )
         assert kept.total == 1
         assert "bad" in caplog.text
+
+
+def test_reconcile_does_not_index_document_with_unreadable_metadata(
+    tmp_path: Path, courses_dir: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    store = JobStore(data_dir=tmp_path / "data")
+    write_ready_document(
+        courses_dir=courses_dir,
+        course_id="course-1",
+        doc_id="good",
+        pages=[Page(text="contratto", no_text=False)],
+    )
+    bad_dir = write_ready_document(
+        courses_dir=courses_dir,
+        course_id="course-1",
+        doc_id="bad",
+        pages=[Page(text="causa", no_text=False)],
+    )
+    (bad_dir / "document.json").write_text("{not json", encoding="utf-8")
+
+    with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
+        replaced = reconcile(store=store, index=index)
+        indexed = set(index.indexed_documents())
+
+    assert (replaced, indexed) == (1, {"good"})
+    assert "bad" in caplog.text

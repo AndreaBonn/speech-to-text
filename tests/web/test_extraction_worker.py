@@ -1,4 +1,6 @@
+import shutil
 import sys
+import threading
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -13,7 +15,7 @@ from sbobina.web.errors import ConflictError
 from sbobina.web.extraction_worker import ExtractionWorker, ExtractionWorkerOptions
 
 # A fake child, in the spirit of test_supervisor.py's RUNNER: touches
-# "started" on entry, blocks on "sleep"/"hold", simulates the real runner's
+# "started" on entry (and appends to "runs"), blocks on "sleep"/"hold", simulates the real runner's
 # own RLIMIT_AS + over-allocation on "oom", otherwise writes a minimal
 # text.json and exits 0.
 FAKE_RUNNER = """
@@ -25,6 +27,8 @@ from pathlib import Path
 _, doc_dir, max_memory_mb = sys.argv[1:]
 path = Path(doc_dir)
 (path / "started").touch()
+with open(path / "runs", "a") as runs:
+    runs.write("x")
 if (path / "sleep").exists():
     time.sleep(10)
 while (path / "hold").exists():
@@ -243,3 +247,40 @@ def test_remove_if_idle_refuses_extracting_and_removes_finished(
     idle_dir = harness.add_document(doc_id="idle")
     harness.worker.remove_if_idle(course_id="course-1", doc_id="idle")
     assert not idle_dir.exists()
+
+
+def test_start_twice_runs_a_single_worker_thread(harness: Harness) -> None:
+    harness.worker.start()
+    harness.worker.start()
+
+    names = [thread.name for thread in threading.enumerate()]
+
+    assert names.count("sbobina-extraction") == 1
+
+
+def test_recover_on_boot_twice_extracts_each_document_once(harness: Harness) -> None:
+    first_dir = harness.add_document(doc_id="doc-1", status=DocumentStatus.EXTRACTING)
+    harness.worker.recover_on_boot()
+    harness.worker.recover_on_boot()
+    second_dir = harness.add_document(doc_id="doc-2")
+    harness.worker.submit(course_id="course-1", doc_id="doc-2")
+
+    harness.worker.start()
+    # The queue is FIFO and serial: once doc-2 is done, doc-1 has run.
+    wait_for(predicate=lambda: harness.status(doc_id="doc-2") == DocumentStatus.READY)
+
+    assert (first_dir / "runs").read_text() == "x"
+    assert (second_dir / "runs").read_text() == "x"
+
+
+def test_worker_survives_a_document_removed_while_queued(harness: Harness) -> None:
+    removed_dir = harness.add_document(doc_id="doc-1")
+    harness.add_document(doc_id="doc-2")
+    harness.worker.submit(course_id="course-1", doc_id="doc-1")
+    harness.worker.submit(course_id="course-1", doc_id="doc-2")
+    shutil.rmtree(removed_dir)
+
+    harness.worker.start()
+
+    wait_for(predicate=lambda: harness.status(doc_id="doc-2") == DocumentStatus.READY)
+    assert harness.worker.is_running()

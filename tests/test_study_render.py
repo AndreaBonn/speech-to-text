@@ -5,6 +5,7 @@ import pytest
 from study_fixtures import FakeChat, response_fixture, transcript_fixture
 
 from sbobina.render import RenderOptions
+from sbobina.study_models import FailedBlock
 from sbobina.study_pipeline import StudyOptions, generate_study
 from sbobina.study_render import load_study, render_study_markdown, save_study
 
@@ -132,3 +133,21 @@ def test_save_study_bad_destination_keeps_previous_json(tmp_path: Path) -> None:
         "audio.studio.json",
         "audio.studio.md",
     ]
+
+
+def test_render_study_markdown_lists_failed_blocks_with_their_times() -> None:
+    transcript = transcript_fixture()
+    result = generate_study(
+        transcript=transcript,
+        chat=FakeChat(responses=[response_fixture()]),
+        options=StudyOptions(model="test"),
+    )
+    failed = replace(result, failed_blocks=(FailedBlock(start=65.0, end=130.0),))
+
+    markdown = render_study_markdown(
+        result=failed, transcript=transcript, options=OPTIONS
+    )
+    plain = render_study_markdown(result=result, transcript=transcript, options=OPTIONS)
+
+    assert "## Blocchi non elaborati" not in plain
+    assert "## Blocchi non elaborati\n\n- 01:05 – 02:10" in markdown

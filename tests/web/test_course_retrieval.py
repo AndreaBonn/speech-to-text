@@ -1,15 +1,19 @@
+import os
 from contextlib import closing
 from pathlib import Path
+
+import pytest
 
 from sbobina.course_registry import get_or_create
 from sbobina.document_passages import DocumentPassage
 from sbobina.models import Segment, Transcript, Word, save_transcript
 from sbobina.retrieval import DocumentSource, LectureSource, RetrievalScope
 from sbobina.search_text import Passage
-from sbobina.web.api_files import TRANSCRIPT_FILES
+from sbobina.web.api_files import TRANSCRIPT_FILES, transcript_revision
 from sbobina.web.course_retrieval import (
     WindowedQuery,
     course_scope,
+    lecture_revision,
     retrieve_windows,
     sample_course,
 )
@@ -286,3 +290,83 @@ def test_sample_course_empty_course_returns_no_passages(tmp_path: Path) -> None:
         sampled = sample_course(store=store, index=index, scope=scope, budget_words=100)
 
     assert sampled == []
+
+
+def test_sample_course_skips_a_lecture_with_a_corrupt_transcript(
+    tmp_path: Path,
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    good = str(store.create(config=JobConfig(subject="Fisica")).id)
+    broken = str(store.create(config=JobConfig(subject="Fisica")).id)
+    _write_lecture(store=store, job_id=good)
+    (store.jobs_dir / broken / TRANSCRIPT_FILES["original"]).write_text(
+        "{", encoding="utf-8"
+    )
+
+    with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
+        scope = RetrievalScope(course_id="fisica", job_ids=frozenset({good, broken}))
+        sampled = sample_course(store=store, index=index, scope=scope, budget_words=500)
+
+    job_ids = {
+        passage.source.job_id
+        for passage in sampled
+        if isinstance(passage.source, LectureSource)
+    }
+    assert job_ids == {good}
+
+
+def test_lecture_revision_prefers_corrected_transcript(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    job_id = str(store.create(config=JobConfig(subject="Fisica")).id)
+    _write_lecture(store=store, job_id=job_id)
+    original = lecture_revision(store=store, job_id=job_id)
+    corrected = store.jobs_dir / job_id / TRANSCRIPT_FILES["corrected"]
+    corrected.write_text('{"diverso": true}', encoding="utf-8")
+
+    revision = lecture_revision(store=store, job_id=job_id)
+
+    assert revision == transcript_revision('{"diverso": true}')
+    assert revision != original
+
+
+def test_lecture_revision_without_transcript_is_none(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    job_id = str(store.create(config=JobConfig(subject="Fisica")).id)
+
+    assert lecture_revision(store=store, job_id=job_id) is None
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads files without permission")
+def test_lecture_revision_unreadable_preferred_transcript_is_none(
+    tmp_path: Path,
+) -> None:
+    # Same choice _segments_for_job makes: an unreadable corrected transcript
+    # yields nothing rather than silently falling back to the original.
+    store = JobStore(data_dir=tmp_path)
+    job_id = str(store.create(config=JobConfig(subject="Fisica")).id)
+    _write_lecture(store=store, job_id=job_id)
+    corrected = store.jobs_dir / job_id / TRANSCRIPT_FILES["corrected"]
+    corrected.write_text("{}", encoding="utf-8")
+    corrected.chmod(0)
+
+    try:
+        revision = lecture_revision(store=store, job_id=job_id)
+    finally:
+        corrected.chmod(0o600)
+
+    assert revision is None
+
+
+def test_sample_course_skips_a_lecture_without_any_transcript(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    good = str(store.create(config=JobConfig(subject="Fisica")).id)
+    empty = str(store.create(config=JobConfig(subject="Fisica")).id)
+    _write_lecture(store=store, job_id=good)
+
+    with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
+        scope = RetrievalScope(course_id="fisica", job_ids=frozenset({good, empty}))
+        sampled = sample_course(store=store, index=index, scope=scope, budget_words=500)
+
+    assert {
+        p.source.job_id for p in sampled if isinstance(p.source, LectureSource)
+    } == {good}

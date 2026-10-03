@@ -270,3 +270,25 @@ def test_generation_question_rejects_duplicate_or_blank_options(
         GenerationQuestion(
             question="q", options=options, correct_index=0, solution="s", citations=()
         )
+
+
+@pytest.mark.parametrize(
+    ("fields", "message"),
+    [
+        ({"doc_id": "d1", "sha256": None, "job_id": None, "revision": None}, "sha256"),
+        ({"doc_id": None, "sha256": "abc", "job_id": "j1", "revision": "r1"}, "sha256"),
+        (
+            {"doc_id": None, "sha256": None, "job_id": "j1", "revision": None},
+            "revision",
+        ),
+        (
+            {"doc_id": "d1", "sha256": "abc", "job_id": None, "revision": "r1"},
+            "revision",
+        ),
+    ],
+)
+def test_generation_source_used_rejects_fingerprint_of_the_other_kind(
+    fields: dict[str, str | None], message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        GenerationSourceUsed(**fields)

@@ -142,8 +142,7 @@ def test_studio_script_is_served_and_mounts_text_only(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert "/api/v1/jobs/" in response.text
-    # LLM output is untrusted: the script must never parse it as markup.
-    assert "innerHTML" not in response.text
+    # No markup sink check here: test_untrusted_rendering.py covers studio.js.
 
 
 def test_studio_page_returns_404_for_missing_job(tmp_path: Path) -> None:

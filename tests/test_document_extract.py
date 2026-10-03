@@ -95,3 +95,14 @@ def test_normalize_pages_removes_repeated_edges_preserves_body() -> None:
     )
     assert pages == ("fisica", "corpo", "Unique\ncorpo\nEnd")
     assert normalize_pages(texts=("Keep",)) == ("Keep",)
+
+
+def test_extract_presentation_without_slides_has_no_pages_and_no_text(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "vuota.pptx"
+    Presentation().save(str(path))
+
+    result = extract(path=path, kind=DocumentKind.PPTX)
+
+    assert (result.pages, result.status) == ((), DocumentStatus.READY_NO_TEXT)

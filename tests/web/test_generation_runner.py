@@ -13,12 +13,19 @@ from sbobina.generation_models import (
 )
 from sbobina.models import Segment, Transcript, Word, save_transcript
 from sbobina.ollama_chat import ChatRequest
+from sbobina.settings import settings
 from sbobina.web.api_files import TRANSCRIPT_FILES
+from sbobina.web.generation_queue import transition_generation
 from sbobina.web.generation_runner import (
     GenerationJob,
     execute_generation,
+    run_generation_stage,
 )
-from sbobina.web.generation_store import create_generation, load_generation
+from sbobina.web.generation_store import (
+    create_generation,
+    load_generation,
+    save_generation,
+)
 from sbobina.web.job_models import JobConfig
 from sbobina.web.job_store import JobStore
 
@@ -237,3 +244,42 @@ def test_execute_generation_with_topic_restricts_retrieval_to_selected_source(
     user_message = fake_chat.requests[0].user_message
     assert "bianco" not in user_message
     assert "nero" in user_message
+
+
+def test_run_generation_stage_completes_the_running_generation_of_the_course_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    lecture = store.create(config=JobConfig(subject="Fisica"))
+    _write_lecture(store=store, job_id=str(lecture.id))
+    course = get_or_create(courses_dir=store.courses_dir, key="fisica", label="Fisica")
+    queued = create_generation(
+        courses_dir=store.courses_dir,
+        course_id=course.id,
+        request=GenerationRequest(
+            format=GenerationFormat.MULTIPLE_CHOICE, count=1, topic="gatto"
+        ),
+    )
+    save_generation(
+        courses_dir=store.courses_dir,
+        course_id=course.id,
+        record=transition_generation(record=queued, status=GenerationStatus.RUNNING),
+    )
+    ensured: list[str] = []
+    monkeypatch.setattr(
+        "sbobina.web.generation_runner.llm_corrector.ensure_model",
+        lambda model, host: ensured.append(model),
+    )
+    monkeypatch.setattr(
+        "sbobina.web.generation_runner.ollama_chat.chat_json",
+        lambda client, request: VALID_REPLY,
+    )
+
+    run_generation_stage(course_dir=store.courses_dir / course.id)
+
+    saved = load_generation(
+        courses_dir=store.courses_dir, course_id=course.id, gen_id=queued.id
+    )
+    assert ensured == [settings.ollama_model]
+    assert saved.status == GenerationStatus.DONE
+    assert saved.questions[0].citations[0].job_id == str(lecture.id)

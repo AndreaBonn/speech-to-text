@@ -189,3 +189,42 @@ def test_cancel_running_generation_kills_child_before_marking_interrupted(
 
     assert status_at_kill == [GenerationStatus.RUNNING]
     assert _status(harness, course_id, generation.id) == GenerationStatus.INTERRUPTED
+
+
+def test_claim_generation_item_refuses_a_generation_already_claimed(
+    harness: Harness,
+) -> None:
+    course_id = _register_course(harness=harness)
+    queued = create_generation(
+        courses_dir=harness.store.courses_dir, course_id=course_id, request=REQUEST
+    )
+    item = WorkItem(job_id=queued.id, action="generation", course_id=course_id)
+
+    claims = [
+        generation_supervisor.claim_generation_item(store=harness.store, item=item)
+        for _ in range(2)
+    ]
+
+    assert claims == [True, False]
+    assert _status(harness, course_id, queued.id) is GenerationStatus.RUNNING
+
+
+def test_execute_generation_action_after_stop_launches_no_child(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    course_id = _register_course(harness=harness)
+    launched: list[WorkItem] = []
+    monkeypatch.setattr(
+        generation_supervisor,
+        "launch_generation_process",
+        lambda supervisor, item: launched.append(item),
+    )
+    harness.supervisor.stop()
+
+    generation_supervisor.execute_generation_action(
+        supervisor=harness.supervisor,
+        item=WorkItem(job_id="g1", action="generation", course_id=course_id),
+        ollama_unavailable_exit=2,
+    )
+
+    assert launched == []

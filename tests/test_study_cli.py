@@ -61,3 +61,17 @@ def test_cmd_studio_corrected_input_has_no_double_suffix(tmp_path: Path) -> None
     assert cmd_studio(args=args, chat=FakeChat(responses=[response_fixture()])) == 0
     assert (tmp_path / "audio.studio.md").is_file()
     assert not (tmp_path / "audio.corretto.studio.md").exists()
+
+
+def test_cmd_studio_invalid_transcript_fails_without_touching_outputs(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "audio.json"
+    path.write_text('{"segments": "non una lista"}', encoding="utf-8")
+    json_path = path.with_suffix(".studio.json")
+    json_path.write_text("previous json")
+    chat = FakeChat(responses=[response_fixture()])
+    args = build_parser().parse_args(["studio", str(path)])
+
+    assert cmd_studio(args=args, chat=chat) == 1
+    assert (json_path.read_text(), chat.requests) == ("previous json", [])

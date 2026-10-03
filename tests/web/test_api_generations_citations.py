@@ -168,3 +168,70 @@ def test_get_generation_lecture_citation_found_anywhere_in_the_window(
     citation = response.json()["data"]["questions"][0]["citations"][0]
 
     assert citation["timestamp"] == expected
+
+
+def _lecture_citation_payload(
+    client: TestClient, tmp_path: Path, course_id: str, timestamp: float
+) -> dict[str, object]:
+    question = GenerationQuestion(
+        question="Domanda",
+        options=(),
+        correct_index=None,
+        solution="risposta",
+        citations=(
+            GenerationCitation(
+                passage_id="L1",
+                quote="dorme sul tappeto",
+                doc_id=None,
+                page=None,
+                job_id="lezione-1",
+                timestamp=timestamp,
+            ),
+        ),
+    )
+    record = _make_record(
+        tmp_path=tmp_path,
+        course_id=course_id,
+        format_=GenerationFormat.OPEN,
+        status=GenerationStatus.DONE,
+        questions=(question,),
+    )
+    response = client.get(f"{COURSES_URL}/fisica/generations/{record.id}")
+    citation: dict[str, object] = response.json()["data"]["questions"][0]["citations"][
+        0
+    ]
+    return citation
+
+
+@pytest.mark.parametrize("transcript", ["missing", "corrupt"])
+def test_get_generation_lecture_citation_without_readable_transcript_keeps_stored_time(
+    client: TestClient, tmp_path: Path, transcript: str
+) -> None:
+    course_id = _register_course(tmp_path=tmp_path)
+    lecture_dir = tmp_path / "jobs" / "lezione-1"
+    lecture_dir.mkdir(parents=True)
+    if transcript == "corrupt":
+        (lecture_dir / "audio.json").write_text("{", encoding="utf-8")
+
+    citation = _lecture_citation_payload(
+        client=client, tmp_path=tmp_path, course_id=course_id, timestamp=12.0
+    )
+
+    assert (citation["timestamp"], citation["href"], citation["changed"]) == (
+        12.0,
+        "/lettore/lezione-1?t=12.0&variant=original",
+        False,
+    )
+
+
+def test_get_generation_lecture_citation_anchor_no_longer_a_segment_keeps_stored_time(
+    client: TestClient, tmp_path: Path
+) -> None:
+    course_id = _register_course(tmp_path=tmp_path)
+    _write_lecture(tmp_path=tmp_path, job_id="lezione-1")
+
+    citation = _lecture_citation_payload(
+        client=client, tmp_path=tmp_path, course_id=course_id, timestamp=0.5
+    )
+
+    assert citation["timestamp"] == 0.5

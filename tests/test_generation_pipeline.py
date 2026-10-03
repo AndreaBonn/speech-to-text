@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from study_fixtures import FakeChat
 
 from sbobina.generation_models import GenerationFormat, GenerationRequest
@@ -112,7 +113,7 @@ def test_generate_fails_after_exhausting_retries_on_invalid_json() -> None:
     )
 
     assert result.outcome == GenerationOutcome.FAILED
-    assert result.error is not None
+    assert result.error == "INVALID_RESPONSE"
     assert result.questions == ()
 
 
@@ -245,3 +246,51 @@ def test_generate_keeps_question_dropping_only_its_invented_citation() -> None:
         "la causa e' illecita quando contraria"
     ]
     assert result.discarded == ()
+
+
+def _text_payload(citation_text: str) -> str:
+    return json.dumps(
+        {
+            "domande": [
+                {
+                    "domanda": "Spiega quando la causa e' illecita.",
+                    "soluzione": "Quando contraria a norme imperative.",
+                    "citazioni": [{"passaggio": "P1", "testo": citation_text}],
+                }
+            ]
+        }
+    )
+
+
+@pytest.mark.parametrize("format_", ["open", "oral"])
+def test_generate_text_question_keeps_cited_solution_without_options(
+    format_: str,
+) -> None:
+    request = GenerationRequest.model_validate({"format": format_, "count": 1})
+    chat = FakeChat(responses=[_text_payload("contraria a norme imperative")])
+
+    result = generate(
+        request=request, passages=[_doc_passage()], chat=chat, options=_options()
+    )
+
+    [question] = result.questions
+    assert (question.options, question.correct_index) == ((), None)
+    assert question.solution == "Quando contraria a norme imperative."
+    assert [c.passage_id for c in question.citations] == ["manuale:p214:c0"]
+
+
+def test_generate_text_question_with_uncited_solution_is_discarded() -> None:
+    request = GenerationRequest.model_validate({"format": "open", "count": 1})
+    chat = FakeChat(responses=[_text_payload("parole mai scritte nel passaggio")])
+
+    result = generate(
+        request=request, passages=[_doc_passage()], chat=chat, options=_options()
+    )
+
+    assert result.questions == ()
+    assert {(d.reason, d.count) for d in result.discarded} == {("QUOTE_NOT_FOUND", 1)}
+
+
+def test_generation_options_rejects_non_positive_num_predict() -> None:
+    with pytest.raises(ValueError, match="num_predict"):
+        GenerationOptions(model="test", num_predict=0)

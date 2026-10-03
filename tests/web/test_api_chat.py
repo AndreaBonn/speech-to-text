@@ -2,6 +2,8 @@ from uuid import UUID
 
 from chat_api_fixtures import BASE_URL, CHATS_URL, ChatApp, chat_app
 
+from sbobina.web.chat_store import chat_path
+
 __all__ = ["chat_app"]
 
 
@@ -97,3 +99,22 @@ def test_corrupt_line_is_skipped_not_a_server_error(chat_app: ChatApp) -> None:
 
     assert response.status_code == 200
     assert len(response.json()["data"]["messages"]) == 2
+
+
+def test_get_chat_whose_file_lost_its_meta_line_is_not_found(
+    chat_app: ChatApp,
+) -> None:
+    chat_id = chat_app.new_chat()
+    chat_app.ask(chat_id=chat_id)
+    path = chat_path(
+        courses_dir=chat_app.store.courses_dir,
+        course_id=chat_app.course_id,
+        chat_id=chat_id,
+    )
+    lines = path.read_text(encoding="utf-8").splitlines()
+    path.write_text("\n".join(lines[1:]) + "\n", encoding="utf-8")
+
+    response = chat_app.client.get(f"{CHATS_URL}/{chat_id}")
+
+    assert chat_app.lines(chat_id)[0]["kind"] == "question"
+    assert response.status_code == 404

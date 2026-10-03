@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from study_fixtures import FakeChat
 
 from sbobina.chat_pipeline import (
@@ -167,7 +168,7 @@ def test_answer_fails_after_exhausting_retries_on_invalid_json() -> None:
     )
 
     assert result.outcome == ChatOutcome.FAILED
-    assert result.error is not None
+    assert result.error == "INVALID_RESPONSE"
     assert result.sentences == ()
 
 
@@ -297,3 +298,8 @@ def test_build_retrieval_question_blank_question_reuses_previous_one_stripped() 
     assert build_retrieval_question(question="  ", history=history) == (
         "che cos'e' il possesso?"
     )
+
+
+def test_chat_options_rejects_non_positive_num_predict() -> None:
+    with pytest.raises(ValueError, match="num_predict"):
+        ChatOptions(model="test", num_predict=0)

@@ -1,11 +1,18 @@
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from pydantic import ValidationError
 
 from sbobina.platform_info import RuntimeChoice
 from sbobina.settings import Settings
-from sbobina.web.job_models import JobConfig, JobRecord, JobStage, JobStatus
+from sbobina.web.job_models import (
+    JobConfig,
+    JobRecord,
+    JobStage,
+    JobStatus,
+    WorkItem,
+)
 
 
 @pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1"])
@@ -97,3 +104,14 @@ def test_record_round_trips_json() -> None:
     )
     assert JobRecord.model_validate_json(record.model_dump_json()) == record
     assert record.pid is None
+
+
+@pytest.mark.parametrize(
+    ("action", "course_id"),
+    [("generation", None), ("ocr", None), ("pipeline", "c1"), ("study", "c1")],
+)
+def test_work_item_course_id_only_for_course_scoped_actions(
+    action: Literal["pipeline", "study", "generation", "ocr"], course_id: str | None
+) -> None:
+    with pytest.raises(ValidationError, match="course-scoped"):
+        WorkItem(job_id="j1", action=action, course_id=course_id)

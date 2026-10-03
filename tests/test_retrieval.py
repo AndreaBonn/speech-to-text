@@ -232,3 +232,9 @@ def test_retrieve_selected_document_survives_more_relevant_documents(
     passages = retrieve(index=index, scope=scope, question="causa", budget_words=500)
 
     assert [passage.passage_id for passage in passages] == ["appunti:p1:c0"]
+
+
+def test_question_to_fts_drops_words_that_stem_to_nothing() -> None:
+    # Stemming strips final vowels: an all-vowel word leaves no term at all.
+    assert question_to_fts("aaaaaa") is None
+    assert question_to_fts("aaaaaa diritto") == '"diritt"*'

@@ -10,6 +10,7 @@ from sbobina.settings import Settings
 from sbobina.study_blocks import build_study_blocks
 from sbobina.study_models import DiscardCount, FailedBlock, RejectionReason
 from sbobina.study_pipeline import StudyOptions, generate_study
+from sbobina.study_validation import validate_chapter
 
 
 def test_generate_study_keeps_supported_items_and_counts_rejections() -> None:
@@ -227,3 +228,42 @@ def test_generate_study_keeps_an_empty_revision_when_none_is_given() -> None:
 
     assert result.source_revision == ""
     assert given.source_revision == "abc"
+
+
+@pytest.mark.parametrize(
+    ("block_words", "num_predict"), [(0, 2048), (1200, 0), (-1, 2048)]
+)
+def test_study_options_rejects_non_positive_limits(
+    block_words: int, num_predict: int
+) -> None:
+    with pytest.raises(ValueError, match="positive"):
+        StudyOptions(model="test", block_words=block_words, num_predict=num_predict)
+
+
+def test_validate_chapter_rejects_quote_missing_from_the_original_segments() -> None:
+    transcript = transcript_fixture()
+    chapter = generate_study(
+        transcript=transcript,
+        chat=FakeChat(responses=[response_fixture(quote="contratto è illecita")]),
+        options=StudyOptions(model="test"),
+    ).chapters[0]
+    quoted = transcript.segments[1]
+    changed = replace(
+        quoted, words=(*quoted.words[:-1], replace(quoted.words[-1], text=" lecita"))
+    )
+    original = (transcript.segments[0], changed)
+    allowed = frozenset({0, 1})
+
+    kept, _ = validate_chapter(
+        chapter=chapter, segments=transcript.segments, allowed=allowed
+    )
+    dropped, counts = validate_chapter(
+        chapter=chapter,
+        segments=transcript.segments,
+        allowed=allowed,
+        original=original,
+    )
+
+    items = len(chapter.summary) + len(chapter.concepts) + len(chapter.questions)
+    assert kept == chapter
+    assert (dropped, dict(counts)) == (None, {RejectionReason.QUOTE_NOT_FOUND: items})

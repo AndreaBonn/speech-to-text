@@ -411,3 +411,38 @@ def test_main_unexpected_startup_failure_returns_one(job_dir: Path) -> None:
     ):
         assert stage_runner.main(argv=["transcribe", str(job_dir)]) == 1
     runner.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("stage", "entry_point", "argument"),
+    [
+        ("generation", "run_generation_stage", "course_dir"),
+        ("ocr", "run_ocr_stage", "document_dir"),
+    ],
+)
+def test_run_stage_course_scoped_stage_runs_its_entry_point_on_the_directory(
+    tmp_path: Path, stage: str, entry_point: str, argument: str
+) -> None:
+    with patch.object(stage_runner, entry_point) as run:
+        result = stage_runner.run_stage(stage=stage, job_dir=tmp_path)
+
+    assert result == 0
+    run.assert_called_once_with(**{argument: tmp_path})
+
+
+@pytest.mark.parametrize(
+    ("stage", "entry_point", "error", "expected"),
+    [
+        ("generation", "run_generation_stage", CorrectorUnavailableError("off"), 2),
+        ("ocr", "run_ocr_stage", CorrectorUnavailableError("off"), 2),
+        ("generation", "run_generation_stage", RuntimeError("failed"), 1),
+        ("ocr", "run_ocr_stage", RuntimeError("failed"), 1),
+    ],
+)
+def test_run_stage_course_scoped_stage_failure_maps_to_exit_code(
+    tmp_path: Path, stage: str, entry_point: str, error: Exception, expected: int
+) -> None:
+    with patch.object(stage_runner, entry_point, side_effect=error):
+        result = stage_runner.run_stage(stage=stage, job_dir=tmp_path)
+
+    assert result == expected

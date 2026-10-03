@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import pytest
@@ -123,3 +124,44 @@ def test_answer_record_rejects_negative_discarded_count() -> None:
             error=None,
             created_at="2026-10-03T00:00:00+00:00",
         )
+
+
+def _drop_meta_line(path: Path) -> None:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    kept = [line for line in lines if '"kind": "meta"' not in line]
+    assert len(kept) == len(lines) - 1
+    path.write_text("\n".join(kept) + "\n", encoding="utf-8")
+
+
+def test_load_records_skips_blank_lines_silently_and_corrupt_lines_with_warning(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    chat_id = create_chat(courses_dir=tmp_path, course_id=COURSE).id
+    append_question(courses_dir=tmp_path, course_id=COURSE, chat_id=chat_id, text="a?")
+    path = chat_path(courses_dir=tmp_path, course_id=COURSE, chat_id=chat_id)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("\n   \n{non json\n")
+    append_question(courses_dir=tmp_path, course_id=COURSE, chat_id=chat_id, text="b?")
+
+    with caplog.at_level(logging.WARNING):
+        records = load_records(courses_dir=tmp_path, course_id=COURSE, chat_id=chat_id)
+
+    assert [getattr(record, "text", None) for record in records] == [None, "a?", "b?"]
+    assert len(caplog.records) == 1
+
+
+def test_list_chats_skips_a_conversation_without_meta(tmp_path: Path) -> None:
+    kept = create_chat(courses_dir=tmp_path, course_id=COURSE).id
+    broken = create_chat(courses_dir=tmp_path, course_id=COURSE).id
+    append_question(
+        courses_dir=tmp_path, course_id=COURSE, chat_id=broken, text="perso?"
+    )
+    _drop_meta_line(chat_path(courses_dir=tmp_path, course_id=COURSE, chat_id=broken))
+
+    metas = list_chats(courses_dir=tmp_path, course_id=COURSE)
+
+    assert [meta.id for meta in metas] == [kept]
+
+
+def test_list_chats_course_without_chats_is_empty(tmp_path: Path) -> None:
+    assert list_chats(courses_dir=tmp_path, course_id=COURSE) == []

@@ -198,3 +198,15 @@ def test_reconcile_skips_an_unreadable_transcript_and_keeps_the_others(
         write_transcript(directory=bad.parent, text="illecita")
         assert reconcile(store=store, index=index) == 1
         assert search(match='"illecita"', job_ids=None, limit=10, offset=0).total == 1
+
+
+def test_reconcile_ignores_stray_files_in_the_jobs_directory(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    write_transcript(directory=store.jobs_dir / "job", text="contratto")
+    (store.jobs_dir / "appunti.txt").write_text("non un job", encoding="utf-8")
+
+    with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
+        replaced = reconcile(store=store, index=index)
+        indexed = set(index.indexed_lectures())
+
+    assert (replaced, indexed) == (1, {"job"})
