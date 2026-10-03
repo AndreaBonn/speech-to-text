@@ -155,3 +155,31 @@ def test_resolve_does_not_match_quote_split_across_non_contiguous_words() -> Non
     result = resolve_citation(passages=passages, citation=citation)
 
     assert result == SourceRejection(reason=SourceRejectionReason.QUOTE_NOT_FOUND)
+
+
+def test_resolve_reattributes_a_quote_found_in_another_given_passage() -> None:
+    # Measured on qwen3.5:9b (T046): a verbatim quote labelled P7 that only
+    # appears in P1. The text is still in the material; only the pointer moves.
+    passages = [_lecture_passage(), _doc_passage(page=9)]
+    citation = ProposedSourceCitation(label="P2", quote="la causa è illecita")
+
+    result = resolve_citation(passages=passages, citation=citation)
+
+    assert isinstance(result, SourceCitation)
+    assert result.passage_id == "Ljob-1-S3"
+    assert result.location == LectureCitation(job_id="job-1", timestamp=42.5)
+
+
+def test_resolve_prefers_the_labelled_passage_when_both_contain_the_quote() -> None:
+    other = RetrievedPassage(
+        text=DOC_TEXT,
+        source=DocumentSource(doc_id="appunti", page=3, chunk=0),
+        passage_id="appunti:p3:c0",
+    )
+    passages = [other, _doc_passage(page=214)]
+    citation = ProposedSourceCitation(label="P2", quote="la causa del contratto")
+
+    result = resolve_citation(passages=passages, citation=citation)
+
+    assert isinstance(result, SourceCitation)
+    assert result.passage_id == "manuale:p214:c0"

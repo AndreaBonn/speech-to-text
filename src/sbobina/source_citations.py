@@ -89,9 +89,21 @@ def resolve_citation(
     quote_tokens = normalize_tokens(text=citation.quote)
     if not MIN_QUOTE_WORDS <= len(quote_tokens) <= MAX_QUOTE_WORDS:
         return SourceRejection(reason=SourceRejectionReason.QUOTE_LENGTH)
-    passage_tokens = normalize_tokens(text=passage.text)
-    if not _contains_sequence(tokens=passage_tokens, quote=quote_tokens):
+    # The labelled passage first; then any other passage the model was given,
+    # since a 9B model copies the right words under the wrong label (T046).
+    found = next(
+        (
+            candidate
+            for candidate in (passage, *passages)
+            if _contains_sequence(
+                tokens=normalize_tokens(text=candidate.text), quote=quote_tokens
+            )
+        ),
+        None,
+    )
+    if found is None:
         return SourceRejection(reason=SourceRejectionReason.QUOTE_NOT_FOUND)
+    passage = found
     return SourceCitation(
         passage_id=passage.passage_id,
         quote=citation.quote,
