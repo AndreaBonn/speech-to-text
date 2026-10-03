@@ -1,92 +1,19 @@
-from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
+from page_fixtures import (
+    BASE_URL,
+    FORM_FIELD_NAMES,
+    _models,
+)
 from pydantic import JsonValue
 
-from sbobina.course_registry import get_or_create
-from sbobina.document_models import CourseDocument, DocumentKind, DocumentStatus
 from sbobina.settings import Settings
 from sbobina.web import pages
 from sbobina.web.app import create_app
-from sbobina.web.document_store import write_document
-from sbobina.web.job_models import JobConfig, JobStatus, LectureMeta
-from sbobina.web.job_store import JobStore
 
-
-def _write_course_document(
-    tmp_path: Path, filename: str, status: DocumentStatus = DocumentStatus.READY
-) -> tuple[str, str]:
-    """Seed a registered course with one document, bypassing the upload API."""
-    courses_dir = tmp_path / "courses"
-    course = get_or_create(courses_dir=courses_dir, key="fisica", label="Fisica")
-    doc_id = "doc-1"
-    doc_dir = courses_dir / course.id / "documents" / doc_id
-    doc_dir.mkdir(parents=True)
-    extracted = status in (DocumentStatus.READY, DocumentStatus.READY_NO_TEXT)
-    write_document(
-        courses_dir=courses_dir,
-        document=CourseDocument(
-            id=doc_id,
-            course_id=course.id,
-            filename=filename,
-            kind=DocumentKind.PDF,
-            size=1,
-            sha256="0" * 64,
-            status=status,
-            error="EXTRACTION_FAILED" if status == DocumentStatus.FAILED else None,
-            pages=1 if extracted else None,
-            created_at=datetime.now(tz=UTC),
-        ),
-    )
-    return course.key, doc_id
-
-
-BASE_URL = "http://127.0.0.1:8765"
-FORM_FIELD_NAMES = (
-    'name="file"',
-    'name="subject"',
-    'name="correct"',
-    'name="ollama_model"',
-    'name="whisper_model"',
-    'name="beam_size"',
-    'name="vad_filter"',
-    'name="condition_on_previous_text"',
-    'name="uncertain_threshold"',
-)
-
-
-OLLAMA_READY: dict[str, JsonValue] = {
-    "status": "ready",
-    "message": "Ollama è pronto.",
-    "models": [{"model": "qwen3.5:2b", "size": 1, "parameter_size": "2B"}],
-}
-WHISPER_MODELS: list[dict[str, JsonValue]] = [
-    {
-        "name": "large-v3-turbo",
-        "downloaded": True,
-        "recommended_gpu": False,
-        "recommended_cpu": True,
-    },
-    {
-        "name": "medium",
-        "downloaded": False,
-        "recommended_gpu": False,
-        "recommended_cpu": False,
-    },
-]
-
-
-@pytest.fixture(autouse=True)
-def _models() -> object:
-    """Keep the index page off the real Ollama server and Hugging Face cache."""
-    with (
-        patch.object(pages, "ollama_status", return_value=OLLAMA_READY),
-        patch.object(pages, "list_whisper_models", return_value=WHISPER_MODELS),
-    ):
-        yield
+__all__ = ["_models"]
 
 
 def test_index_lists_models_with_state_and_profile(tmp_path: Path) -> None:
@@ -168,33 +95,6 @@ def test_modelli_page_returns_catalogue_shell(tmp_path: Path) -> None:
     assert "/static/js/modelli.js" in body
 
 
-def test_corsi_page_returns_shell(tmp_path: Path) -> None:
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        response = client.get("/corsi")
-
-    assert response.status_code == 200
-    body = response.text
-    assert 'id="corsi-list"' in body
-    assert 'id="corsi-detail"' in body
-    assert "/static/js/corsi.js" in body
-    assert "/static/js/corso-dettaglio.js" in body
-    assert body.index("/static/js/dom.js") < body.index("/static/js/corso-dettaglio.js")
-    assert body.index("/static/js/corso-dettaglio.js") < body.index(
-        "/static/js/corsi.js"
-    )
-    assert body.index("/static/js/corsi.js") < body.index("/static/js/search.js")
-
-
-def test_corsi_page_marks_its_rail_entry_active(tmp_path: Path) -> None:
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        body = client.get("/corsi").text
-
-    assert ">Corsi<" in body
-    assert 'class="rail__link rail__link--active"' in body
-
-
 def test_confronto_page_returns_form_shell(tmp_path: Path) -> None:
     app = create_app(settings=Settings(), data_dir=tmp_path)
     with TestClient(app=app, base_url=BASE_URL) as client:
@@ -207,70 +107,6 @@ def test_confronto_page_returns_form_shell(tmp_path: Path) -> None:
     assert "/static/js/confronto.js" in body
 
 
-def test_rail_disables_reader_link_without_a_done_job(tmp_path: Path) -> None:
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        response = client.get("/")
-
-    assert 'aria-disabled="true"' in response.text
-    assert ">Lettore<" in response.text
-
-
-def test_reader_page_returns_shell_for_an_existing_job(tmp_path: Path) -> None:
-    store = JobStore(data_dir=tmp_path)
-    record = store.create(
-        config=JobConfig(subject="Fisica"), source_name="lezione1.m4a"
-    )
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        response = client.get(f"/lettore/{record.id}")
-
-    assert response.status_code == 200
-    body = response.text
-    assert f'data-job-id="{record.id}"' in body
-    assert "lezione1.m4a" in body
-    assert 'id="reader-text"' in body
-    assert 'id="reader-points"' in body
-    assert 'id="audio-bar"' in body
-    assert f"/api/v1/jobs/{record.id}/audio" in body
-    assert f"/api/v1/jobs/{record.id}/files/md" in body
-    assert "/static/js/reader.js" in body
-
-
-def test_reader_course_field_falls_back_to_subject(tmp_path: Path) -> None:
-    store = JobStore(data_dir=tmp_path)
-    record = store.create(config=JobConfig(subject="Fisica"), source_name="a.m4a")
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        body = client.get(f"/lettore/{record.id}").text
-
-    assert 'id="course-input"' in body
-    assert 'value="Fisica"' in body
-    assert 'maxlength="100"' in body
-    assert "/static/js/course-field.js" in body
-
-
-def test_reader_course_field_prefers_meta_and_escapes_it(tmp_path: Path) -> None:
-    store = JobStore(data_dir=tmp_path)
-    record = store.create(config=JobConfig(subject="Fisica"), source_name="a.m4a")
-    store.write_meta(job_id=str(record.id), meta=LectureMeta(course='Analisi "1" <b>'))
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        body = client.get(f"/lettore/{record.id}").text
-
-    assert 'value="Analisi &#34;1&#34; &lt;b&gt;"' in body
-    assert 'value="Fisica"' not in body
-
-
-def test_reader_page_returns_404_for_missing_job(tmp_path: Path) -> None:
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        response = client.get("/lettore/does-not-exist")
-
-    assert response.status_code == 404
-    assert "/storico" in response.text
-
-
 def test_pages_show_the_transcriber_brand(tmp_path: Path) -> None:
     app = create_app(settings=Settings(), data_dir=tmp_path)
     with TestClient(app=app, base_url=BASE_URL) as client:
@@ -278,103 +114,6 @@ def test_pages_show_the_transcriber_brand(tmp_path: Path) -> None:
 
     assert '<div class="rail__brand">Transcriber</div>' in body
     assert "<title>Nuova trascrizione · Transcriber</title>" in body
-
-
-def test_rail_links_reader_to_the_newest_done_job(tmp_path: Path) -> None:
-    store = JobStore(data_dir=tmp_path)
-    done = store.create(config=JobConfig(), source_name="vecchia.m4a")
-    store.update(record=done.model_copy(update={"status": JobStatus.DONE}))
-    store.create(config=JobConfig(), source_name="in-coda.m4a")
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        body = client.get("/").text
-
-    assert f'href="/lettore/{done.id}"' in body
-    assert 'aria-disabled="true"' not in body
-
-
-@pytest.mark.parametrize(
-    ("subject", "expected_title"), [("Fisica", "Fisica"), (None, "Lezione del ")]
-)
-def test_reader_page_without_source_name_falls_back_to_subject_then_date(
-    tmp_path: Path, subject: str | None, expected_title: str
-) -> None:
-    store = JobStore(data_dir=tmp_path)
-    record = store.create(config=JobConfig(subject=subject))
-    if subject is None:
-        expected_title += record.created_at.strftime("%d/%m/%Y")
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        body = client.get(f"/lettore/{record.id}").text
-
-    assert f'<h2 class="reader__title">{expected_title}</h2>' in body
-
-
-def test_reader_page_loads_the_deep_link_after_the_reader(tmp_path: Path) -> None:
-    record = JobStore(data_dir=tmp_path).create(config=JobConfig())
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        body = client.get(f"/lettore/{record.id}").text
-
-    assert "/static/js/reader-link.js" in body
-    assert body.index("/static/js/reader.js") < body.index("/static/js/reader-link.js")
-
-
-def test_corsi_page_has_the_search_form(tmp_path: Path) -> None:
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        body = client.get("/corsi").text
-
-    assert 'id="search-form"' in body
-    assert 'id="search-input"' in body
-    assert 'id="search-course"' in body
-    assert 'id="search-results"' in body
-    assert body.index("/static/js/dom.js") < body.index("/static/js/search.js")
-
-
-def test_studio_page_returns_shell_for_an_existing_job(tmp_path: Path) -> None:
-    store = JobStore(data_dir=tmp_path)
-    record = store.create(config=JobConfig(subject="Fisica"), source_name="a.m4a")
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        response = client.get(f"/studio/{record.id}")
-
-    assert response.status_code == 200
-    body = response.text
-    assert f'data-job-id="{record.id}"' in body
-    assert "a.m4a" in body
-    assert 'id="study-chapters"' in body
-    assert f'href="/lettore/{record.id}"' in body
-    assert body.index("/static/js/dom.js") < body.index("/static/js/studio.js")
-
-
-def test_studio_script_is_served_and_mounts_text_only(tmp_path: Path) -> None:
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        response = client.get("/static/js/studio.js")
-
-    assert response.status_code == 200
-    assert "/api/v1/jobs/" in response.text
-    # LLM output is untrusted: the script must never parse it as markup.
-    assert "innerHTML" not in response.text
-
-
-def test_studio_page_returns_404_for_missing_job(tmp_path: Path) -> None:
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        response = client.get("/studio/does-not-exist")
-
-    assert response.status_code == 404
-    assert 'id="study-chapters"' not in response.text
-
-
-def test_reader_links_to_the_study_page(tmp_path: Path) -> None:
-    record = JobStore(data_dir=tmp_path).create(config=JobConfig())
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        body = client.get(f"/lettore/{record.id}").text
-
-    assert f'href="/studio/{record.id}"' in body
 
 
 def test_pages_apply_the_saved_theme_before_the_stylesheets(tmp_path: Path) -> None:
@@ -414,73 +153,3 @@ def test_index_explains_beam_size_with_the_recommended_value(tmp_path: Path) -> 
     assert 'aria-describedby="beam_size-tip"' in help_button
     tip = body.split('id="beam_size-tip"')[1].split("</span>")[0]
     assert "Consigliato: 5" in tip
-
-
-def test_corsi_page_includes_the_materials_section(tmp_path: Path) -> None:
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        body = client.get("/corsi").text
-
-    assert 'id="materials-list"' in body
-    assert 'id="materials-dropzone"' in body
-    assert 'id="materials-empty"' in body
-    assert "/static/js/corso-materiali.js" in body
-    assert body.index("/static/js/dom.js") < body.index("/static/js/corso-upload.js")
-    assert body.index("/static/js/corso-upload.js") < body.index(
-        "/static/js/corso-materiali.js"
-    )
-    assert body.index("/static/js/corso-materiali.js") < body.index(
-        "/static/js/corso-dettaglio.js"
-    )
-
-
-def test_documento_page_returns_shell_for_an_existing_document(tmp_path: Path) -> None:
-    key, doc_id = _write_course_document(tmp_path, "Manuale.pdf")
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        response = client.get(f"/corsi/{key}/documenti/{doc_id}")
-
-    assert response.status_code == 200
-    body = response.text
-    assert f'data-doc-id="{doc_id}"' in body
-    assert "Manuale.pdf" in body
-    assert 'id="document-text"' in body
-    assert body.index("/static/js/dom.js") < body.index("/static/js/documento.js")
-
-
-def test_documento_page_returns_404_for_missing_document(tmp_path: Path) -> None:
-    key, _ = _write_course_document(tmp_path, "Manuale.pdf")
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        response = client.get(f"/corsi/{key}/documenti/does-not-exist")
-
-    assert response.status_code == 404
-    assert 'id="document-text"' not in response.text
-
-
-def test_documento_page_returns_404_for_unregistered_course(tmp_path: Path) -> None:
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        response = client.get("/corsi/does-not-exist/documenti/doc-1")
-
-    assert response.status_code == 404
-
-
-def test_documento_page_escapes_a_malicious_filename(tmp_path: Path) -> None:
-    safe_key, safe_doc_id = _write_course_document(tmp_path, "Manuale.pdf")
-    app = create_app(settings=Settings(), data_dir=tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        baseline = client.get(f"/corsi/{safe_key}/documenti/{safe_doc_id}").text
-
-    other_tmp_path = tmp_path / "other"
-    key, doc_id = _write_course_document(
-        other_tmp_path, "Manuale<script>alert(1)</script>.pdf"
-    )
-    app = create_app(settings=Settings(), data_dir=other_tmp_path)
-    with TestClient(app=app, base_url=BASE_URL) as client:
-        body = client.get(f"/corsi/{key}/documenti/{doc_id}").text
-
-    assert "<script>alert(1)</script>" not in body
-    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in body
-    # The payload adds no real <script> tag: both pages load the same set.
-    assert body.count("<script") == baseline.count("<script")
