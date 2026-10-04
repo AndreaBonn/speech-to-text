@@ -7,6 +7,7 @@ from sbobina.grading_models import JudgementOutcome
 from sbobina.web.api_practice import (
     GradingServices,
     _validate_generation_id,
+    citation_context,
     text_payload,
 )
 from sbobina.web.course_dependencies import Course
@@ -41,6 +42,9 @@ def grade_submitted_answer(
             attempt=attempt,
             index=target.question_index,
             mode=grading_mode(settings=services.settings),
+            context=citation_context(
+                store=services.store, course=course, attempt=attempt
+            ),
         )
     }
 
@@ -62,5 +66,8 @@ def self_grade_answer(
             attempt=attempt,
             index=target.question_index,
             mode=grading_mode(settings=services.settings),
+            context=citation_context(
+                store=services.store, course=course, attempt=attempt
+            ),
         )
     }

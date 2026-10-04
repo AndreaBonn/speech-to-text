@@ -20,7 +20,9 @@ from sbobina.practice_models import MultipleChoiceAnswer, PracticeAttempt
 from sbobina.settings import Settings
 from sbobina.web.api_practice import _attempt_payload
 from sbobina.web.app import create_app
+from sbobina.web.generation_citations_api import CitationContext
 from sbobina.web.generation_store import generation_path, save_generation
+from sbobina.web.job_store import JobStore
 from sbobina.web.practice_store import (
     create_attempt,
     load_attempt,
@@ -141,7 +143,18 @@ def test_get_attempt_only_answered_question_reveals_solution(
     data = response.json()["data"]
     assert data["questions"][1]["solution"] == generation.questions[1].solution
     assert data["questions"][1]["correct_index"] == 2
-    assert data["questions"][1]["citations"][0]["quote"] == "Original source"
+    citation = data["questions"][1]["citations"][0]
+    assert citation["quote"] == "Original source"
+    # Resolved like the mistakes list: a link and the anchor state, so the
+    # page can say "fonte modificata" instead of linking to a moved quote.
+    assert citation["status"] in {
+        "ok",
+        "moved",
+        "source_modified",
+        "source_removed",
+        "unavailable",
+    }
+    assert "href" in citation
     assert "solution" not in data["questions"][0]
     assert "correct_index" not in data["questions"][0]
     assert "Hidden explanation" not in response.text
@@ -184,16 +197,27 @@ def set_attempt_mtimes(courses_dir: Path, attempts: list[PracticeAttempt]) -> No
         os.utime(path=path, times=(timestamp, timestamp))
 
 
-def test_attempt_payload_unanswered_hidden_and_submitted_revealed() -> None:
+def test_attempt_payload_unanswered_hidden_and_submitted_revealed(
+    tmp_path: Path,
+) -> None:
     attempt = make_attempt()
+    store = JobStore(data_dir=tmp_path)
+    context = CitationContext(
+        courses_dir=store.courses_dir,
+        store=store,
+        course_id=attempt.course_id,
+        key="fisica",
+    )
     assert_hidden(
-        payload=_attempt_payload(attempt=attempt),
+        payload=_attempt_payload(attempt=attempt, context=context),
         solution=attempt.questions[0].solution,
     )
     answer = MultipleChoiceAnswer(
         answer_id=str(uuid4()), question_index=1, chosen_index=2
     )
-    payload = _attempt_payload(attempt=replace(attempt, answers=(answer,)))
+    payload = _attempt_payload(
+        attempt=replace(attempt, answers=(answer,)), context=context
+    )
     assert payload["questions"][1]["solution"] == attempt.questions[1].solution
     assert payload["questions"][1]["correct_index"] == 2
     assert "solution" not in payload["questions"][0]

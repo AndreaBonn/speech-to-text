@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, ConfigDict, Field
 
+from sbobina.course_registry import CourseRecord
 from sbobina.generation_models import (
     EXPECTED_OPTION_COUNT,
     GenerationQuestion,
@@ -15,9 +16,12 @@ from sbobina.practice_models import AnswerStatus, PracticeAttempt, require_uuid4
 from sbobina.web.api_chat import _chat_client
 from sbobina.web.course_dependencies import Course, Services
 from sbobina.web.errors import ConflictError, NotFoundError, ValidationError
+from sbobina.web.generation_citations_api import CitationContext
 from sbobina.web.generation_store import load_generation
+from sbobina.web.job_store import JobStore
 from sbobina.web.pagination import Page, page_bounds, page_meta
 from sbobina.web.practice_answers import AnswerTarget, submit_choice
+from sbobina.web.practice_citations import practice_citation
 from sbobina.web.practice_grading import PracticeServices, grading_mode
 from sbobina.web.practice_payloads import answer_payload
 from sbobina.web.practice_store import create_attempt, list_attempts, load_attempt
@@ -66,6 +70,9 @@ def add_choice_answer(
                 attempt=attempt,
                 index=target.question_index,
                 mode=grading_mode(settings=services.settings),
+                context=citation_context(
+                    store=services.store, course=course, attempt=attempt
+                ),
             )
         }
     attempt = submit_choice(
@@ -74,20 +81,48 @@ def add_choice_answer(
         target=target,
         choice=body.choice,
     )
-    return {"data": choice_payload(attempt=attempt, index=target.question_index)}
+    return {
+        "data": choice_payload(
+            attempt=attempt,
+            index=target.question_index,
+            context=citation_context(
+                store=services.store, course=course, attempt=attempt
+            ),
+        )
+    }
 
 
-def choice_payload(attempt: PracticeAttempt, index: int) -> dict[str, Any]:
+def citation_context(
+    store: JobStore, course: CourseRecord, attempt: PracticeAttempt
+) -> CitationContext:
+    return CitationContext(
+        courses_dir=store.courses_dir,
+        store=store,
+        course_id=course.id,
+        key=course.key,
+        sources=attempt.sources,
+    )
+
+
+def choice_payload(
+    attempt: PracticeAttempt, index: int, context: CitationContext
+) -> dict[str, Any]:
     answer = next(item for item in attempt.answers if item.question_index == index)
     return {
-        **_question_payload(question=attempt.questions[index], is_submitted=True),
+        **_question_payload(
+            question=attempt.questions[index], is_submitted=True, context=context
+        ),
         **answer_payload(attempt=attempt, answer=answer),
     }
 
 
-def text_payload(attempt: PracticeAttempt, index: int, mode: str) -> dict[str, Any]:
+def text_payload(
+    attempt: PracticeAttempt, index: int, mode: str, context: CitationContext
+) -> dict[str, Any]:
     return {
-        **_question_payload(question=attempt.questions[index], is_submitted=True),
+        **_question_payload(
+            question=attempt.questions[index], is_submitted=True, context=context
+        ),
         **answer_payload(
             attempt=attempt, answer=text_answer(attempt=attempt, question_index=index)
         ),
@@ -103,7 +138,7 @@ def _validate_generation_id(gen_id: str) -> None:
 
 
 def _question_payload(
-    question: GenerationQuestion, is_submitted: bool
+    question: GenerationQuestion, is_submitted: bool, context: CitationContext
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "question": question.question,
@@ -113,12 +148,17 @@ def _question_payload(
         payload.update(
             solution=question.solution,
             correct_index=question.correct_index,
-            citations=jsonable_encoder(obj=question.citations),
+            citations=[
+                practice_citation(citation=citation, context=context)
+                for citation in question.citations
+            ],
         )
     return payload
 
 
-def _attempt_payload(attempt: PracticeAttempt) -> dict[str, Any]:
+def _attempt_payload(
+    attempt: PracticeAttempt, context: CitationContext
+) -> dict[str, Any]:
     submitted = {
         answer.question_index
         for answer in attempt.answers
@@ -139,7 +179,11 @@ def _attempt_payload(attempt: PracticeAttempt) -> dict[str, Any]:
                 for answer in attempt.answers
             ],
             "questions": [
-                _question_payload(question=question, is_submitted=index in submitted)
+                _question_payload(
+                    question=question,
+                    is_submitted=index in submitted,
+                    context=context,
+                )
                 for index, question in enumerate(attempt.questions)
             ],
         }
@@ -169,7 +213,14 @@ def add_attempt(gen_id: str, course: Course, services: Services) -> dict[str, An
         raise ValidationError(
             message="Serve una generazione completata di domande, non un riassunto."
         ) from error
-    return {"data": _attempt_payload(attempt=attempt)}
+    return {
+        "data": _attempt_payload(
+            attempt=attempt,
+            context=citation_context(
+                store=services.store, course=course, attempt=attempt
+            ),
+        )
+    }
 
 
 @router.get("/{attempt_id}")
@@ -184,7 +235,14 @@ def get_attempt(
     )
     if attempt.generation_id != gen_id or attempt.course_id != course.id:
         raise NotFoundError(entity="Tentativo", id=attempt_id)
-    return {"data": _attempt_payload(attempt=attempt)}
+    return {
+        "data": _attempt_payload(
+            attempt=attempt,
+            context=citation_context(
+                store=services.store, course=course, attempt=attempt
+            ),
+        )
+    }
 
 
 @router.get("")
@@ -200,7 +258,12 @@ def get_attempts(
     ]
     return {
         "data": [
-            _attempt_payload(attempt=attempt)
+            _attempt_payload(
+                attempt=attempt,
+                context=citation_context(
+                    store=services.store, course=course, attempt=attempt
+                ),
+            )
             for attempt in attempts[page_bounds(query=query)]
         ],
         "meta": {
