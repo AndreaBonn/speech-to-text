@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -13,34 +12,14 @@ from sbobina.document_models import CourseDocument
 from sbobina.model_catalog import ollama_options, whisper_options
 from sbobina.web.document_store import read_document
 from sbobina.web.errors import NotFoundError
-from sbobina.web.job_models import JobRecord, JobStatus
+from sbobina.web.job_models import JobRecord
 from sbobina.web.job_store import JobStore
 from sbobina.web.lecture_title import reader_title as _reader_title
 from sbobina.web.model_service import list_whisper_models, ollama_status
+from sbobina.web.pages_nav import build_nav
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
-
-# How many recent jobs to scan for the rail's "Lettore" destination. A local
-# install rarely has more queued than this between two completed lectures.
-READER_LOOKUP_PAGE_SIZE = 50
-
-
-@dataclass(frozen=True)
-class NavSpec:
-    id: str
-    label: str
-    href: str | None  # None: resolved per-request (the Lettore destination).
-
-
-NAV_SPECS = (
-    NavSpec(id="nuova", label="Nuova trascrizione", href="/"),
-    NavSpec(id="corsi", label="Corsi", href="/corsi"),
-    NavSpec(id="lettore", label="Lettore", href=None),
-    NavSpec(id="storico", label="Storico", href="/storico"),
-    NavSpec(id="modelli", label="Modelli", href="/modelli"),
-    NavSpec(id="confronto", label="Confronto (WER)", href="/confronto"),
-)
 
 
 def _job_store(request: Request) -> JobStore:
@@ -49,36 +28,6 @@ def _job_store(request: Request) -> JobStore:
 
 
 JobStoreDep = Annotated[JobStore, Depends(_job_store)]
-
-
-def _last_reader_href(store: JobStore) -> str | None:
-    """Most recent completed job, so the rail can link straight to it.
-
-    The reader (T022) is not built yet, but the destination already resolves
-    to a real job once one exists, instead of staying disabled forever.
-    """
-    page = store.list(page=1, per_page=READER_LOOKUP_PAGE_SIZE)
-    for record in page.items:
-        if record.status == JobStatus.DONE:
-            return f"/lettore/{record.id}"
-    return None
-
-
-def _nav(active: str, store: JobStore) -> list[dict[str, Any]]:
-    reader_href = _last_reader_href(store=store)
-    items = []
-    for spec in NAV_SPECS:
-        href = reader_href if spec.id == "lettore" else spec.href
-        items.append(
-            {
-                "id": spec.id,
-                "label": spec.label,
-                "href": href,
-                "disabled": href is None,
-                "active": spec.id == active,
-            }
-        )
-    return items
 
 
 def _render(
@@ -93,7 +42,7 @@ def _render(
         request=request,
         name=template_name,
         status_code=status_code,
-        context={"nav_items": _nav(active=active, store=store), **context},
+        context={"nav_items": build_nav(active=active, store=store), **context},
     )
 
 
