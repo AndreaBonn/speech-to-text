@@ -3,10 +3,13 @@ from collections.abc import Mapping
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-LIMITED_METHOD = "POST"
+LIMITED_METHODS = frozenset({"POST", "PATCH"})
 BYTES_PER_MB = 1024 * 1024
 # Multipart boundaries and the config fields travel with the file.
 FORM_OVERHEAD_BYTES = BYTES_PER_MB
+# Card front/back (MAX_CARD_TEXT_LENGTH) and a citation quote (MAX_QUOTE_CHARS)
+# are each capped at 2000 chars; 64 KiB is generous headroom over that JSON.
+CARD_JSON_LIMIT_BYTES = 64 * 1024
 
 
 def upload_limit_bytes(max_upload_mb: int) -> int:
@@ -46,6 +49,19 @@ class UploadLimitMiddleware:
         exact = self.limits.get(path)
         if exact is not None:
             return exact
+        direct = self._suffix_limit(path=path)
+        if direct is not None:
+            return direct
+        # A trailing variable id segment (.../cards/{card_id}) has no fixed
+        # suffix of its own: retry once against the path with that segment
+        # removed, so a PATCH on a specific resource inherits its collection
+        # limit without a per-id entry.
+        parent, separator, segment = path.rpartition("/")
+        if not separator or not segment:
+            return None
+        return self._suffix_limit(path=parent)
+
+    def _suffix_limit(self, path: str) -> int | None:
         return next(
             (
                 limit
@@ -56,7 +72,7 @@ class UploadLimitMiddleware:
         )
 
     def _rejection(self, scope: Scope) -> JSONResponse | None:
-        if scope["type"] != "http" or scope["method"] != LIMITED_METHOD:
+        if scope["type"] != "http" or scope["method"] not in LIMITED_METHODS:
             return None
         max_bytes = self._max_bytes(path=scope["path"].rstrip("/"))
         if max_bytes is None:

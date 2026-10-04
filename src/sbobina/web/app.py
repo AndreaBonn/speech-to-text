@@ -13,6 +13,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from sbobina.settings import LOOPBACK_HOSTS, Settings
 from sbobina.web import search_service
+from sbobina.web.api_cards import router as cards_router
 from sbobina.web.api_chat import router as chat_router
 from sbobina.web.api_corrected import router as corrected_router
 from sbobina.web.api_courses import router as courses_router
@@ -45,7 +46,11 @@ from sbobina.web.responses import (
 from sbobina.web.search_index import index_session
 from sbobina.web.sse import router as events_router
 from sbobina.web.supervisor import Supervisor, SupervisorOptions
-from sbobina.web.upload_limit import UploadLimitMiddleware, upload_limit_bytes
+from sbobina.web.upload_limit import (
+    CARD_JSON_LIMIT_BYTES,
+    UploadLimitMiddleware,
+    upload_limit_bytes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +155,9 @@ def _add_middleware(app: FastAPI, settings: Settings) -> None:
         },
         suffix_limits={
             "/documents": upload_limit_bytes(max_upload_mb=settings.course_doc_max_mb),
+            "/cards": CARD_JSON_LIMIT_BYTES,
+            "/review": CARD_JSON_LIMIT_BYTES,
+            "/from-concepts": CARD_JSON_LIMIT_BYTES,
         },
     )
 
@@ -168,6 +176,7 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(generations_router)
     app.include_router(exam_cues_router)
     app.include_router(review_router)
+    app.include_router(cards_router)
     app.include_router(search_router)
     app.include_router(study_router)
     app.include_router(files_router)

@@ -84,3 +84,39 @@ def test_each_path_has_its_own_limit(client: TestClient, reached: list[str]) -> 
     assert rejected.status_code == 413
     assert accepted.status_code == 200
     assert reached == ["POST"]
+
+
+@pytest.fixture
+def patch_client(reached: list[str]) -> TestClient:
+    async def endpoint(request: Request) -> PlainTextResponse:
+        await request.body()
+        reached.append(request.method)
+        return PlainTextResponse("ok")
+
+    inner = Starlette(
+        routes=[
+            Route("/api/v1/courses/{key}/cards/{card_id}", endpoint, methods=["PATCH"]),
+        ]
+    )
+    inner.add_middleware(
+        UploadLimitMiddleware,
+        limits={},
+        suffix_limits={"/cards": SMALL_LIMIT_BYTES},
+    )
+    return TestClient(inner)
+
+
+def test_patch_on_a_variable_id_matches_the_parent_suffix(
+    patch_client: TestClient, reached: list[str]
+) -> None:
+    rejected = patch_client.patch(
+        "/api/v1/courses/diritto/cards/abc123",
+        content=b"x" * (SMALL_LIMIT_BYTES + 1),
+    )
+    accepted = patch_client.patch(
+        "/api/v1/courses/diritto/cards/abc123", content=b"x" * SMALL_LIMIT_BYTES
+    )
+
+    assert rejected.status_code == 413
+    assert accepted.status_code == 200
+    assert reached == ["PATCH"]
