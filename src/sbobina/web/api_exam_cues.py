@@ -5,9 +5,12 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query, Request
 
 from sbobina.exam_cues import ExamCue, find_exam_cues
-from sbobina.models import load_transcript
-from sbobina.web.api_files import TRANSCRIPT_FILES
-from sbobina.web.course_retrieval import NO_REGISTERED_COURSE, course_scope
+from sbobina.models import transcript_from_json
+from sbobina.web.api_files import TRANSCRIPT_FILES, transcript_revision
+from sbobina.web.course_retrieval import (
+    NO_REGISTERED_COURSE,
+    course_scope,
+)
 from sbobina.web.errors import NotFoundError, ValidationError
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_schema import Variant
@@ -52,6 +55,7 @@ QueryOptions = Annotated[CueQuery, Depends(_query)]
 class LectureCue:
     cue: ExamCue
     variant: Variant
+    revision: str
 
 
 def _cues_for_job(store: JobStore, job_id: str) -> tuple[LectureCue, ...]:
@@ -61,20 +65,26 @@ def _cues_for_job(store: JobStore, job_id: str) -> tuple[LectureCue, ...]:
         if not path.exists():
             continue
         try:
-            transcript = load_transcript(path=path)
+            # One read per lecture: cues and revision come from the same text,
+            # so a card anchored with this revision quotes this exact version.
+            content = path.read_text(encoding="utf-8")
+            transcript = transcript_from_json(content=content)
             cues = find_exam_cues(transcript=transcript, job_id=job_id)
         except (OSError, ValueError, KeyError, TypeError) as error:
             logger.warning("Unreadable transcript, skipping %s: %s", path, error)
             return ()
+        revision = transcript_revision(content=content)
         # The reader must open the variant the quote was read from.
-        return tuple(LectureCue(cue=cue, variant=variant) for cue in cues)
+        return tuple(
+            LectureCue(cue=cue, variant=variant, revision=revision) for cue in cues
+        )
     return ()
 
 
 def _cue_payload(item: LectureCue) -> dict[str, Any]:
     cue = item.cue
     href = f"/lettore/{cue.job_id}?t={cue.start}&variant={item.variant}"
-    return {**asdict(cue), "href": href}
+    return {**asdict(cue), "href": href, "revision": item.revision}
 
 
 @router.get("/{key:path}/exam-cues")

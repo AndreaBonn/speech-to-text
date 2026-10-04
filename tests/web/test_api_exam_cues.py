@@ -12,6 +12,7 @@ from sbobina.models import save_transcript
 from sbobina.settings import Settings
 from sbobina.web.api_files import TRANSCRIPT_FILES
 from sbobina.web.app import create_app
+from sbobina.web.course_retrieval import lecture_revision
 from sbobina.web.job_models import JobConfig, LectureMeta
 from sbobina.web.job_store import JobStore
 
@@ -57,6 +58,7 @@ def test_list_exam_cues_envelope_and_reader_link(
     client: TestClient, store: JobStore
 ) -> None:
     job_id = _lecture(store=store, text="Introduzione. Segnatevelo")
+    revision = lecture_revision(store=store, job_id=job_id)
 
     response = client.get(url=URL)
 
@@ -70,10 +72,12 @@ def test_list_exam_cues_envelope_and_reader_link(
                 "start": 12.5,
                 "level": "strong",
                 "href": f"/lettore/{job_id}?t=12.5&variant=original",
+                "revision": revision,
             }
         ],
         "meta": {"page": 1, "per_page": 20, "total": 1, "total_pages": 1},
     }
+    assert revision is not None
 
 
 def test_list_exam_cues_strong_filters_before_pagination(
