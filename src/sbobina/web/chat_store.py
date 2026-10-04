@@ -18,7 +18,6 @@ from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from threading import Lock
 from uuid import uuid4
 
 from sbobina.web.chat_records import (
@@ -31,25 +30,13 @@ from sbobina.web.chat_records import (
     record_to_line,
 )
 from sbobina.web.errors import NotFoundError
+from sbobina.web.path_locks import _LOCKS_GUARD, _PATH_LOCKS, lock_for
 
 logger = logging.getLogger("sbobina")
 
 CHATS_DIRNAME = "chats"
 TITLE_MAX_CHARS = 60
-
-
-_LOCKS_GUARD = Lock()
-_CHAT_LOCKS: dict[Path, Lock] = {}
-
-
-def _lock_for(path: Path) -> Lock:
-    """One lock per conversation path, created once, shared by every caller."""
-    with _LOCKS_GUARD:
-        lock = _CHAT_LOCKS.get(path)
-        if lock is None:
-            lock = Lock()
-            _CHAT_LOCKS[path] = lock
-        return lock
+_CHAT_LOCKS = _PATH_LOCKS
 
 
 def chats_dir(courses_dir: Path, course_id: str) -> Path:
@@ -71,7 +58,7 @@ def _append(path: Path, record: ChatRecord) -> None:
     flight, leaving a chat with no meta line that nobody can list or delete.
     """
     line = record_to_line(record=record)
-    with _lock_for(path=path):
+    with lock_for(path=path):
         if not isinstance(record, ChatMeta) and not path.is_file():
             raise NotFoundError(entity="Chat", id=path.stem)
         with path.open("a", encoding="utf-8") as handle:
@@ -191,7 +178,7 @@ def list_chats(courses_dir: Path, course_id: str) -> list[ChatMeta]:
 
 def delete_chat(courses_dir: Path, course_id: str, chat_id: str) -> None:
     path = _existing_path(courses_dir=courses_dir, course_id=course_id, chat_id=chat_id)
-    with _lock_for(path=path):
+    with lock_for(path=path):
         path.unlink(missing_ok=True)
     with _LOCKS_GUARD:
         _CHAT_LOCKS.pop(path, None)
