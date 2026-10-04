@@ -41,6 +41,7 @@ from sbobina.web.gpu_release import unload_ollama_models
 from sbobina.web.job_store import JobStore
 from sbobina.web.middleware import OriginMiddleware, web_origin
 from sbobina.web.pages import router as pages_router
+from sbobina.web.pages_esercitazione import router as practice_pages_router
 from sbobina.web.responses import (
     app_error_handler,
     http_error_handler,
@@ -190,6 +191,7 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(wer_router)
     app.include_router(events_router)
     app.include_router(pages_router)
+    app.include_router(practice_pages_router)
     app.mount(
         "/static",
         StaticFiles(directory=Path(__file__).parent / "static"),

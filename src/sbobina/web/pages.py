@@ -46,6 +46,10 @@ def _render(
     )
 
 
+# Public name for page routes split into their own modules (300-line cap).
+render_page = _render
+
+
 def _installed_ollama_models(
     status: dict[str, JsonValue],
 ) -> list[dict[str, JsonValue]]:

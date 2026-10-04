@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if not_found %}
+<div class="empty-state" role="alert">
+  <p class="empty-state__text">
+    Esercitazione non trovata: non esiste, oppure appartiene a un altro corso.
+  </p>
+  <a class="btn btn--secondary" href="/corsi?corso={{ course_key | urlencode }}">Torna al corso</a>
+</div>
+{% else %}
+<div
+  id="esercitazione-root"
+  class="practice"
+  data-course-key="{{ course_key }}"
+  data-generation-id="{{ generation_id }}"
+  data-attempt-id="{{ attempt_id }}"
+>
+  <div class="practice__head">
+    <p class="practice__course">
+      <a class="table__link" href="/corsi?corso={{ course_key | urlencode }}">{{ course_label }}</a>
+    </p>
+    <p id="esercitazione-progress" class="practice__progress" role="status" aria-live="polite"></p>
+  </div>
+
+  <div id="esercitazione-status" class="history__status" role="alert" hidden></div>
+
+  <ol id="esercitazione-questions" class="practice__questions" aria-label="Domande">
+    <li class="skeleton-row"></li>
+    <li class="skeleton-row"></li>
+  </ol>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if not not_found %}
+<script src="/static/js/dom.js" defer></script>
+<script src="/static/js/esercitazione-esito.js" defer></script>
+<script src="/static/js/esercitazione-ui.js" defer></script>
+<script src="/static/js/esercitazione.js" defer></script>
+{% endif %}
+{% endblock %}

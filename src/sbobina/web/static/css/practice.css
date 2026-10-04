@@ -1,0 +1,229 @@
+/* ---------- Esercitazione: one attempt (esercitazione.js) ---------- */
+
+/* Head and questions share one column, so the progress line ends where the
+   cards end instead of at the far edge of the page. */
+.practice {
+  max-width: var(--measure-reading);
+}
+
+.practice__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-xs) var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.practice__course,
+.practice__progress {
+  margin: 0;
+}
+
+.practice__progress {
+  color: var(--color-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.practice__questions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.practice-question {
+  padding: var(--space-md) var(--space-lg);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.practice-question__number {
+  margin: 0 0 var(--space-2xs);
+  color: var(--color-ink-3);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.practice-question__text {
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+/* The fieldset only groups the radios: no box of its own inside the card. */
+.practice-question__options {
+  margin: 0 0 var(--space-md);
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.practice-question__options legend {
+  padding: 0;
+}
+
+.practice-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  min-height: var(--target-min);
+  padding: var(--space-2xs) 0;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.practice-option input {
+  margin-top: 0.2em;
+  accent-color: var(--color-accent);
+}
+
+/* A written answer is paragraphs, not a form field: it takes the card width
+   instead of the 28rem cap of .text-input. */
+.practice-question textarea {
+  width: 100%;
+  max-width: none;
+  min-height: 8rem;
+  resize: vertical;
+}
+
+.practice-question__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.practice-question__message {
+  margin: var(--space-sm) 0 0;
+}
+
+/* ---------- Esercitazione: result of one question (esercitazione-esito.js) ---------- */
+
+.practice-result {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: var(--rule-hair) solid var(--color-rule);
+}
+
+.practice-result:focus {
+  outline: none;
+}
+
+.practice-result:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.practice-result__verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-sm);
+}
+
+.practice-result__label {
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+}
+
+.practice-result__answer {
+  margin: 0 0 var(--space-md);
+  padding-left: var(--space-sm);
+  border-left: 3px solid var(--color-rule-strong);
+  color: var(--color-ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.practice-result__heading {
+  margin: var(--space-md) 0 var(--space-2xs);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+}
+
+.practice-result__list {
+  margin: 0;
+  padding-left: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  overflow-wrap: anywhere;
+}
+
+.practice-result__quote {
+  display: block;
+  color: var(--color-ink-2);
+}
+
+.practice-result__solution {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.practice-result__citations {
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.practice-result__selfgrade {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+}
+
+.practice-result__selfgrade-label {
+  margin-right: var(--space-2xs);
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+}
+
+.practice-result__selfgrade .btn[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+}
+
+/* Outcome words always sit inside the badge: colour never carries them alone. */
+.badge--outcome-corretta {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badge--outcome-parziale {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.badge--outcome-errata {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.badge--pending {
+  background: var(--color-paper-3);
+  color: var(--color-ink-2);
+}
+
+/* display:flex above would otherwise beat the UA [hidden] rule (as .btn[hidden]). */
+.practice-question__actions[hidden],
+.practice-result__selfgrade[hidden],
+.practice-result__verdict[hidden] {
+  display: none;
+}

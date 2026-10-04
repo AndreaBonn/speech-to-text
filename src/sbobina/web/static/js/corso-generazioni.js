@@ -142,6 +142,9 @@
       }
     });
     actions.appendChild(toggleButton);
+    if (record.format !== "summary") {
+      actions.appendChild(window.SbobinaPracticeStart.button(itemUrl(key, record), key, statusEl));
+    }
     li.appendChild(actions);
     li.appendChild(detail.downloadLinks(apiBase(key), record));
     li.appendChild(detailContainer);
