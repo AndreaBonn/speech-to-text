@@ -9,6 +9,7 @@
     </div>
     <div class="reader__toolbar-actions">
       <a class="btn btn--ghost" href="/lettore/{{ job_id }}">Torna al lettore</a>
+      <button type="button" id="study-cards-add" class="btn btn--ghost">Aggiungi i concetti al mazzo</button>
       <button type="button" id="study-generate" class="btn btn--primary">Genera</button>
     </div>
   </div>
@@ -18,6 +19,7 @@
     da cui è tratta: controllala con un clic prima di studiarci sopra.
   </p>
 
+  <div id="study-cards-status" class="history__status" role="status" aria-live="polite" hidden></div>
   <div id="study-status" class="history__status" role="status" aria-live="polite" hidden></div>
   <div id="study-progress" class="study__progress" hidden>
     <div class="progress" role="progressbar" aria-label="Avanzamento della generazione"
@@ -39,4 +41,5 @@
 {% block scripts %}
 <script src="/static/js/dom.js" defer></script>
 <script src="/static/js/studio.js" defer></script>
+<script src="/static/js/studio-cards.js" defer></script>
 {% endblock %}

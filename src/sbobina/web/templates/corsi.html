@@ -94,6 +94,8 @@
         <label for="examcues-toggle">Mostra anche i segnali deboli</label>
       </div>
 
+      <p id="examcue-card-success" class="banner banner--success" role="status" hidden></p>
+
       <div id="examcues-status" class="history__status" role="alert" hidden></div>
 
       <ul id="examcues-list" class="examcues__list" hidden></ul>
@@ -104,6 +106,27 @@
 
       <nav id="examcues-pagination" class="pagination" aria-label="Pagine delle frasi da esame" hidden></nav>
     </section>
+
+    <dialog id="examcue-card-dialog" class="card-dialog" aria-labelledby="examcue-card-dialog-title">
+      <form id="examcue-card-form" novalidate>
+        <h3 id="examcue-card-dialog-title" class="card-dialog__title">Crea carta</h3>
+        <div class="field">
+          <label class="field__label" for="examcue-card-front">Fronte</label>
+          <textarea id="examcue-card-front" class="text-input" rows="3" maxlength="2000" required></textarea>
+          <p id="examcue-card-front-error" class="field__error" role="alert" hidden></p>
+        </div>
+        <div class="field">
+          <label class="field__label" for="examcue-card-back">Retro</label>
+          <textarea id="examcue-card-back" class="text-input" rows="4" maxlength="2000"></textarea>
+          <p id="examcue-card-back-error" class="field__error" role="alert" hidden></p>
+        </div>
+        <p id="examcue-card-error" class="card-dialog__error" role="alert"></p>
+        <div class="card-dialog__actions">
+          <button type="button" id="examcue-card-cancel" class="btn btn--ghost">Annulla</button>
+          <button type="submit" id="examcue-card-submit" class="btn btn--primary">Crea carta</button>
+        </div>
+      </form>
+    </dialog>
 
     <section id="corsi-materials" class="materials" aria-labelledby="corsi-materials-title">
       <h3 id="corsi-materials-title" class="section-title">Materiali</h3>
@@ -250,6 +273,8 @@
 {% block scripts %}
 <script src="/static/js/dom.js" defer></script>
 <script src="/static/js/corso-frasi-esame.js" defer></script>
+<script src="/static/js/card-dialog.js" defer></script>
+<script src="/static/js/exam-cue-cards.js" defer></script>
 <script src="/static/js/corso-upload.js" defer></script>
 <script src="/static/js/corso-ocr.js" defer></script>
 <script src="/static/js/corso-materiali.js" defer></script>

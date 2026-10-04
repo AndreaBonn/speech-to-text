@@ -106,6 +106,20 @@
     return badge;
   }
 
+  // job_id/segment_index/quote/revision as data-*: exam-cue-cards.js reads
+  // them via event delegation and never fetches the cues itself.
+  function cardButton(cue) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn btn--ghost examcues__card-btn";
+    button.textContent = "Crea carta";
+    button.dataset.jobId = cue.job_id;
+    button.dataset.segmentIndex = cue.segment_index;
+    button.dataset.quote = cue.quote;
+    button.dataset.revision = cue.revision || "";
+    return button;
+  }
+
   function cueNode(cue) {
     var li = document.createElement("li");
     li.className = "examcues__cue";
@@ -120,6 +134,7 @@
     quote.className = "examcues__quote";
     quote.textContent = cue.quote;
     li.appendChild(quote);
+    li.appendChild(cardButton(cue));
     return li;
   }
 
@@ -278,5 +293,8 @@
   window.SbobinaCourseExamCues = {
     show: show,
     hide: hide,
+    currentKey: function () {
+      return currentKey;
+    },
   };
 })();

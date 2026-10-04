@@ -87,6 +87,10 @@ def test_corsi_page_includes_the_exam_cues_section(tmp_path: Path) -> None:
     assert body.index("/static/js/corso-frasi-esame.js") < body.index(
         "/static/js/corso-dettaglio.js"
     )
+    # Deferred scripts run in order: the shared dialog must load first.
+    assert body.index("/static/js/card-dialog.js") < body.index(
+        "/static/js/exam-cue-cards.js"
+    )
 
 
 def test_documento_page_returns_shell_for_an_existing_document(tmp_path: Path) -> None:

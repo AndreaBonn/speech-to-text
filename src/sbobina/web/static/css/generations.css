@@ -236,6 +236,12 @@
   overflow-wrap: anywhere;
 }
 
+.examcues__card-btn {
+  flex-basis: 100%;
+  margin-top: var(--space-2xs);
+  align-self: flex-start;
+}
+
 .badge--strong {
   background: var(--color-success-bg);
   color: var(--color-success);
