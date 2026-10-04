@@ -102,6 +102,25 @@ def test_find_exam_cues_splits_sentences_in_reading_order() -> None:
     assert [(cue.start, cue.segment_index) for cue in cues] == [(9.25, 0)] * 3
 
 
+def test_find_exam_cues_inner_dots_keep_sentence_whole() -> None:
+    transcript = make_transcript(
+        segments=[
+            make_segment(
+                words=[
+                    make_word(
+                        text="All'esame vi chiederò l'art.1140 c.c. sul possesso. Fine.",
+                        start=4.0,
+                    )
+                ]
+            )
+        ]
+    )
+
+    cues = find_exam_cues(transcript=transcript, job_id="lecture")
+
+    assert [cue.quote for cue in cues] == ["All'esame vi chiederò l'art.1140 c.c"]
+
+
 def test_find_exam_cues_negative_context_stays_within_sentence() -> None:
     transcript = make_transcript(
         segments=[

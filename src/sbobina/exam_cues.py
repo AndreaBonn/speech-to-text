@@ -15,7 +15,8 @@ STRONG_PATTERNS_V1 = (
 )
 WEAK_PATTERNS_V1 = ("importante", "fondamentale", "attenzione")
 NEGATIVE_PATTERNS_V1 = ("l'importante è che",)
-SENTENCE_SEPARATOR = re.compile(r"[.!?]+")
+# A dot glued to the next character ("art.1140", "window.x") is not a sentence end.
+SENTENCE_SEPARATOR = re.compile(r"[.!?]+(?=\s|$)")
 
 
 def _whole_words(patterns: tuple[str, ...]) -> re.Pattern[str]:
