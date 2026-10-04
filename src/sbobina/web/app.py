@@ -16,6 +16,7 @@ from sbobina.web import search_service
 from sbobina.web.api_cards import router as cards_router
 from sbobina.web.api_chat import router as chat_router
 from sbobina.web.api_corrected import router as corrected_router
+from sbobina.web.api_course_attempts import router as course_attempts_router
 from sbobina.web.api_courses import router as courses_router
 from sbobina.web.api_documents import router as documents_router
 from sbobina.web.api_exam_cues import router as exam_cues_router
@@ -181,6 +182,7 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(practice_router)
     app.include_router(practice_grading_router)
     app.include_router(practice_mistakes_router)
+    app.include_router(course_attempts_router)
     app.include_router(exam_cues_router)
     app.include_router(review_router)
     app.include_router(cards_router)
