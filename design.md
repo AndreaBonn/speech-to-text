@@ -47,10 +47,11 @@ Spacing: 4-pt scale `--space-3xs` … `--space-3xl`. Radii: 6 px controls,
 
 ## Layout
 - Rail `--rail-width`, content up to `--content-max`, reader text column at
-  `--measure-reading`. Below 768 px the rail becomes a top bar with the six
+  `--measure-reading`. Below 768 px the rail becomes a top bar with the seven
   destinations in one scrollable row; no hamburger.
-- Pages: Nuova trascrizione · Corsi · Lettore · Storico · Modelli ·
-  Confronto (WER). Corsi added in T013 to group lectures by course.
+- Pages: Nuova trascrizione · Corsi · Ripasso · Lettore · Storico · Modelli ·
+  Confronto (WER). Corsi added in T013 to group lectures by course; Ripasso
+  added in T028, right after Corsi, for the spaced-repetition queue.
 - The reader puts the transcript in the centre column and the list of points
   to re-listen in a side column from 1024 px; below, the list follows the text.
 
@@ -83,6 +84,15 @@ Spacing: 4-pt scale `--space-3xs` … `--space-3xl`. Radii: 6 px controls,
   and inline "prima: …"; current word while playing: accent-soft background.
 - **Audio bar** · sticky bottom in the reader: play/pause, −10 s / +10 s,
   time, speed (1×, 1.25×, 1.5×), seek bar; click on a word seeks there.
+- **Review card** (Ripasso) · one card at a time: front only, then "Mostra
+  risposta" (also Space) reveals the back and the source line below it. The
+  source line always carries a status word before its link: ok, spostata,
+  fonte modificata, fonte rimossa; colour never carries that meaning alone.
+  Below the back, 4 equal-weight secondary buttons in fixed order (Di nuovo,
+  Difficile, Bene, Facile), also bound to keys 1–4; disabled until the back
+  is shown. The back column wraps long text with `overflow-wrap: anywhere`
+  and has no maximum height, so a 1000-character back grows the card instead
+  of scrolling inside it.
 
 ## UI states (every data surface)
 - Loading · skeleton rows; after 15 s "Ci sta mettendo più del previsto".

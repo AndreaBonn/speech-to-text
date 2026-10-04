@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="ripasso-root" class="review">
+  <section id="ripasso-summary" class="review__summary" aria-labelledby="ripasso-summary-title">
+    <h2 id="ripasso-summary-title" class="section-title">Oggi</h2>
+
+    <div id="ripasso-summary-status" class="history__status" role="alert" hidden></div>
+
+    <ul id="ripasso-summary-list" class="review__summary-list" aria-live="polite">
+      <li class="skeleton-row"></li>
+      <li class="skeleton-row"></li>
+    </ul>
+
+    <div id="ripasso-summary-empty" class="empty-state" hidden>
+      <p class="empty-state__text">
+        Non hai ancora carte: aggiungi i concetti di una lezione dal Lettore o dallo Studio.
+      </p>
+    </div>
+
+    <nav id="ripasso-summary-pagination" class="pagination" aria-label="Pagine dei corsi" hidden></nav>
+  </section>
+
+  <section id="ripasso-session" class="review__session" aria-labelledby="ripasso-session-title" hidden>
+    <div class="review__session-head">
+      <h2 id="ripasso-session-title" class="section-title"></h2>
+      <button type="button" id="ripasso-session-exit" class="btn btn--ghost">Torna a Oggi</button>
+    </div>
+
+    <p id="ripasso-session-counter" class="review__counter" role="status" aria-live="polite"></p>
+
+    <div id="ripasso-session-status" class="history__status" role="alert" hidden></div>
+
+    <div id="ripasso-session-finished" class="empty-state" hidden>
+      <p class="empty-state__text">Per oggi hai finito.</p>
+    </div>
+
+    <article id="ripasso-card" class="review-card" hidden>
+      <p id="ripasso-card-front" class="review-card__front"></p>
+
+      <button type="button" id="ripasso-card-reveal" class="btn btn--secondary">Mostra risposta</button>
+
+      <div id="ripasso-card-back-wrap" class="review-card__back-wrap" hidden>
+        <p id="ripasso-card-back" class="review-card__back"></p>
+
+        <p id="ripasso-card-source" class="review-card__source">
+          <span id="ripasso-card-source-badge" class="badge"></span>
+          <a id="ripasso-card-source-link" class="table__link" href="#">Apri la fonte</a>
+        </p>
+
+        <div id="ripasso-card-actions" class="review-card__actions" role="group" aria-label="Valuta la carta">
+          <button type="button" class="btn btn--secondary review-card__rating" data-rating="1">
+            Di nuovo <span class="review-card__key">1</span>
+          </button>
+          <button type="button" class="btn btn--secondary review-card__rating" data-rating="2">
+            Difficile <span class="review-card__key">2</span>
+          </button>
+          <button type="button" class="btn btn--secondary review-card__rating" data-rating="3">
+            Bene <span class="review-card__key">3</span>
+          </button>
+          <button type="button" class="btn btn--secondary review-card__rating" data-rating="4">
+            Facile <span class="review-card__key">4</span>
+          </button>
+        </div>
+      </div>
+    </article>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dom.js" defer></script>
+<script src="/static/js/ripasso.js" defer></script>
+{% endblock %}

@@ -21,6 +21,7 @@ class NavSpec:
 NAV_SPECS = (
     NavSpec(id="nuova", label="Nuova trascrizione", href="/"),
     NavSpec(id="corsi", label="Corsi", href="/corsi"),
+    NavSpec(id="ripasso", label="Ripasso", href="/ripasso"),
     NavSpec(id="lettore", label="Lettore", href=None),
     NavSpec(id="storico", label="Storico", href="/storico"),
     NavSpec(id="modelli", label="Modelli", href="/modelli"),

@@ -103,6 +103,18 @@ def corsi(request: Request, store: JobStoreDep) -> HTMLResponse:
     )
 
 
+@router.get("/ripasso", response_class=HTMLResponse)
+def ripasso(request: Request, store: JobStoreDep) -> HTMLResponse:
+    """Spaced-repetition queue; the per-course summary and session load client-side."""
+    return _render(
+        request=request,
+        template_name="ripasso.html",
+        active="ripasso",
+        store=store,
+        page_title="Ripasso",
+    )
+
+
 @router.get("/storico", response_class=HTMLResponse)
 def storico(request: Request, store: JobStoreDep) -> HTMLResponse:
     """Paginated job history; the table itself is fetched client-side."""

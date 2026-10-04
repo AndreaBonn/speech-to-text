@@ -144,6 +144,29 @@ def test_static_theme_script_is_served(tmp_path: Path) -> None:
     assert "data-theme" in response.text or "dataset.theme" in response.text
 
 
+def test_ripasso_page_returns_shell(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        response = client.get("/ripasso")
+
+    assert response.status_code == 200
+    body = response.text
+    assert 'id="ripasso-summary-list"' in body
+    assert 'id="ripasso-card"' in body
+    assert "/static/js/ripasso.js" in body
+
+
+def test_ripasso_page_marks_its_rail_entry_active_after_corsi(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/ripasso").text
+
+    assert ">Ripasso<" in body
+    rail = body.split('class="rail__list"')[1].split("</ul>")[0]
+    assert rail.index(">Corsi<") < rail.index(">Ripasso<")
+    assert 'class="rail__link rail__link--active"' in body
+
+
 def test_index_explains_beam_size_with_the_recommended_value(tmp_path: Path) -> None:
     app = create_app(settings=Settings(), data_dir=tmp_path)
     with TestClient(app=app, base_url=BASE_URL) as client:
