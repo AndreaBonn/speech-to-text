@@ -150,6 +150,11 @@
 }
 
 .table__link {
+  /* Title and "Materiali di studio" sit one above the other: each needs its
+     own 24px target (WCAG 2.5.8). */
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min);
   color: var(--color-accent);
   font-weight: var(--weight-medium);
   text-underline-offset: 0.2em;
