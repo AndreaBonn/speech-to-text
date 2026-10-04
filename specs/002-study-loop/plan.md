@@ -57,7 +57,9 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
       `start=-1` → `ValueError`).
 - [ ] `GET /api/v1/courses/<key>/exam-cues?level=strong|all&page=&per_page=` → 200 con `data` e
       `meta` paginato (`page`, `per_page`, `total`, `total_pages`); ogni voce ha `href`
-      `/lettore/<job_id>?t=<start>`. Corso inesistente → 404; `level` diverso → 422.
+      `/lettore/<job_id>?t=<start>&variant=<v>` (la variante da cui è letta la frase) e la
+      `revision` di quella trascrizione; `meta.unavailable_jobs` elenca le lezioni non leggibili
+      (emendato in /analyze F2, A3/A8). Corso inesistente → 404; `level` diverso → 422.
 - [ ] Nel dettaglio corso una sezione "Frasi da esame" elenca i cue forti raggruppati per lezione
       (frase, minuto cliccabile verso il Lettore), con interruttore "Mostra anche i segnali deboli".
       Stati: loading, empty ("In queste lezioni non trovo frasi in cui il docente parla
@@ -86,9 +88,11 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
       identici alla libreria chiamata direttamente.
 - [ ] Persistenza (ADR D1): `data/courses/<course_id>/cards/cards.jsonl` (eventi carta: created,
       edited, suspended, deleted) e `cards/reviews.jsonl` (un ripasso per riga con lo stato FSRS
-      risultante: `card_id`, `rating`, `reviewed_at`, `duration_ms`, `state`, `step`,
-      `stability`, `difficulty`, `due`); stato corrente = ultima riga della carta; un `Lock` per
-      file riusando `chat_store._lock_for` (B5: un solo worker uvicorn, `launcher.py:100`); riga
+      risultante: `card_id`, `rating`, `reviewed_at`, `duration_ms` e `fsrs` annidato con
+      `state`, `step`, `stability`, `difficulty`, `due`, `last_review`, quest'ultimo necessario
+      per ricostruire la carta della libreria fra due ripassi; emendato in /analyze F2, A4);
+      stato corrente = ultima riga della carta; un `Lock` per file da `web/path_locks.lock_for`,
+      estratto da `chat_store` e condiviso (B5: un solo worker uvicorn, `launcher.py:100`); riga
       finale troncata ignorata e append successivo integro (V4).
 - [ ] Tipi (T4, T5): `FsrsState` frozen (`state`, `step`, `stability`, `difficulty`, `due`)
       annidato nella vista di dominio `Card` prodotta dalla piega (non scritto in `cards.jsonl`,
@@ -145,7 +149,7 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
 - [ ] Tipi (T2, T3): `Answer` union per formato (`MultipleChoiceAnswer{chosen_index >= 0}`,
       `OpenAnswer{text}`, `OralAnswer{text}`); `Judgement` di dominio frozen con l'esito come
       property derivata dai punti, mai un campo assegnabile; `ProposedJudgement` pydantic solo al
-      boundary. Persistenza del tentativo con lo stesso lock per file di `chat_store._lock_for`
+      boundary. Persistenza del tentativo con lo stesso lock per file di `web/path_locks.lock_for`
       (B5).
 - [ ] Formato del giudice (ADR D3): prompt `valutazione-v1.md` (via prompt-master), schema
       `ProposedJudgement` con `punti_coperti[{punto, prova}]`, `punti_mancanti[]`,
