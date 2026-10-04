@@ -95,7 +95,31 @@
     return button;
   }
 
+  // Same rule as jobTitle() in corso-dettaglio.js/storico.js/jobs.js so a lecture
+  // is never called something different on two pages.
+  function jobTitle(job) {
+    if (job.source_name) {
+      return job.source_name;
+    }
+    var subject = job.config && job.config.subject;
+    if (subject) {
+      return subject;
+    }
+    var created = new Date(job.created_at).toLocaleDateString("it-IT");
+    return "Lezione del " + created;
+  }
+
+  function formatTime(seconds) {
+    var total = Math.floor(seconds);
+    var h = Math.floor(total / 3600);
+    var m = Math.floor((total % 3600) / 60);
+    var s = String(total % 60).padStart(2, "0");
+    return h > 0 ? h + ":" + String(m).padStart(2, "0") + ":" + s : m + ":" + s;
+  }
+
   window.SbobinaDom = {
+    jobTitle: jobTitle,
+    formatTime: formatTime,
     clearChildren: clearChildren,
     textCell: textCell,
     showSkeleton: showSkeleton,

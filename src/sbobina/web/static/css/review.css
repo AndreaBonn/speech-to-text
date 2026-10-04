@@ -123,7 +123,8 @@
 }
 
 .badge--anchor-moved,
-.badge--anchor-source_modified {
+.badge--anchor-source_modified,
+.badge--anchor-unavailable {
   background: var(--color-warning-bg);
   color: var(--color-warning);
 }

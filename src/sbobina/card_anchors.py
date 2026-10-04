@@ -18,7 +18,9 @@ from sbobina.web.search_service import PREFERRED_VARIANTS
 
 logger = logging.getLogger(__name__)
 TRANSCRIPT_ADAPTER = TypeAdapter(Transcript)
-type AnchorStatus = Literal["ok", "moved", "source_modified", "source_removed"]
+type AnchorStatus = Literal[
+    "ok", "moved", "source_modified", "source_removed", "unavailable"
+]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -73,9 +75,14 @@ def _relocate(
 
 
 def _lecture_resolution(anchor: LectureAnchor, store: JobStore) -> AnchorResolution:
+    href = f"/lettore/{anchor.job_id}"
     try:
         record = store.get(job_id=anchor.job_id)
-        directory = store.jobs_dir / str(record.id)
+    except NotFoundError as error:
+        logger.warning("Lecture source removed %s: %s", anchor.job_id, error)
+        return AnchorResolution(href=href, status="source_removed")
+    directory = store.jobs_dir / str(record.id)
+    try:
         for variant in PREFERRED_VARIANTS:
             path = directory / TRANSCRIPT_FILES[variant]
             if not path.exists():
@@ -88,9 +95,10 @@ def _lecture_resolution(anchor: LectureAnchor, store: JobStore) -> AnchorResolut
                 revision=transcript_revision(content=content),
                 variant=variant,
             )
-    except (OSError, ValueError, NotFoundError) as error:
+    except (OSError, ValueError) as error:
         logger.warning("Unreadable lecture source %s: %s", anchor.job_id, error)
-    return AnchorResolution(href=f"/lettore/{anchor.job_id}", status="source_removed")
+        return AnchorResolution(href=href, status="unavailable")
+    return AnchorResolution(href=href, status="source_removed")
 
 
 def _document_resolution(
@@ -105,6 +113,9 @@ def _document_resolution(
         )
     except NotFoundError:
         return AnchorResolution(href=href, status="source_removed")
+    except (OSError, ValueError) as error:
+        logger.warning("Unreadable document source %s: %s", anchor.doc_id, error)
+        return AnchorResolution(href=href, status="unavailable")
     return revision_resolution(href=href, unchanged=document.sha256 == anchor.sha256)
 
 
@@ -124,6 +135,11 @@ def _generation_resolution(
         )
     except NotFoundError:
         return AnchorResolution(href=href, status="source_removed")
+    except (OSError, ValueError) as error:
+        logger.warning(
+            "Unreadable generation source %s: %s", anchor.generation_id, error
+        )
+        return AnchorResolution(href=href, status="unavailable")
     return AnchorResolution(href=href, status="ok")
 
 

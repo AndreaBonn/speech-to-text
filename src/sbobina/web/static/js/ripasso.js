@@ -8,10 +8,11 @@
   var PER_PAGE = 100;
   var SLOW_MS = 15000;
   var ANCHOR_LABELS = {
-    ok: "Fonte aggiornata",
+    ok: "Fonte verificata",
     moved: "Fonte spostata",
     source_modified: "Fonte modificata",
     source_removed: "Fonte rimossa",
+    unavailable: "Fonte non leggibile ora",
   };
   var summaryStatusEl = document.getElementById("ripasso-summary-status");
   var summaryListEl = document.getElementById("ripasso-summary-list");
@@ -113,7 +114,8 @@
         });
         dom.renderPagination(summaryPaginationEl, body.meta, loadSummary);
       })
-      .catch(function () {
+      .catch(function (error) {
+        console.error(error);
         if (request !== summaryRequest) return;
         clearTimeout(summarySlowTimer);
         dom.clearChildren(summaryListEl);
@@ -185,7 +187,8 @@
         queueIndex = 0;
         showCurrentCard();
       })
-      .catch(function () {
+      .catch(function (error) {
+        console.error(error);
         if (request !== sessionRequest) return;
         clearTimeout(sessionSlowTimer);
         cardEl.hidden = true;
@@ -259,7 +262,8 @@
         dom.clearStatus(sessionStatusEl);
         advance();
       })
-      .catch(function () {
+      .catch(function (error) {
+        console.error(error);
         pendingRating = false;
         setRatingButtonsDisabled(false);
         dom.showRetryStatus(sessionStatusEl, "Impossibile salvare la valutazione.", function () {

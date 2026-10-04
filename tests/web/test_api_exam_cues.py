@@ -75,7 +75,13 @@ def test_list_exam_cues_envelope_and_reader_link(
                 "revision": revision,
             }
         ],
-        "meta": {"page": 1, "per_page": 20, "total": 1, "total_pages": 1},
+        "meta": {
+            "page": 1,
+            "per_page": 20,
+            "total": 1,
+            "total_pages": 1,
+            "unavailable_jobs": [],
+        },
     }
     assert revision is not None
 
@@ -96,6 +102,7 @@ def test_list_exam_cues_strong_filters_before_pagination(
         "per_page": 1,
         "total": 2,
         "total_pages": 2,
+        "unavailable_jobs": [],
     }
 
 
@@ -133,7 +140,13 @@ def test_list_exam_cues_registered_empty_course_returns_200(
     get_or_create(courses_dir=store.courses_dir, key="diritto", label="Diritto")
     assert client.get(url=URL).json() == {
         "data": [],
-        "meta": {"page": 1, "per_page": 20, "total": 0, "total_pages": 0},
+        "meta": {
+            "page": 1,
+            "per_page": 20,
+            "total": 0,
+            "total_pages": 0,
+            "unavailable_jobs": [],
+        },
     }
     assert client.get(url=URL).status_code == 200
     _lecture(store=store, text="Segnatevelo")
@@ -203,26 +216,9 @@ def test_list_exam_cues_corrected_transcript_replaces_original(
                 ],
             }
         ),
-        json.dumps(
-            {
-                "source": "lecture",
-                "model": "test",
-                "language": "it",
-                "duration": 20,
-                "segments": [
-                    {
-                        "start": 0,
-                        "end": 20,
-                        "words": [
-                            {"start": 0, "end": 20, "text": None, "probability": 1},
-                        ],
-                    }
-                ],
-            }
-        ),
     ],
 )
-def test_list_exam_cues_unreadable_corrected_skips_lecture(
+def test_list_exam_cues_unreadable_corrected_marks_job_unavailable(
     client: TestClient,
     store: JobStore,
     caplog: pytest.LogCaptureFixture,
@@ -239,8 +235,10 @@ def test_list_exam_cues_unreadable_corrected_skips_lecture(
     with caplog.at_level(level=logging.WARNING):
         response = client.get(url=URL)
 
+    body = response.json()
     assert response.status_code == 200
-    assert [cue["job_id"] for cue in response.json()["data"]] == [good]
+    assert [cue["job_id"] for cue in body["data"]] == [good]
+    assert body["meta"]["unavailable_jobs"] == [bad]
     assert str(corrected) in caplog.text
 
 
@@ -267,7 +265,13 @@ def test_list_exam_cues_pages_follow_job_and_sentence_order(
     ] == [(job_id, quote) for job_id in jobs for quote in ("Importante", "Segnatevelo")]
     assert pages[4] == {
         "data": [],
-        "meta": {"page": 5, "per_page": 1, "total": 4, "total_pages": 4},
+        "meta": {
+            "page": 5,
+            "per_page": 1,
+            "total": 4,
+            "total_pages": 4,
+            "unavailable_jobs": [],
+        },
     }
 
 

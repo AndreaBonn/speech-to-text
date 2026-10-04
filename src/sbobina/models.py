@@ -55,18 +55,21 @@ def load_transcript(path: Path) -> Transcript:
 def transcript_from_json(content: str) -> Transcript:
     """Parse saved transcript JSON, for callers that already read the file text."""
     raw = json.loads(content)
-    segments = tuple(
-        Segment(
-            start=seg["start"],
-            end=seg["end"],
-            words=tuple(Word(**word) for word in seg["words"]),
+    try:
+        segments = tuple(
+            Segment(
+                start=seg["start"],
+                end=seg["end"],
+                words=tuple(Word(**word) for word in seg["words"]),
+            )
+            for seg in raw["segments"]
         )
-        for seg in raw["segments"]
-    )
-    return Transcript(
-        source=raw["source"],
-        model=raw["model"],
-        language=raw["language"],
-        duration=raw["duration"],
-        segments=segments,
-    )
+        return Transcript(
+            source=raw["source"],
+            model=raw["model"],
+            language=raw["language"],
+            duration=raw["duration"],
+            segments=segments,
+        )
+    except (KeyError, TypeError) as error:
+        raise ValueError(f"Transcript JSON malformato: {error}") from error

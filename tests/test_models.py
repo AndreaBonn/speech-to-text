@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from conftest import make_segment, make_transcript, make_word
 
 from sbobina.models import (
@@ -53,3 +54,9 @@ def test_transcript_from_json_round_trips_saved_text() -> None:
     )
 
     assert transcript_from_json(transcript_to_json(transcript)) == transcript
+
+
+@pytest.mark.parametrize("content", ["{}", '{"segments": null}'])
+def test_transcript_from_json_missing_keys_raises_value_error(content: str) -> None:
+    with pytest.raises(ValueError, match="Transcript"):
+        transcript_from_json(content=content)

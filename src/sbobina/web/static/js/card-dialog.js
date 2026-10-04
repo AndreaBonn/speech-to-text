@@ -133,7 +133,8 @@
           return postCard(key, payload);
         })
         .then(finish)
-        .catch(function () {
+        .catch(function (error) {
+          console.error(error);
           setSaving(false);
           el.error.textContent = FAILED_MESSAGE;
         });

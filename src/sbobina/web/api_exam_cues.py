@@ -3,9 +3,10 @@ from dataclasses import asdict, dataclass
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Request
+from pydantic import TypeAdapter
 
 from sbobina.exam_cues import ExamCue, find_exam_cues
-from sbobina.models import transcript_from_json
+from sbobina.models import Transcript
 from sbobina.web.api_files import TRANSCRIPT_FILES, transcript_revision
 from sbobina.web.course_retrieval import (
     NO_REGISTERED_COURSE,
@@ -17,6 +18,9 @@ from sbobina.web.search_schema import Variant
 from sbobina.web.search_service import PREFERRED_VARIANTS
 
 router = APIRouter(prefix="/api/v1/courses")
+# Type-checked parse, like card_anchors/api_study: a word with "text": null is
+# a corrupted lecture (unavailable), not a 500 for the whole course.
+TRANSCRIPT_ADAPTER = TypeAdapter(Transcript)
 logger = logging.getLogger(__name__)
 DEFAULT_PAGE = 1
 DEFAULT_PER_PAGE = 20
@@ -58,7 +62,13 @@ class LectureCue:
     revision: str
 
 
-def _cues_for_job(store: JobStore, job_id: str) -> tuple[LectureCue, ...]:
+@dataclass(frozen=True)
+class JobCuesResult:
+    cues: tuple[LectureCue, ...]
+    unavailable: bool
+
+
+def _cues_for_job(store: JobStore, job_id: str) -> JobCuesResult:
     directory = store.jobs_dir / job_id
     for variant in PREFERRED_VARIANTS:
         path = directory / TRANSCRIPT_FILES[variant]
@@ -68,17 +78,20 @@ def _cues_for_job(store: JobStore, job_id: str) -> tuple[LectureCue, ...]:
             # One read per lecture: cues and revision come from the same text,
             # so a card anchored with this revision quotes this exact version.
             content = path.read_text(encoding="utf-8")
-            transcript = transcript_from_json(content=content)
+            transcript = TRANSCRIPT_ADAPTER.validate_json(content)
             cues = find_exam_cues(transcript=transcript, job_id=job_id)
-        except (OSError, ValueError, KeyError, TypeError) as error:
+        except (OSError, ValueError) as error:
             logger.warning("Unreadable transcript, skipping %s: %s", path, error)
-            return ()
+            return JobCuesResult(cues=(), unavailable=True)
         revision = transcript_revision(content=content)
         # The reader must open the variant the quote was read from.
-        return tuple(
-            LectureCue(cue=cue, variant=variant, revision=revision) for cue in cues
+        return JobCuesResult(
+            cues=tuple(
+                LectureCue(cue=cue, variant=variant, revision=revision) for cue in cues
+            ),
+            unavailable=False,
         )
-    return ()
+    return JobCuesResult(cues=(), unavailable=False)
 
 
 def _cue_payload(item: LectureCue) -> dict[str, Any]:
@@ -92,12 +105,17 @@ def list_exam_cues(key: str, services: Services, query: QueryOptions) -> dict[st
     scope = course_scope(store=services, key=key)
     if scope.course_id == NO_REGISTERED_COURSE and not scope.job_ids:
         raise NotFoundError(entity="Corso", id=key)
+    results = [
+        (job_id, _cues_for_job(store=services, job_id=job_id))
+        for job_id in sorted(scope.job_ids)
+    ]
     cues = [
         item
-        for job_id in sorted(scope.job_ids)
-        for item in _cues_for_job(store=services, job_id=job_id)
+        for _, result in results
+        for item in result.cues
         if query.level == ALL_LEVELS or item.cue.level == STRONG_LEVEL
     ]
+    unavailable_jobs = [job_id for job_id, result in results if result.unavailable]
     total = len(cues)
     start = (query.page - 1) * query.per_page
     return {
@@ -109,5 +127,6 @@ def list_exam_cues(key: str, services: Services, query: QueryOptions) -> dict[st
             "per_page": query.per_page,
             "total": total,
             "total_pages": (total + query.per_page - 1) // query.per_page,
+            "unavailable_jobs": unavailable_jobs,
         },
     }

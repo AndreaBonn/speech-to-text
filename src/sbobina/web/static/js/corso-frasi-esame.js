@@ -26,6 +26,7 @@
   var emptyEl = document.getElementById("examcues-empty");
   var emptyTextEl = document.getElementById("examcues-empty-text");
   var paginationEl = document.getElementById("examcues-pagination");
+  var unavailableEl = document.getElementById("examcues-unavailable");
 
   if (!sectionEl || !dom) {
     return;
@@ -37,27 +38,8 @@
   var slowTimer = null;
   var latestRequest = 0;
 
-  // Mirrors jobTitle() in corso-dettaglio.js/storico.js/jobs.js so a lecture
-  // is never called something different on two pages.
-  function jobTitle(job) {
-    if (job.source_name) {
-      return job.source_name;
-    }
-    var subject = job.config && job.config.subject;
-    if (subject) {
-      return subject;
-    }
-    var created = new Date(job.created_at).toLocaleDateString("it-IT");
-    return "Lezione del " + created;
-  }
-
-  function formatTime(seconds) {
-    var total = Math.floor(seconds);
-    var h = Math.floor(total / 3600);
-    var m = Math.floor((total % 3600) / 60);
-    var s = String(total % 60).padStart(2, "0");
-    return h > 0 ? h + ":" + String(m).padStart(2, "0") + ":" + s : m + ":" + s;
-  }
+  var jobTitle = dom && dom.jobTitle;
+  var formatTime = dom && dom.formatTime;
 
   function currentLevel() {
     return toggleEl.checked ? ALL_LEVELS : STRONG_LEVEL;
@@ -90,7 +72,8 @@
         });
         return map;
       })
-      .catch(function () {
+      .catch(function (error) {
+        console.error(error);
         return {};
       });
   }
@@ -200,6 +183,15 @@
     clearTimeout(slowTimer);
   }
 
+  // Lessons the server could not read are listed in meta, not silently dropped.
+  function showUnavailable(meta) {
+    var count = (meta && meta.unavailable_jobs ? meta.unavailable_jobs : []).length;
+    unavailableEl.hidden = count === 0;
+    unavailableEl.textContent = count === 1
+      ? "Una lezione non è leggibile ora: le sue frasi non compaiono."
+      : count + " lezioni non sono leggibili ora: le loro frasi non compaiono.";
+  }
+
   function load(key, page) {
     currentKey = key;
     currentPage = page;
@@ -207,6 +199,7 @@
     var request = ++latestRequest;
     clearStatus(statusEl);
     emptyEl.hidden = true;
+    unavailableEl.hidden = true;
     showSkeleton();
     clearTimeout(slowTimer);
     slowTimer = setTimeout(function () {
@@ -228,6 +221,7 @@
         }
         finish();
         clearStatus(statusEl);
+        showUnavailable(body.meta);
         if (body.data.length === 0) {
           clearChildren(listEl);
           listEl.hidden = true;
@@ -245,7 +239,8 @@
           load(key, nextPage);
         });
       })
-      .catch(function () {
+      .catch(function (error) {
+        console.error(error);
         if (request !== latestRequest) {
           return;
         }

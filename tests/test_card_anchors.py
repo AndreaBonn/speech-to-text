@@ -123,7 +123,7 @@ def test_resolve_lecture_invalid_index_relocates_without_io() -> None:
 
 
 @pytest.mark.parametrize("content", ["{", "{}", '{"segments": null}', None])
-def test_resolve_lecture_unreadable_source_returns_removed(
+def test_resolve_lecture_corrupted_source_returns_unavailable(
     store: JobStore, content: str | None
 ) -> None:
     anchor = _lecture(store=store)
@@ -134,7 +134,7 @@ def test_resolve_lecture_unreadable_source_returns_removed(
     else:
         corrected.write_text(data=content, encoding="utf-8")
     before = _snapshot(directory=store.jobs_dir.parent)
-    assert _resolve(store=store, anchor=anchor).status == "source_removed"
+    assert _resolve(store=store, anchor=anchor).status == "unavailable"
     assert _snapshot(directory=store.jobs_dir.parent) == before
 
 

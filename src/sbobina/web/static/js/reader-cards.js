@@ -128,7 +128,8 @@
         })[0];
         return match ? match.key : null;
       })
-      .catch(function () {
+      .catch(function (error) {
+        console.error(error);
         return null;
       });
   }

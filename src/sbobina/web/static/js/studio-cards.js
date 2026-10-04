@@ -78,7 +78,8 @@
         }
         showMessage(error.message || FAILED_MESSAGE, "danger");
       })
-      .catch(function () {
+      .catch(function (error) {
+        console.error(error);
         setBusy(false);
         showMessage(FAILED_MESSAGE, "danger");
       });
