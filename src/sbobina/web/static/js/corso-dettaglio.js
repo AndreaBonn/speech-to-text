@@ -33,6 +33,7 @@
   var materials = window.SbobinaCourseMaterials;
   var generations = window.SbobinaCourseGenerations;
   var chat = window.SbobinaCourseChat;
+  var examCues = window.SbobinaCourseExamCues;
   var clearChildren = dom.clearChildren;
   var textCell = dom.textCell;
   var showSkeleton = dom.showSkeleton;
@@ -164,6 +165,7 @@
     detailEl.hidden = false;
     detailTitleEl.textContent = labelFor(key, knownLabel);
     loadDetail(key, 1);
+    examCues.show(key);
     materials.show(key);
     generations.show(key);
     chat.show(key);
@@ -173,6 +175,7 @@
     currentCourseKey = null;
     detailEl.hidden = true;
     listEl.hidden = false;
+    examCues.hide();
     materials.hide();
     generations.hide();
     chat.hide();

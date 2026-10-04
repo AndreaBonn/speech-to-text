@@ -86,6 +86,25 @@
 
     <nav id="corsi-detail-pagination" class="pagination" aria-label="Pagine delle lezioni del corso" hidden></nav>
 
+    <section id="corsi-examcues" class="examcues" aria-labelledby="corsi-examcues-title">
+      <h3 id="corsi-examcues-title" class="section-title">Frasi da esame</h3>
+
+      <div class="checkbox-field examcues__toggle">
+        <input id="examcues-toggle" type="checkbox" name="examcues-weak" />
+        <label for="examcues-toggle">Mostra anche i segnali deboli</label>
+      </div>
+
+      <div id="examcues-status" class="history__status" role="alert" hidden></div>
+
+      <ul id="examcues-list" class="examcues__list" hidden></ul>
+
+      <div id="examcues-empty" class="empty-state" hidden>
+        <p id="examcues-empty-text" class="empty-state__text"></p>
+      </div>
+
+      <nav id="examcues-pagination" class="pagination" aria-label="Pagine delle frasi da esame" hidden></nav>
+    </section>
+
     <section id="corsi-materials" class="materials" aria-labelledby="corsi-materials-title">
       <h3 id="corsi-materials-title" class="section-title">Materiali</h3>
 
@@ -230,6 +249,7 @@
 
 {% block scripts %}
 <script src="/static/js/dom.js" defer></script>
+<script src="/static/js/corso-frasi-esame.js" defer></script>
 <script src="/static/js/corso-upload.js" defer></script>
 <script src="/static/js/corso-ocr.js" defer></script>
 <script src="/static/js/corso-materiali.js" defer></script>

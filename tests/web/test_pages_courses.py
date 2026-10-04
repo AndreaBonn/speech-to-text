@@ -70,6 +70,25 @@ def test_corsi_page_includes_the_materials_section(tmp_path: Path) -> None:
     )
 
 
+def test_corsi_page_includes_the_exam_cues_section(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/corsi").text
+
+    assert 'id="corsi-examcues"' in body
+    assert 'id="examcues-toggle"' in body
+    assert 'id="examcues-list"' in body
+    assert 'id="examcues-empty"' in body
+    assert "Mostra anche i segnali deboli" in body
+    assert "/static/js/corso-frasi-esame.js" in body
+    assert body.index("/static/js/dom.js") < body.index(
+        "/static/js/corso-frasi-esame.js"
+    )
+    assert body.index("/static/js/corso-frasi-esame.js") < body.index(
+        "/static/js/corso-dettaglio.js"
+    )
+
+
 def test_documento_page_returns_shell_for_an_existing_document(tmp_path: Path) -> None:
     key, doc_id = write_course_document(tmp_path, "Manuale.pdf")
     app = create_app(settings=Settings(), data_dir=tmp_path)

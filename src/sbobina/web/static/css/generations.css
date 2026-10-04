@@ -177,3 +177,71 @@
   font-size: var(--text-sm);
   color: var(--color-danger);
 }
+
+/* ---------- Exam cues (course detail: "Frasi da esame") ---------- */
+
+.examcues {
+  margin-top: var(--space-xl);
+}
+
+.examcues__toggle {
+  margin-top: var(--space-sm);
+}
+
+.examcues__list {
+  list-style: none;
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.examcues__skeleton {
+  height: 4.5rem;
+}
+
+.examcues__group-title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.examcues__cues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.examcues__cue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs);
+  padding: var(--space-xs) 0;
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+
+.examcues__time {
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.examcues__quote {
+  flex-basis: 100%;
+  margin: var(--space-2xs) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.badge--strong {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badge--weak {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
