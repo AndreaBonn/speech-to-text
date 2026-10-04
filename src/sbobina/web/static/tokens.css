@@ -45,6 +45,7 @@
   --shadow-raise: 0 1px 2px oklch(22% 0.018 255 / 0.06),
     0 4px 12px oklch(22% 0.018 255 / 0.05);
   --shadow-overlay: 0 8px 28px oklch(22% 0.018 255 / 0.14);
+  --color-scrim: oklch(22% 0.018 255 / 0.45);
 
   /* Type. Inter is the house face; Source Serif 4 only for transcript text. */
   --font-ui: "Inter", "InterVariable", system-ui, -apple-system, "Segoe UI",
@@ -143,6 +144,7 @@
     --color-danger-bg: oklch(29% 0.05 27);
     --shadow-raise: 0 1px 2px oklch(5% 0.01 255 / 0.4);
     --shadow-overlay: 0 8px 28px oklch(5% 0.01 255 / 0.55);
+    --color-scrim: oklch(5% 0.01 255 / 0.65);
   }
 }
 
@@ -179,4 +181,5 @@
   --color-danger-bg: oklch(29% 0.05 27);
   --shadow-raise: 0 1px 2px oklch(5% 0.01 255 / 0.4);
   --shadow-overlay: 0 8px 28px oklch(5% 0.01 255 / 0.55);
+  --color-scrim: oklch(5% 0.01 255 / 0.65);
 }

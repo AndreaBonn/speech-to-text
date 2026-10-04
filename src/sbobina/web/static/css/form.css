@@ -29,6 +29,17 @@
   border: var(--rule-hair) solid var(--color-rule);
 }
 
+.banner--success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  border: var(--rule-hair) solid var(--color-success);
+}
+
+.banner--success a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 /* ---------- Form error ---------- */
 
 .form-error {

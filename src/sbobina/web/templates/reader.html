@@ -104,6 +104,31 @@
     <option value="1.5">1.5&times;</option>
   </select>
 </div>
+
+<p id="reader-card-success" class="banner banner--success" role="status" hidden></p>
+
+<button type="button" id="reader-card-trigger" class="btn btn--primary reader-card-trigger" hidden>Crea carta</button>
+
+<dialog id="reader-card-dialog" class="card-dialog" aria-labelledby="reader-card-dialog-title">
+  <form id="reader-card-form" novalidate>
+    <h3 id="reader-card-dialog-title" class="card-dialog__title">Crea carta</h3>
+    <div class="field">
+      <label class="field__label" for="reader-card-front">Fronte</label>
+      <textarea id="reader-card-front" class="text-input" rows="3" maxlength="2000" required></textarea>
+      <p id="reader-card-front-error" class="field__error" role="alert" hidden></p>
+    </div>
+    <div class="field">
+      <label class="field__label" for="reader-card-back">Retro</label>
+      <textarea id="reader-card-back" class="text-input" rows="4" maxlength="2000"></textarea>
+      <p id="reader-card-back-error" class="field__error" role="alert" hidden></p>
+    </div>
+    <p id="reader-card-error" class="card-dialog__error" role="alert"></p>
+    <div class="card-dialog__actions">
+      <button type="button" id="reader-card-cancel" class="btn btn--ghost">Annulla</button>
+      <button type="submit" id="reader-card-submit" class="btn btn--primary">Crea carta</button>
+    </div>
+  </form>
+</dialog>
 {% endif %}
 {% endblock %}
 
@@ -111,6 +136,7 @@
 {% if not not_found %}
 <script src="/static/js/reader.js" defer></script>
 <script src="/static/js/reader-edit.js" defer></script>
+<script src="/static/js/reader-cards.js" defer></script>
 <script src="/static/js/course-field.js" defer></script>
 <script src="/static/js/reader-link.js" defer></script>
 {% endif %}

@@ -137,6 +137,17 @@
   flex: none;
 }
 
+/* ---------- Manual card creation (reader-cards.js) ---------- */
+
+.reader-card-trigger {
+  /* A fixed box near the right edge would otherwise shrink and wrap, so its
+     measured width (used to keep it on screen) would be wrong. */
+  white-space: nowrap;
+  position: fixed;
+  z-index: var(--z-overlay);
+  box-shadow: var(--shadow-overlay);
+}
+
 .reader__points-empty {
   color: var(--color-ink-3);
   font-size: var(--text-sm);

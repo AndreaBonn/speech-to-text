@@ -252,3 +252,44 @@
   color: var(--color-warning);
 }
 
+/* ---------- Dialog (native <dialog>, reader-cards.js) ---------- */
+
+.card-dialog {
+  max-width: 32rem;
+  width: calc(100% - var(--space-xl));
+  padding: var(--space-lg);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-overlay);
+}
+
+.card-dialog::backdrop {
+  background: var(--color-scrim);
+}
+
+.card-dialog__title {
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.card-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.card-dialog__error {
+  margin: var(--space-xs) 0 0;
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+.card-dialog__error:empty {
+  display: none;
+}
+

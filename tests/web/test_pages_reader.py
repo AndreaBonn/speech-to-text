@@ -43,6 +43,9 @@ def test_reader_page_returns_shell_for_an_existing_job(tmp_path: Path) -> None:
     assert f"/api/v1/jobs/{record.id}/audio" in body
     assert f"/api/v1/jobs/{record.id}/files/md" in body
     assert "/static/js/reader.js" in body
+    assert "/static/js/reader-cards.js" in body
+    assert 'id="reader-card-trigger"' in body
+    assert 'id="reader-card-dialog"' in body
 
 
 def test_reader_course_field_falls_back_to_subject(tmp_path: Path) -> None:
