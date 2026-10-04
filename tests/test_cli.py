@@ -12,6 +12,13 @@ from sbobina.settings import Settings
 
 
 @pytest.fixture
+def available_correction_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        target=llm_corrector, name="ensure_model", value=lambda model, host: False
+    )
+
+
+@pytest.fixture
 def transcript_json(tmp_path: Path) -> Path:
     transcript = make_transcript(
         [make_segment([make_word(" teorema", 0.0), make_word(" Sennberg", 0.5, 0.5)])]
@@ -93,6 +100,7 @@ def test_trascrivi_writes_next_to_audio_unless_output_dir_given(
     assert destinations == [target if explicit_dir else tmp_path]
 
 
+@pytest.mark.usefixtures("available_correction_model")
 def test_correggi_writes_corrected_transcript_and_report(
     transcript_json: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -119,6 +127,7 @@ def test_correggi_writes_corrected_transcript_and_report(
     )
 
 
+@pytest.mark.usefixtures("available_correction_model")
 def test_correggi_model_option_reaches_corrector_and_report(
     transcript_json: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -140,6 +149,7 @@ def test_correggi_model_option_reaches_corrector_and_report(
     assert "gemma3:4b" in report
 
 
+@pytest.mark.usefixtures("available_correction_model")
 def test_correggi_returns_error_when_ollama_unreachable(
     transcript_json: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -156,6 +166,7 @@ def test_correggi_returns_error_when_ollama_unreachable(
     assert not transcript_json.with_name("lezione.corretto.json").exists()
 
 
+@pytest.mark.usefixtures("available_correction_model")
 def test_correggi_interrupted_midway_saves_done_work_and_returns_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
