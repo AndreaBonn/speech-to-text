@@ -16,7 +16,7 @@ from sbobina.generation_models import (
     GenerationRecord,
     GenerationStatus,
 )
-from sbobina.practice_models import AnswerStatus, MultipleChoiceAnswer, PracticeAttempt
+from sbobina.practice_models import MultipleChoiceAnswer, PracticeAttempt
 from sbobina.settings import Settings
 from sbobina.web.api_practice import _attempt_payload
 from sbobina.web.app import create_app
@@ -29,7 +29,13 @@ from sbobina.web.practice_store import (
 )
 
 __all__ = ["client"]
-SECOND_PAGE_META = {"page": 2, "per_page": 2, "total": 3, "total_pages": 2}
+SECOND_PAGE_META = {
+    "page": 2,
+    "per_page": 2,
+    "total": 3,
+    "total_pages": 2,
+    "unavailable_attempts": [],
+}
 
 
 def make_url(generation: GenerationRecord, key: str = "fisica") -> str:
@@ -110,11 +116,9 @@ def test_get_attempt_deleted_generation_still_readable_and_hidden(
     )
 
 
-@pytest.mark.parametrize("status", tuple(AnswerStatus))
 def test_get_attempt_only_answered_question_reveals_solution(
     client: TestClient,
     tmp_path: Path,
-    status: AnswerStatus,
 ) -> None:
     course_id = _register_course(tmp_path=tmp_path)
     courses_dir = _store(tmp_path=tmp_path).courses_dir
@@ -125,7 +129,7 @@ def test_get_attempt_only_answered_question_reveals_solution(
         courses_dir=courses_dir, course_id=course_id, generation=generation
     )
     answer = MultipleChoiceAnswer(
-        answer_id=str(uuid4()), question_index=1, status=status, chosen_index=2
+        answer_id=str(uuid4()), question_index=1, chosen_index=2
     )
     save_attempt(
         courses_dir=courses_dir,
@@ -268,5 +272,11 @@ def test_get_attempts_empty_page_has_meta(client: TestClient, tmp_path: Path) ->
     assert response.status_code == 200
     assert response.json() == {
         "data": [],
-        "meta": {"page": 1, "per_page": 20, "total": 0, "total_pages": 0},
+        "meta": {
+            "page": 1,
+            "per_page": 20,
+            "total": 0,
+            "total_pages": 0,
+            "unavailable_attempts": [],
+        },
     }

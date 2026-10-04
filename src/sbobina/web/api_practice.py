@@ -2,9 +2,9 @@
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from sbobina.generation_models import (
     EXPECTED_OPTION_COUNT,
@@ -12,42 +12,86 @@ from sbobina.generation_models import (
     GenerationStatus,
 )
 from sbobina.practice_models import AnswerStatus, PracticeAttempt, require_uuid4
+from sbobina.web.api_chat import _chat_client
 from sbobina.web.course_dependencies import Course, Services
 from sbobina.web.errors import ConflictError, NotFoundError, ValidationError
 from sbobina.web.generation_store import load_generation
 from sbobina.web.pagination import Page, page_bounds, page_meta
 from sbobina.web.practice_answers import AnswerTarget, submit_choice
+from sbobina.web.practice_grading import PracticeServices, grading_mode
+from sbobina.web.practice_payloads import answer_payload
 from sbobina.web.practice_store import create_attempt, list_attempts, load_attempt
+from sbobina.web.practice_text_answers import (
+    AnswerLocation,
+    TextSubmission,
+    submit_text,
+    text_answer,
+)
 
 router = APIRouter(prefix="/api/v1/courses/{key:path}/generations/{gen_id}/attempts")
 
 
+def _grading_services(request: Request) -> PracticeServices:
+    return PracticeServices(
+        store=request.app.state.job_store,
+        settings=request.app.state.settings,
+        arbiter=request.app.state.gpu_arbiter,
+        chat=_chat_client(request=request),
+    )
+
+
+GradingServices = Annotated[PracticeServices, Depends(_grading_services)]
+
+
 class ChoiceSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     choice: int = Field(strict=True, ge=0, lt=EXPECTED_OPTION_COUNT)
 
 
 @router.post("/{attempt_id}/answers/{question_index}")
 def add_choice_answer(
     target: Annotated[AnswerTarget, Depends()],
-    body: ChoiceSubmission,
+    body: ChoiceSubmission | TextSubmission,
     course: Course,
-    services: Services,
+    services: GradingServices,
 ) -> dict[str, Any]:
     _validate_generation_id(gen_id=target.gen_id)
+    if isinstance(body, TextSubmission):
+        location = AnswerLocation(
+            courses_dir=services.store.courses_dir, course_id=course.id, target=target
+        )
+        attempt = submit_text(location=location, body=body, services=services)
+        return {
+            "data": text_payload(
+                attempt=attempt,
+                index=target.question_index,
+                mode=grading_mode(settings=services.settings),
+            )
+        }
     attempt = submit_choice(
         courses_dir=services.store.courses_dir,
         course_id=course.id,
         target=target,
         choice=body.choice,
     )
-    question = attempt.questions[target.question_index]
-    is_correct = body.choice == question.correct_index
+    return {"data": choice_payload(attempt=attempt, index=target.question_index)}
+
+
+def choice_payload(attempt: PracticeAttempt, index: int) -> dict[str, Any]:
+    answer = next(item for item in attempt.answers if item.question_index == index)
     return {
-        "data": {
-            **_question_payload(question=question, is_submitted=True),
-            "outcome": "corretta" if is_correct else "errata",
-            "score": 1 if is_correct else 0,
-        }
+        **_question_payload(question=attempt.questions[index], is_submitted=True),
+        **answer_payload(attempt=attempt, answer=answer),
+    }
+
+
+def text_payload(attempt: PracticeAttempt, index: int, mode: str) -> dict[str, Any]:
+    return {
+        **_question_payload(question=attempt.questions[index], is_submitted=True),
+        **answer_payload(
+            attempt=attempt, answer=text_answer(attempt=attempt, question_index=index)
+        ),
+        "grading_mode": mode,
     }
 
 
@@ -90,7 +134,10 @@ def _attempt_payload(attempt: PracticeAttempt) -> dict[str, Any]:
             "status": attempt.status,
             "created_at": attempt.created_at,
             "updated_at": attempt.updated_at,
-            "answers": attempt.answers,
+            "answers": [
+                answer_payload(attempt=attempt, answer=answer)
+                for answer in attempt.answers
+            ],
             "questions": [
                 _question_payload(question=question, is_submitted=index in submitted)
                 for index, question in enumerate(attempt.questions)
@@ -145,11 +192,10 @@ def get_attempts(
     gen_id: str, course: Course, services: Services, query: Page
 ) -> dict[str, Any]:
     _validate_generation_id(gen_id=gen_id)
+    scan = list_attempts(courses_dir=services.store.courses_dir, course_id=course.id)
     attempts = [
         attempt
-        for attempt in list_attempts(
-            courses_dir=services.store.courses_dir, course_id=course.id
-        )
+        for attempt in scan.attempts
         if attempt.generation_id == gen_id and attempt.course_id == course.id
     ]
     return {
@@ -157,5 +203,8 @@ def get_attempts(
             _attempt_payload(attempt=attempt)
             for attempt in attempts[page_bounds(query=query)]
         ],
-        "meta": page_meta(total=len(attempts), query=query),
+        "meta": {
+            **page_meta(total=len(attempts), query=query),
+            "unavailable_attempts": list(scan.unavailable_ids),
+        },
     }

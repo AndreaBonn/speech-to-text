@@ -8,7 +8,13 @@ from uuid import UUID
 
 from pydantic import Field, TypeAdapter
 
-from sbobina.generation_models import GenerationFormat, GenerationQuestion
+from sbobina.generation_models import (
+    DiscardCount,
+    GenerationFormat,
+    GenerationQuestion,
+    GenerationSourceUsed,
+)
+from sbobina.grading_models import Judgement, JudgementOutcome
 from sbobina.time_guards import require_aware
 
 
@@ -40,10 +46,13 @@ class SubmittedAnswer:
     answer_id: str
     question_index: int
     status: AnswerStatus = AnswerStatus.UNGRADED
+    submitted_at: datetime | None = None
 
     def __post_init__(self) -> None:
         require_uuid4(value=self.answer_id, field="answer_id")
         AnswerStatus(self.status)
+        if self.submitted_at is not None:
+            require_aware(value=self.submitted_at, field="submitted_at")
         if self.question_index < 0:
             raise ValueError("question_index must be nonnegative")
 
@@ -51,6 +60,7 @@ class SubmittedAnswer:
 @dataclass(frozen=True, kw_only=True)
 class MultipleChoiceAnswer(SubmittedAnswer):
     chosen_index: int
+    status: AnswerStatus = AnswerStatus.GRADED
     kind: Literal["multiple_choice"] = "multiple_choice"
 
     def __post_init__(self) -> None:
@@ -59,11 +69,48 @@ class MultipleChoiceAnswer(SubmittedAnswer):
             raise ValueError("kind must be multiple_choice")
         if self.chosen_index < 0:
             raise ValueError("chosen_index must be nonnegative")
+        # Multiple choice is graded by code on submission, never later.
+        if self.status != AnswerStatus.GRADED:
+            raise ValueError("multiple choice answers must have graded status")
 
 
 @dataclass(frozen=True, kw_only=True)
-class OpenAnswer(SubmittedAnswer):
+class TextAnswer(SubmittedAnswer):
     text: str
+    judgement: Judgement | None = None
+    self_grade: JudgementOutcome | None = None
+    reason: str | None = None
+    discarded: tuple[DiscardCount, ...] = ()
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if not self.text.strip():
+            raise ValueError("text must not be blank")
+        if self.self_grade is not None:
+            JudgementOutcome(self.self_grade)
+        check_grading_state(answer=self)
+
+
+def check_grading_state(answer: TextAnswer) -> None:
+    """Reject grading fields that disagree with the status.
+
+    A graded answer without judgement could never be graded again, and a
+    self-graded one without the student's grade would show no outcome. A
+    judgement may stay on a self-graded answer: the student's grade wins.
+    """
+    status = answer.status
+    if (status == AnswerStatus.SELF_GRADED) != (answer.self_grade is not None):
+        raise ValueError("self_grade requires self_graded status and vice versa")
+    if status == AnswerStatus.GRADED and answer.judgement is None:
+        raise ValueError("graded status requires a judgement")
+    if status == AnswerStatus.UNGRADED and answer.judgement is not None:
+        raise ValueError("a judgement requires graded or self_graded status")
+    if answer.reason is not None and status != AnswerStatus.UNGRADED:
+        raise ValueError("reason is only allowed with ungraded status")
+
+
+@dataclass(frozen=True, kw_only=True)
+class OpenAnswer(TextAnswer):
     kind: Literal["open"] = "open"
 
     def __post_init__(self) -> None:
@@ -73,8 +120,7 @@ class OpenAnswer(SubmittedAnswer):
 
 
 @dataclass(frozen=True, kw_only=True)
-class OralAnswer(SubmittedAnswer):
-    text: str
+class OralAnswer(TextAnswer):
     kind: Literal["oral"] = "oral"
 
     def __post_init__(self) -> None:
@@ -99,6 +145,7 @@ class PracticeAttempt:
     updated_at: datetime
     questions: tuple[GenerationQuestion, ...]
     answers: tuple[Answer, ...]
+    sources: tuple[GenerationSourceUsed, ...] = ()
 
     def __post_init__(self) -> None:
         PracticeStatus(self.status)

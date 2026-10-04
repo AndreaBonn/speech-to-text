@@ -175,6 +175,15 @@ def _find_duplicate(
 def create_card(
     courses_dir: Path, course_id: str, draft: CardDraft, now: datetime
 ) -> Card:
+    card, _ = create_card_result(
+        courses_dir=courses_dir, course_id=course_id, draft=draft, now=now
+    )
+    return card
+
+
+def create_card_result(
+    courses_dir: Path, course_id: str, draft: CardDraft, now: datetime
+) -> tuple[Card, bool]:
     with _locked_paths(courses_dir=courses_dir, course_id=course_id) as paths:
         cards, reviews = paths
         events = _read_records(path=cards, parse=load_card_event)
@@ -185,7 +194,7 @@ def create_card(
             events=events, cards=folded, dedup_key=draft.dedup_key
         )
         if existing is not None:
-            return existing
+            return existing, False
         event = CardCreated(
             card_id=str(uuid4()),
             occurred_at=now,
@@ -199,7 +208,7 @@ def create_card(
         _append_record(
             path=cards, content=dump_card_event(event=event), parse=load_card_event
         )
-        return card
+        return card, True
 
 
 def append_card_event(

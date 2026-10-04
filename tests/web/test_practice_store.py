@@ -1,3 +1,4 @@
+import logging
 import os
 from dataclasses import replace
 from pathlib import Path
@@ -131,17 +132,34 @@ def fail_replacing(target: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 def test_list_attempts_returns_all_by_descending_mtime(tmp_path: Path) -> None:
     first = make_attempt()
     second = replace(first, id=str(uuid4()))
-    assert list_attempts(courses_dir=tmp_path, course_id=first.course_id) == []
+    assert list_attempts(courses_dir=tmp_path, course_id=first.course_id).attempts == ()
     for timestamp, attempt in enumerate((first, second), start=1):
         save_attempt(courses_dir=tmp_path, course_id=attempt.course_id, attempt=attempt)
         path = practice_path(
             courses_dir=tmp_path, course_id=attempt.course_id, attempt_id=attempt.id
         )
         os.utime(path=path, times=(timestamp, timestamp))
-    assert list_attempts(courses_dir=tmp_path, course_id=first.course_id) == [
-        second,
-        first,
-    ]
+    scan = list_attempts(courses_dir=tmp_path, course_id=first.course_id)
+    assert scan.attempts == (second, first)
+    assert scan.unavailable_ids == ()
+
+
+def test_list_attempts_skips_unreadable_file_and_reports_it(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    good = make_attempt()
+    save_attempt(courses_dir=tmp_path, course_id=good.course_id, attempt=good)
+    bad_id = str(uuid4())
+    practice_path(
+        courses_dir=tmp_path, course_id=good.course_id, attempt_id=bad_id
+    ).write_text("{", encoding="utf-8")
+
+    with caplog.at_level(level=logging.ERROR):
+        scan = list_attempts(courses_dir=tmp_path, course_id=good.course_id)
+
+    assert scan.attempts == (good,)
+    assert scan.unavailable_ids == (bad_id,)
+    assert bad_id in caplog.text
 
 
 @pytest.mark.parametrize("attempt_id", (str(uuid4()), "../escape", "invalid"))

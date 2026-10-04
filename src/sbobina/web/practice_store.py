@@ -1,5 +1,7 @@
 """Atomic, process-locked storage of self-contained practice attempts."""
 
+import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -19,6 +21,8 @@ from sbobina.practice_models import (
 from sbobina.study_files import atomic_write_pair
 from sbobina.web.errors import NotFoundError
 from sbobina.web.path_locks import lock_for
+
+logger = logging.getLogger(__name__)
 
 PRACTICE_DIRNAME = "practice"
 
@@ -57,6 +61,7 @@ def create_attempt(
         updated_at=now,
         questions=generation.questions,
         answers=(),
+        sources=generation.sources,
     )
     save_attempt(courses_dir=courses_dir, course_id=course_id, attempt=attempt)
     return attempt
@@ -85,12 +90,34 @@ def load_attempt(courses_dir: Path, course_id: str, attempt_id: str) -> Practice
         raise NotFoundError(entity="Tentativo", id=attempt_id) from error
 
 
-def list_attempts(courses_dir: Path, course_id: str) -> list[PracticeAttempt]:
+@dataclass(frozen=True, kw_only=True)
+class AttemptScan:
+    attempts: tuple[PracticeAttempt, ...]
+    unavailable_ids: tuple[str, ...]
+
+
+def list_attempts(courses_dir: Path, course_id: str) -> AttemptScan:
+    """Read every attempt of the course, newest first.
+
+    One unreadable file is reported in `unavailable_ids` instead of failing
+    the whole listing, so the student keeps every other attempt.
+    """
     directory = practice_dir(courses_dir=courses_dir, course_id=course_id)
     paths = sorted(
         directory.glob("*.json"), key=lambda path: path.stat().st_mtime, reverse=True
     )
-    return [
-        load_attempt(courses_dir=courses_dir, course_id=course_id, attempt_id=path.stem)
-        for path in paths
-    ]
+    attempts: list[PracticeAttempt] = []
+    unavailable: list[str] = []
+    for path in paths:
+        try:
+            attempts.append(
+                load_attempt(
+                    courses_dir=courses_dir, course_id=course_id, attempt_id=path.stem
+                )
+            )
+        except NotFoundError:
+            continue  # deleted between glob and read: nothing to report
+        except (OSError, ValueError) as error:
+            logger.error("Unreadable practice attempt %s: %s", path, error)
+            unavailable.append(path.stem)
+    return AttemptScan(attempts=tuple(attempts), unavailable_ids=tuple(unavailable))

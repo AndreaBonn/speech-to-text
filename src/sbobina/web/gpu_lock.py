@@ -1,17 +1,17 @@
-"""GPU arbitration between the web process's chat (T042) and the
+"""GPU arbitration between the web process's interactive LLM calls and the
 supervisor's TRANSCRIBING stage (ADR D3).
 
 Readers-writer lock, priority to the writer. The supervisor is the writer:
-`transcription_lease` blocks until no chat turn is in flight, then holds the
-GPU exclusively for the whole TRANSCRIBING stage. Chat turns are the
+`transcription_lease` blocks until no interactive LLM call is in flight, then holds the
+GPU exclusively for the whole TRANSCRIBING stage. Chat and practice grading are the
 readers: `chat_turn` is non-blocking and raises `GpuBusyError` immediately
-once a writer is waiting or active, so a steady stream of chat requests
+once a writer is waiting or active, so a steady stream of interactive requests
 cannot starve the transcription forever. Readers may run concurrently with
-each other: they all call Ollama with the same model and options, which
-Ollama does not reload, so there is no VRAM conflict between them.
+each other: they use the same resident Ollama model, so shared calls do not
+require another copy of the model in VRAM.
 
-Only the chat (run in the web process, outside the supervisor's FIFO) needs
-this arbiter. The queue's own children (pipeline/correct/study/generation)
+Chat and practice grading run in the web process, outside the supervisor's FIFO,
+and need this arbiter. The queue's own children (pipeline/correct/study/generation)
 are already serialized by the supervisor's FIFO.
 """
 
@@ -58,7 +58,7 @@ class GpuArbiter:
 
     @contextmanager
     def chat_turn(self) -> Iterator[None]:
-        """Non-blocking shared lease for one chat turn. Raises `GpuBusyError`
+        """Non-blocking shared lease for an interactive LLM call. Raises `GpuBusyError`
         immediately if a transcription is active or waiting; never blocks."""
         with self._condition:
             if self._writer_waiting or self._writer_active:
@@ -76,11 +76,8 @@ class GpuArbiter:
     def transcription_lease(
         self, stage: str, estimate_s: float | None = None
     ) -> Iterator[None]:
-        """Blocking exclusive lease for the TRANSCRIBING stage. Rejects new
-        chat turns from the moment it starts waiting (priority to the
-        writer), waits for in-flight chat turns to finish, then holds the
-        GPU until the `with` block exits. Raises `LeaseCancelledError` if
-        `cancel_wait` interrupts the wait (supervisor stop/cancel)."""
+        """Wait for readers and hold the GPU with priority over interactive calls.
+        Raise `LeaseCancelledError` if `cancel_wait` interrupts the wait."""
         with self._condition:
             self._writer_waiting = True
             self._stage = stage

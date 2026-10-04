@@ -47,6 +47,7 @@ def apply_choice(
         question_index=question_index,
         status=AnswerStatus.GRADED,
         chosen_index=choice,
+        submitted_at=datetime.now(tz=UTC),
     )
     answers = (*attempt.answers, answer)
     status = (

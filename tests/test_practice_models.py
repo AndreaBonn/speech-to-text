@@ -6,8 +6,8 @@ from uuid import uuid4
 import pytest
 
 from sbobina.generation_models import GenerationFormat, GenerationQuestion
+from sbobina.grading_models import Judgement, JudgementOutcome
 from sbobina.practice_models import (
-    Answer,
     AnswerStatus,
     MultipleChoiceAnswer,
     OpenAnswer,
@@ -65,36 +65,95 @@ def test_practice_attempt_text_answer_for_multiple_choice_rejected(
     assert replace(make_attempt(format=format), answers=(answer,)).answers == (answer,)
 
 
-@pytest.mark.parametrize("status", tuple(AnswerStatus))
-@pytest.mark.parametrize(
-    "format",
-    (
-        GenerationFormat.MULTIPLE_CHOICE,
-        GenerationFormat.OPEN,
-        GenerationFormat.ORAL,
-    ),
+JUDGEMENT = Judgement(covered_points=(), missing_points=("Punto",), errors=())
+
+
+def text_answer(**fields: Any) -> OpenAnswer:
+    return OpenAnswer(answer_id=str(uuid4()), question_index=1, text="Answer", **fields)
+
+
+VALID_TEXT_STATES: tuple[dict[str, Any], ...] = (
+    {},
+    {"reason": "GPU_BUSY"},
+    {"status": AnswerStatus.GRADED, "judgement": JUDGEMENT},
+    {"status": AnswerStatus.SELF_GRADED, "self_grade": JudgementOutcome.PARTIAL},
+    {
+        "status": AnswerStatus.SELF_GRADED,
+        "self_grade": JudgementOutcome.CORRECT,
+        "judgement": JUDGEMENT,
+    },
 )
-def test_practice_attempt_roundtrip_preserves_discriminated_answers(
-    status: AnswerStatus,
-    format: GenerationFormat,
+INVALID_TEXT_STATES: tuple[dict[str, Any], ...] = (
+    {"status": AnswerStatus.GRADED},
+    {"judgement": JUDGEMENT},
+    {"status": AnswerStatus.SELF_GRADED},
+    {"self_grade": JudgementOutcome.PARTIAL},
+    {"status": AnswerStatus.GRADED, "judgement": JUDGEMENT, "reason": "GPU_BUSY"},
+    {
+        "status": AnswerStatus.SELF_GRADED,
+        "self_grade": JudgementOutcome.PARTIAL,
+        "reason": "GPU_BUSY",
+    },
+)
+
+
+@pytest.mark.parametrize("fields", VALID_TEXT_STATES)
+@pytest.mark.parametrize("answer_type", (OpenAnswer, OralAnswer))
+def test_practice_attempt_roundtrip_preserves_text_answer_states(
+    fields: dict[str, Any], answer_type: type[OpenAnswer] | type[OralAnswer]
 ) -> None:
-    answer: Answer
-    if format == GenerationFormat.MULTIPLE_CHOICE:
-        answer = MultipleChoiceAnswer(
-            answer_id=str(uuid4()),
-            question_index=1,
-            status=status,
-            chosen_index=2,
-        )
-    else:
-        answer_type = OpenAnswer if format == GenerationFormat.OPEN else OralAnswer
-        answer = answer_type(
-            answer_id=str(uuid4()), question_index=1, status=status, text="Answer"
-        )
+    answer = answer_type(
+        answer_id=str(uuid4()), question_index=1, text="Answer", **fields
+    )
+    format = GenerationFormat(answer.kind)
     attempt = replace(make_attempt(format=format), answers=(answer,))
     loaded = load_practice_attempt(content=dump_practice_attempt(attempt=attempt))
     assert loaded == attempt
-    assert type(loaded.answers[0]) is type(answer)
+    assert type(loaded.answers[0]) is answer_type
+
+
+def test_practice_attempt_roundtrip_preserves_multiple_choice_answer() -> None:
+    answer = MultipleChoiceAnswer(
+        answer_id=str(uuid4()),
+        question_index=1,
+        status=AnswerStatus.GRADED,
+        chosen_index=2,
+    )
+    attempt = replace(
+        make_attempt(format=GenerationFormat.MULTIPLE_CHOICE), answers=(answer,)
+    )
+    loaded = load_practice_attempt(content=dump_practice_attempt(attempt=attempt))
+    assert loaded == attempt
+    assert type(loaded.answers[0]) is MultipleChoiceAnswer
+
+
+@pytest.mark.parametrize("fields", INVALID_TEXT_STATES)
+def test_text_answer_inconsistent_grading_state_rejected(
+    fields: dict[str, Any],
+) -> None:
+    # A graded answer without judgement could never be graded again, and a
+    # self-graded one without the student's grade would show no outcome.
+    with pytest.raises(ValueError, match="status"):
+        text_answer(**fields)
+
+
+@pytest.mark.parametrize("status", (AnswerStatus.UNGRADED, AnswerStatus.SELF_GRADED))
+def test_multiple_choice_answer_must_be_graded(status: AnswerStatus) -> None:
+    with pytest.raises(ValueError, match="status"):
+        MultipleChoiceAnswer(
+            answer_id=str(uuid4()), question_index=0, status=status, chosen_index=1
+        )
+
+
+def test_inconsistent_answer_on_disk_rejected_on_load() -> None:
+    answer = text_answer(status=AnswerStatus.GRADED, judgement=JUDGEMENT)
+    attempt = replace(make_attempt(format=GenerationFormat.OPEN), answers=(answer,))
+    content = dump_practice_attempt(attempt=attempt)
+    assert load_practice_attempt(content=content) == attempt
+    corrupted = content.replace('"status": "graded"', '"status": "self_graded"', 1)
+    assert corrupted != content
+    with pytest.raises(ValueError, match="status"):
+        load_practice_attempt(content=corrupted)
 
 
 @pytest.mark.parametrize("field", ("id", "course_id", "generation_id"))
