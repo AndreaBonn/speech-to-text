@@ -1,4 +1,5 @@
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from generation_api_fixtures import (
@@ -86,7 +87,13 @@ def test_list_generations_paginated_newest_first(
     body = response.json()
 
     assert response.status_code == 200
-    assert body["meta"] == {"page": 1, "per_page": 1, "total": 2, "total_pages": 2}
+    assert body["meta"] == {
+        "page": 1,
+        "per_page": 1,
+        "total": 2,
+        "total_pages": 2,
+        "unavailable_generations": [],
+    }
     assert body["data"][0]["id"] == second.id
     second_page = client.get(
         f"{COURSES_URL}/fisica/generations", params={"page": 2, "per_page": 1}
@@ -99,8 +106,32 @@ def test_list_generations_unregistered_course_is_empty(client: TestClient) -> No
     assert response.status_code == 200
     assert response.json() == {
         "data": [],
-        "meta": {"page": 1, "per_page": 20, "total": 0, "total_pages": 0},
+        "meta": {
+            "page": 1,
+            "per_page": 20,
+            "total": 0,
+            "total_pages": 0,
+            "unavailable_generations": [],
+        },
     }
+
+
+def test_list_generations_unreadable_record_is_reported_not_fatal(
+    client: TestClient, tmp_path: Path
+) -> None:
+    course_id = _register_course(tmp_path=tmp_path)
+    good = _make_record(tmp_path=tmp_path, course_id=course_id)
+    bad_id = str(uuid4())
+    generation_path(
+        courses_dir=_store(tmp_path).courses_dir, course_id=course_id, gen_id=bad_id
+    ).write_text("{", encoding="utf-8")
+
+    response = client.get(f"{COURSES_URL}/fisica/generations")
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["data"]] == [good.id]
+    assert response.json()["meta"]["total"] == 1
+    assert response.json()["meta"]["unavailable_generations"] == [bad_id]
 
 
 def test_get_generation_not_found(client: TestClient, tmp_path: Path) -> None:

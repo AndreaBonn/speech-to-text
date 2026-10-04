@@ -1,5 +1,6 @@
 """CRUD and exports for course generations (T034, D3/D5)."""
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,6 +42,7 @@ from sbobina.web.generation_store import (
 from sbobina.web.job_store import JobStore
 from sbobina.web.supervisor import Supervisor
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/courses")
 MARKDOWN_MEDIA_TYPE = "text/markdown; charset=utf-8"
 DOCX_MEDIA_TYPE = (
@@ -85,19 +87,34 @@ def _course_id_for_key(key: str, services: GenerationServices) -> str:
     return course.id
 
 
-def _list_records(courses_dir: Path, course_id: str) -> list[GenerationRecord]:
-    """Every generation of a course, newest file first (no created_at field
-    on GenerationRecord: mtime is the same ordering key the queue uses)."""
+def _list_records(
+    courses_dir: Path, course_id: str
+) -> tuple[list[GenerationRecord], list[str]]:
+    """Every readable generation of a course, newest file first (no created_at
+    field on GenerationRecord: mtime is the same ordering key the queue uses),
+    plus the ids of unreadable files, so one corrupted record does not hide
+    the others."""
     directory = generation_dir(courses_dir=courses_dir, course_id=course_id)
     if not directory.is_dir():
-        return []
+        return [], []
     paths = sorted(
         directory.glob("*.json"), key=lambda path: path.stat().st_mtime, reverse=True
     )
-    return [
-        load_generation(courses_dir=courses_dir, course_id=course_id, gen_id=path.stem)
-        for path in paths
-    ]
+    records: list[GenerationRecord] = []
+    unavailable: list[str] = []
+    for path in paths:
+        try:
+            records.append(
+                load_generation(
+                    courses_dir=courses_dir, course_id=course_id, gen_id=path.stem
+                )
+            )
+        except NotFoundError:
+            continue  # deleted between glob and read: nothing to report
+        except (OSError, ValueError) as error:
+            logger.error("Unreadable generation %s: %s", path, error)
+            unavailable.append(path.stem)
+    return records, unavailable
 
 
 @router.post("/{key:path}/generations", status_code=202)
@@ -120,10 +137,10 @@ def list_generations(
 ) -> dict[str, Any]:
     """An unregistered course has no generations: empty page, not 404."""
     course = find_by_key(courses_dir=services.courses_dir, key=course_key(label=key))
-    records = (
+    records, unavailable = (
         _list_records(courses_dir=services.courses_dir, course_id=course.id)
         if course is not None
-        else []
+        else ([], [])
     )
     total = len(records)
     start = (page - 1) * per_page
@@ -136,6 +153,7 @@ def list_generations(
             "per_page": per_page,
             "total": total,
             "total_pages": (total + per_page - 1) // per_page,
+            "unavailable_generations": unavailable,
         },
     }
 
