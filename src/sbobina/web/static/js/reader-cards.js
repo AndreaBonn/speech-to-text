@@ -12,91 +12,26 @@
   var readerRoot = document.querySelector(".reader");
   var textEl = document.getElementById("reader-text");
   var trigger = document.getElementById("reader-card-trigger");
-  var dialog = document.getElementById("reader-card-dialog");
   var reader = window.sbobinaReader;
-  if (!readerRoot || !textEl || !trigger || !dialog || !reader) {
+  var cardDialog = window.SbobinaCardDialog;
+  if (!readerRoot || !textEl || !trigger || !reader || !cardDialog) {
     return;
   }
 
   var JOB_ID = readerRoot.dataset.jobId;
   var COURSES_URL = "/api/v1/courses?per_page=100";
-  var FAILED_MESSAGE =
-    "Creazione non riuscita. Controlla che il server sia attivo e riprova.";
   var NO_COURSE_MESSAGE =
     "Nessun corso associato a questa lezione: imposta un corso per creare carte.";
-  var SOURCE_CHANGED_MESSAGE = "Il testo è cambiato: ricarica la pagina.";
   var TRIGGER_MARGIN = 8;
   var TRIGGER_GAP = 4;
 
-  var form = document.getElementById("reader-card-form");
-  var frontInput = document.getElementById("reader-card-front");
-  var backInput = document.getElementById("reader-card-back");
-  var frontError = document.getElementById("reader-card-front-error");
-  var backError = document.getElementById("reader-card-back-error");
-  var errorEl = document.getElementById("reader-card-error");
-  var successBanner = document.getElementById("reader-card-success");
-  var cancelButton = document.getElementById("reader-card-cancel");
-  var submitButton = document.getElementById("reader-card-submit");
   var courseInput = document.getElementById("course-input");
 
   var pendingSelection = null; // {segmentIndex, quote}
-  var isSaving = false;
+  var openedSelection = null; // the selection the open dialog was made from
 
   function isEditing() {
     return readerRoot.classList.contains("is-editing");
-  }
-
-  // ---------- field errors ----------
-
-  function clearErrors() {
-    frontError.hidden = true;
-    frontError.textContent = "";
-    backError.hidden = true;
-    backError.textContent = "";
-    errorEl.textContent = "";
-    frontInput.classList.remove("is-invalid");
-    backInput.classList.remove("is-invalid");
-  }
-
-  function showFieldError(field, message) {
-    var el = field === "back" ? backError : frontError;
-    var input = field === "back" ? backInput : frontInput;
-    el.textContent = message;
-    el.hidden = false;
-    input.classList.add("is-invalid");
-  }
-
-  function showSavedMessage() {
-    successBanner.textContent = "";
-    successBanner.appendChild(
-      document.createTextNode("Carta aggiunta al ripasso. ")
-    );
-    var link = document.createElement("a");
-    link.href = "/ripasso";
-    link.textContent = "Vai al ripasso";
-    successBanner.appendChild(link);
-    successBanner.hidden = false;
-  }
-
-  function applyServerError(body) {
-    var error = (body && body.error) || {};
-    if (error.code === "SOURCE_CHANGED") {
-      errorEl.textContent = SOURCE_CHANGED_MESSAGE;
-      return;
-    }
-    var handled = false;
-    (error.details || []).forEach(function (detail) {
-      if (/front$/.test(detail.field || "")) {
-        showFieldError("front", detail.message);
-        handled = true;
-      } else if (/back$/.test(detail.field || "")) {
-        showFieldError("back", detail.message);
-        handled = true;
-      }
-    });
-    if (!handled) {
-      errorEl.textContent = error.message || FAILED_MESSAGE;
-    }
   }
 
   // ---------- selection -> trigger button ----------
@@ -160,7 +95,7 @@
   }
 
   function onSelectionChange() {
-    if (isEditing() || dialog.open) return;
+    if (isEditing() || cardForm.dialog.open) return;
     var range = transcriptRange();
     var anchor = range && selectionAnchor(range);
     if (!anchor) {
@@ -198,87 +133,29 @@
       });
   }
 
-  function openDialog() {
+  var cardForm = cardDialog.create("reader-card", {
+    resolveCourseKey: findCourseKey,
+    buildAnchor: function () {
+      return {
+        kind: "lecture",
+        job_id: JOB_ID,
+        revision: reader.revision(),
+        segment_index: openedSelection.segmentIndex,
+        quote: openedSelection.quote,
+      };
+    },
+    noCourseMessage: NO_COURSE_MESSAGE,
+    onSaved: hideTrigger,
+  });
+
+  trigger.addEventListener("click", function () {
     if (!pendingSelection) {
       return;
     }
-    clearErrors();
-    frontInput.value = "";
-    backInput.value = pendingSelection.quote;
-    successBanner.hidden = true;
-    dialog.showModal();
-    frontInput.focus();
-  }
-
-  trigger.addEventListener("click", openDialog);
-  cancelButton.addEventListener("click", function () {
-    dialog.close();
+    openedSelection = pendingSelection;
+    cardForm.open(openedSelection.quote);
   });
-  dialog.addEventListener("close", function () {
+  cardForm.dialog.addEventListener("close", function () {
     trigger.focus();
-  });
-
-  function setSaving(saving) {
-    isSaving = saving;
-    submitButton.disabled = saving;
-    submitButton.setAttribute("aria-busy", String(saving));
-  }
-
-  form.addEventListener("submit", function (event) {
-    event.preventDefault();
-    if (isSaving || !pendingSelection) {
-      return;
-    }
-    clearErrors();
-    var front = frontInput.value.trim();
-    if (!front) {
-      showFieldError("front", "Il fronte non può essere vuoto.");
-      return;
-    }
-    var segmentIndex = pendingSelection.segmentIndex;
-    var quote = pendingSelection.quote;
-    setSaving(true);
-    findCourseKey()
-      .then(function (key) {
-        if (!key) {
-          setSaving(false);
-          errorEl.textContent = NO_COURSE_MESSAGE;
-          return null;
-        }
-        return fetch("/api/v1/courses/" + encodeURIComponent(key) + "/cards", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            front: front,
-            back: backInput.value.trim() || front,
-            anchor: {
-              kind: "lecture",
-              job_id: JOB_ID,
-              revision: reader.revision(),
-              segment_index: segmentIndex,
-              quote: quote,
-            },
-          }),
-        });
-      })
-      .then(function (response) {
-        if (!response) {
-          return;
-        }
-        setSaving(false);
-        return response.json().then(function (body) {
-          if (!response.ok) {
-            applyServerError(body);
-            return;
-          }
-          dialog.close();
-          hideTrigger();
-          showSavedMessage();
-        });
-      })
-      .catch(function () {
-        setSaving(false);
-        errorEl.textContent = FAILED_MESSAGE;
-      });
   });
 })();
