@@ -1,19 +1,54 @@
 """Practice creation and per-question disclosure after submission."""
 
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel, Field
 
-from sbobina.generation_models import GenerationQuestion, GenerationStatus
+from sbobina.generation_models import (
+    EXPECTED_OPTION_COUNT,
+    GenerationQuestion,
+    GenerationStatus,
+)
 from sbobina.practice_models import AnswerStatus, PracticeAttempt, require_uuid4
 from sbobina.web.course_dependencies import Course, Services
 from sbobina.web.errors import ConflictError, NotFoundError, ValidationError
 from sbobina.web.generation_store import load_generation
 from sbobina.web.pagination import Page, page_bounds, page_meta
+from sbobina.web.practice_answers import AnswerTarget, submit_choice
 from sbobina.web.practice_store import create_attempt, list_attempts, load_attempt
 
 router = APIRouter(prefix="/api/v1/courses/{key:path}/generations/{gen_id}/attempts")
+
+
+class ChoiceSubmission(BaseModel):
+    choice: int = Field(strict=True, ge=0, lt=EXPECTED_OPTION_COUNT)
+
+
+@router.post("/{attempt_id}/answers/{question_index}")
+def add_choice_answer(
+    target: Annotated[AnswerTarget, Depends()],
+    body: ChoiceSubmission,
+    course: Course,
+    services: Services,
+) -> dict[str, Any]:
+    _validate_generation_id(gen_id=target.gen_id)
+    attempt = submit_choice(
+        courses_dir=services.store.courses_dir,
+        course_id=course.id,
+        target=target,
+        choice=body.choice,
+    )
+    question = attempt.questions[target.question_index]
+    is_correct = body.choice == question.correct_index
+    return {
+        "data": {
+            **_question_payload(question=question, is_submitted=True),
+            "outcome": "corretta" if is_correct else "errata",
+            "score": 1 if is_correct else 0,
+        }
+    }
 
 
 def _validate_generation_id(gen_id: str) -> None:

@@ -1,0 +1,76 @@
+from collections.abc import Callable
+from dataclasses import dataclass
+from importlib import resources
+
+from pydantic import ValidationError
+
+from sbobina.correction import InvalidResponseError
+from sbobina.generation_models import DiscardCount, GenerationFormat, GenerationQuestion
+from sbobina.generation_validation import discard_counts
+from sbobina.grading_models import Judgement, ProposedJudgement, validate_judgement
+from sbobina.ollama_chat import ChatRequest, strip_markdown_fence
+from sbobina.solution_points import extract_solution_points
+
+PROMPT_FILE = "valutazione-v1.md"
+MAX_ATTEMPTS = 2
+GRADING_FAILED = "GRADING_FAILED"
+FORMAT_LABELS = {GenerationFormat.OPEN: "aperta", GenerationFormat.ORAL: "orale"}
+
+type GradingChat = Callable[[ChatRequest], str]
+
+
+@dataclass(frozen=True, kw_only=True)
+class GradingRequest:
+    question: GenerationQuestion
+    format: GenerationFormat
+    answer: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class GradingResult:
+    judgement: Judgement | None
+    discarded: tuple[DiscardCount, ...] = ()
+
+    @property
+    def error(self) -> str | None:
+        return GRADING_FAILED if self.judgement is None else None
+
+
+def _build_request(request: GradingRequest, model: str) -> ChatRequest:
+    points = extract_solution_points(
+        solution=request.question.solution, format=request.format
+    )
+    numbered = "\n".join(
+        f"[{index}] {point}" for index, point in enumerate(points, start=1)
+    )
+    return ChatRequest(
+        model=model,
+        system_prompt=resources.files("sbobina.prompts")
+        .joinpath(PROMPT_FILE)
+        .read_text(encoding="utf-8"),
+        user_message=(
+            f"Domanda: {request.question.question}\nFormato: {FORMAT_LABELS[request.format]}\n"
+            f"{numbered}\n<risposta>\n{request.answer}\n</risposta>"
+        ),
+        schema=ProposedJudgement.model_json_schema(),
+    )
+
+
+def grade(*, request: GradingRequest, chat: GradingChat, model: str) -> GradingResult:
+    chat_request = _build_request(request=request, model=model)
+    for _ in range(MAX_ATTEMPTS):
+        try:
+            content = strip_markdown_fence(content=chat(chat_request))
+            proposed = ProposedJudgement.model_validate_json(content)
+        except (InvalidResponseError, ValidationError):
+            continue
+        judgement, counts = validate_judgement(
+            proposed=proposed,
+            solution=request.question.solution,
+            answer=request.answer,
+            format=request.format,
+        )
+        return GradingResult(
+            judgement=judgement, discarded=discard_counts(counts=counts)
+        )
+    return GradingResult(judgement=None)
