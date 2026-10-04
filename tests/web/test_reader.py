@@ -24,6 +24,7 @@ def test_build_paragraphs_threshold_and_correction_preserves_word_fields() -> No
         [
             WordView(
                 index=0,
+                segment=0,
                 start=0.0,
                 end=0.4,
                 text=" cloroplasto",
@@ -32,6 +33,7 @@ def test_build_paragraphs_threshold_and_correction_preserves_word_fields() -> No
             ),
             WordView(
                 index=1,
+                segment=0,
                 start=0.4,
                 end=0.8,
                 text=" chiaro",
@@ -128,3 +130,22 @@ def test_build_paragraphs_indexes_words_across_paragraphs() -> None:
     paragraphs = build_paragraphs(transcript=transcript, options=OPTIONS)
 
     assert [[w.index for w in p] for p in paragraphs] == [[0, 1], [2]]
+
+
+def test_build_paragraphs_segment_index_counts_segments_not_words() -> None:
+    transcript = make_transcript(
+        [
+            make_segment([make_word(" uno", 0.0), make_word(" due", 0.4)]),
+            make_segment([make_word(" tre", 1.0), make_word(" quattro", 1.4)]),
+        ]
+    )
+
+    paragraphs = build_paragraphs(transcript=transcript, options=OPTIONS)
+
+    words = [word for paragraph in paragraphs for word in paragraph]
+    assert [(word.index, word.segment) for word in words] == [
+        (0, 0),
+        (1, 0),
+        (2, 1),
+        (3, 1),
+    ]

@@ -131,6 +131,7 @@
     span.dataset.start = String(word.start);
     span.dataset.end = String(word.end);
     span.dataset.index = String(word.index);
+    span.dataset.segment = String(word.segment);
     // Raw text with its leading space: the edit module sends it back as the
     // text the user saw, and textContent would include the sr-only note.
     span.dataset.text = word.text;

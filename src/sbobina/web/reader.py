@@ -14,10 +14,12 @@ class WordView:
     """A timed reader word with uncertainty and its original spelling, if corrected.
 
     ``index`` is the word's flat position in the transcript, the handle the
-    reader sends back when the user edits a span.
+    reader sends back when the user edits a span. ``segment`` is the index of
+    the transcript segment holding the word, the handle a card anchor needs.
     """
 
     index: int
+    segment: int
     start: float
     end: float
     text: str
@@ -35,9 +37,12 @@ class ReviewPoint:
     after: str
 
 
-def _build_word_view(word: Word, index: int, threshold: float) -> WordView:
+def _build_word_view(
+    word: Word, index: int, segment: int, threshold: float
+) -> WordView:
     return WordView(
         index=index,
+        segment=segment,
         start=word.start,
         end=word.end,
         text=word.text,
@@ -65,15 +70,23 @@ def build_paragraphs(
     """
     paragraphs: list[list[WordView]] = []
     index = 0
+    segment_index = 0
     for paragraph in group_paragraphs(segments=transcript.segments, options=options):
         views: list[WordView] = []
-        for word in (word for segment in paragraph for word in segment.words):
-            views.append(
-                _build_word_view(
-                    word=word, index=index, threshold=options.uncertain_threshold
+        # Paragraphs keep every segment in order, so a running count is the
+        # segment's position in transcript.segments.
+        for segment in paragraph:
+            for word in segment.words:
+                views.append(
+                    _build_word_view(
+                        word=word,
+                        index=index,
+                        segment=segment_index,
+                        threshold=options.uncertain_threshold,
+                    )
                 )
-            )
-            index += 1
+                index += 1
+            segment_index += 1
         paragraphs.append(views)
     return paragraphs
 

@@ -167,6 +167,7 @@ def test_get_transcript_variant_returns_reader_then_not_found(
                 [
                     {
                         "index": 0,
+                        "segment": 0,
                         "start": 0.0,
                         "end": 0.4,
                         "text": " cloroplasto",
@@ -177,6 +178,7 @@ def test_get_transcript_variant_returns_reader_then_not_found(
                 [
                     {
                         "index": 1,
+                        "segment": 1,
                         "start": 1.0,
                         "end": 1.4,
                         "text": " dopo",
