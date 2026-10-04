@@ -114,38 +114,7 @@
 
   // ---------- transcript DOM ----------
 
-  function wordClassName(word) {
-    var classes = ["word"];
-    if (word.uncertain) {
-      classes.push("word--uncertain");
-    }
-    if (word.corrected_from) {
-      classes.push("word--corrected");
-    }
-    return classes.join(" ");
-  }
-
-  function buildWordSpan(word, displayText) {
-    var span = document.createElement("span");
-    span.className = wordClassName(word);
-    span.dataset.start = String(word.start);
-    span.dataset.end = String(word.end);
-    span.dataset.index = String(word.index);
-    span.dataset.segment = String(word.segment);
-    // Raw text with its leading space: the edit module sends it back as the
-    // text the user saw, and textContent would include the sr-only note.
-    span.dataset.text = word.text;
-    span.tabIndex = 0;
-    span.textContent = displayText;
-    if (word.corrected_from) {
-      span.title = "prima: " + word.corrected_from;
-      var srNote = document.createElement("span");
-      srNote.className = "sr-only";
-      srNote.textContent = " (prima: " + word.corrected_from + ")";
-      span.appendChild(srNote);
-    }
-    return span;
-  }
+  var buildWordSpan = window.SbobinaReaderWords.buildWordSpan;
 
   function buildParagraph(paragraph) {
     var row = document.createElement("div");
