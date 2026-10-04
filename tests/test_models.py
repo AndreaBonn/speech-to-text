@@ -2,7 +2,12 @@ from pathlib import Path
 
 from conftest import make_segment, make_transcript, make_word
 
-from sbobina.models import load_transcript, save_transcript
+from sbobina.models import (
+    load_transcript,
+    save_transcript,
+    transcript_from_json,
+    transcript_to_json,
+)
 
 
 def test_segment_text_joins_whisper_word_prefixes() -> None:
@@ -40,3 +45,11 @@ def test_load_transcript_accepts_files_written_before_corrected_from(
     )
 
     assert load_transcript(path).words[0].corrected_from is None
+
+
+def test_transcript_from_json_round_trips_saved_text() -> None:
+    transcript = make_transcript(
+        [make_segment([make_word(" uno", 0.0), make_word(" due", 0.4)])]
+    )
+
+    assert transcript_from_json(transcript_to_json(transcript)) == transcript

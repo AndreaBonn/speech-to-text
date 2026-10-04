@@ -49,7 +49,12 @@ def save_transcript(transcript: Transcript, path: Path) -> None:
 
 
 def load_transcript(path: Path) -> Transcript:
-    raw = json.loads(path.read_text(encoding="utf-8"))
+    return transcript_from_json(content=path.read_text(encoding="utf-8"))
+
+
+def transcript_from_json(content: str) -> Transcript:
+    """Parse saved transcript JSON, for callers that already read the file text."""
+    raw = json.loads(content)
     segments = tuple(
         Segment(
             start=seg["start"],
