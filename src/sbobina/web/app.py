@@ -23,6 +23,7 @@ from sbobina.web.api_generations import router as generations_router
 from sbobina.web.api_jobs import router as jobs_router
 from sbobina.web.api_models import create_models_router
 from sbobina.web.api_ocr import router as ocr_router
+from sbobina.web.api_review import router as review_router
 from sbobina.web.api_search import router as search_router
 from sbobina.web.api_study import router as study_router
 from sbobina.web.api_system import create_system_router
@@ -166,6 +167,7 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(documents_router)
     app.include_router(generations_router)
     app.include_router(exam_cues_router)
+    app.include_router(review_router)
     app.include_router(search_router)
     app.include_router(study_router)
     app.include_router(files_router)
