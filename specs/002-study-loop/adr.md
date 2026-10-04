@@ -564,11 +564,27 @@ stessa finestra.
 ## Verifiche da fare prima di accettare
 
 - **V1** `uv add "fsrs>=6.3,<7"`: lock senza dipendenze transitive oltre `typing-extensions`.
+  **Esito (2026-10-04): superata.** Il diff di `uv.lock` aggiunge solo `fsrs` 6.3.2 (MIT);
+  `typing-extensions` era già presente. BASIS: measured.
 - **V2** Test del confine `flashcard_scheduler.py` con `enable_fuzzing=False`: sequenza
   Again/Good/Good/Easy produce stati e `due` identici a quelli della libreria chiamata direttamente.
+  **Esito: superata** (`tests/test_flashcard_scheduler.py`); `fsrs` importato solo da
+  `flashcard_scheduler.py`. BASIS: measured.
 - **V3** Piegatura di `cards.jsonl` + `reviews.jsonl` con 3.000 carte e 30.000 ripassi sintetici:
   tempo di "in scadenza oggi" sotto 200 ms, altrimenti tabella derivata.
+  **Esito (2026-10-04): al limite, non superata con margine.** `scripts/bench_review_fold.py`,
+  6 esecuzioni da 10 run, cache calda, macchina di sviluppo: p50 della piega fra 177 e 223 ms
+  (max fino a 275 ms); un append su `reviews.jsonl` da 30.000 righe p50 4,5-5,6 ms, quindi il
+  rilievo della review B-3 sull'append non richiede interventi. Lo scenario è un limite superiore
+  (circa un anno di ripasso intensivo in un solo corso), ma `/review/summary` ripete la piega per
+  ogni corso. **Decisione: T032 rinviato, non scartato.** Si riapre se la latenza misurata nel
+  click-through di T029 su `/review/today` o `/review/summary` supera 300 ms, o se un mazzo reale
+  supera 1.000 carte. In quel caso l'ordine è: prima una memoizzazione in processo della piega
+  invalidata da dimensione e mtime dei due file (un solo worker uvicorn, `launcher.py:100`), poi
+  la tabella derivata solo se non basta. BASIS: measured sui tempi, inferred sulla soglia d'uso.
 - **V4** Riga JSONL troncata in coda: il lettore la ignora e l'append successivo non la corrompe.
+  **Esito: superata** (`tests/web/test_card_store.py`), estesa alle righe valide ma con dati
+  non validi, saltate con warning. BASIS: measured.
 - **V5** Latenza del giudice su 20 risposte reali, GPU e CPU.
 - **V6** 30 risposte etichettate a mano dall'utente (corretta, parziale, errata): accordo del
   giudice ≥ 80% per mostrare l'esito come voto e non come suggerimento.
