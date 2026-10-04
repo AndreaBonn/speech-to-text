@@ -1,5 +1,3 @@
-from collections import Counter
-
 """LLM-backed answer-with-citations for the course chat (plan B-9, T041).
 
 Mirrors generation_pipeline.py: a versioned system prompt, one retry on
@@ -11,6 +9,7 @@ stays pure otherwise. build_retrieval_question() is the one piece of
 ("e quella di prima?") does not carry enough terms on its own.
 """
 
+from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
