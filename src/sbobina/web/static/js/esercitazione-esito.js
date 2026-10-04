@@ -229,5 +229,10 @@
     return section;
   }
 
-  window.SbobinaPracticeResult = { render: render, el: el };
+  window.SbobinaPracticeResult = {
+    render: render,
+    el: el,
+    outcomeBadge: outcomeBadge,
+    citationItem: citationItem,
+  };
 })();

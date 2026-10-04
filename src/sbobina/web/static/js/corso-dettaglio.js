@@ -34,6 +34,7 @@
   var generations = window.SbobinaCourseGenerations;
   var chat = window.SbobinaCourseChat;
   var examCues = window.SbobinaCourseExamCues;
+  var practice = window.SbobinaCoursePractice;
   var clearChildren = dom.clearChildren;
   var textCell = dom.textCell;
   var showSkeleton = dom.showSkeleton;
@@ -168,6 +169,7 @@
     examCues.show(key);
     materials.show(key);
     generations.show(key);
+    practice.show(key);
     chat.show(key);
   }
 
@@ -178,6 +180,7 @@
     examCues.hide();
     materials.hide();
     generations.hide();
+    practice.hide();
     chat.hide();
   }
 

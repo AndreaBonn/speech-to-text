@@ -143,3 +143,23 @@ def test_documento_page_escapes_a_malicious_filename(tmp_path: Path) -> None:
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in body
     # The payload adds no real <script> tag: both pages load the same set.
     assert body.count("<script") == baseline.count("<script")
+
+
+def test_corsi_page_has_attempts_and_mistakes_before_detail_script(
+    tmp_path: Path,
+) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/corsi").text
+
+    assert 'id="corsi-attempts"' in body
+    assert 'id="corsi-mistakes"' in body
+    assert "Non hai ancora svolto esercitazioni" in body
+    # corso-dettaglio.js reads window.SbobinaCoursePractice when it runs, so the
+    # practice module and the result helpers it uses must load before it.
+    assert body.index("/static/js/esercitazione-esito.js") < body.index(
+        "/static/js/corso-esercitazioni.js"
+    )
+    assert body.index("/static/js/corso-esercitazioni.js") < body.index(
+        "/static/js/corso-dettaglio.js"
+    )

@@ -227,3 +227,61 @@
 .practice-result__verdict[hidden] {
   display: none;
 }
+
+/* ---------- Course detail: attempts and mistakes (corso-esercitazioni.js) ---------- */
+
+/* Notices and lists share the reading column, as on the practice page. */
+.practice-course {
+  max-width: var(--measure-reading);
+}
+
+.practice-course__list {
+  list-style: none;
+  margin: 0 0 var(--space-md);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.practice-course__item,
+.practice-course__mistake {
+  padding: var(--space-sm) var(--space-md);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  overflow-wrap: anywhere;
+}
+
+.practice-course__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs) var(--space-md);
+}
+
+.practice-course__text {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.practice-course__meta {
+  display: block;
+  color: var(--color-ink-3);
+  font-size: var(--text-sm);
+}
+
+.practice-course__mistake .practice-question__text {
+  font-size: var(--text-base);
+  margin-bottom: var(--space-xs);
+}
+
+.practice-course__mistake .practice-result__answer,
+.practice-course__mistake .practice-result__solution {
+  margin-bottom: var(--space-xs);
+}
+
+.practice-course__list[hidden] {
+  display: none;
+}
