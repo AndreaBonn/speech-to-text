@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Literal
+from uuid import UUID
 
 from pydantic import Field, TypeAdapter
 
@@ -10,9 +11,12 @@ from sbobina.flashcard_scheduler import FsrsState, Rating
 from sbobina.time_guards import require_aware
 
 MAX_CARD_TEXT_LENGTH = 2000
+# Bounds the cost of re-tokenizing a quote on every relocation attempt
+# (card_anchors._relocate calls locate_quote once per candidate segment).
+MAX_QUOTE_CHARS = 2000
 
 
-def _validate_card_text(*, front: str | None, back: str | None) -> None:
+def validate_card_text(*, front: str | None, back: str | None) -> None:
     for label, text in (("fronte", front), ("retro", back)):
         if text is None:
             continue
@@ -21,6 +25,17 @@ def _validate_card_text(*, front: str | None, back: str | None) -> None:
                 f"Il {label} deve contenere da 1 a "
                 f"{MAX_CARD_TEXT_LENGTH} caratteri e non può essere vuoto."
             )
+
+
+def _require_uuid4(value: str, field: str) -> None:
+    """Reject anything that is not a canonical UUID4, so an anchor id can never
+    double as a path segment (``../x``) when resolvers join it onto a directory."""
+    try:
+        parsed = UUID(value)
+    except ValueError as error:
+        raise ValueError(f"{field} deve essere un UUID4 valido") from error
+    if parsed.version != 4 or str(parsed) != value:
+        raise ValueError(f"{field} deve essere un UUID4 valido")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -32,10 +47,13 @@ class LectureAnchor:
     kind: Literal["lecture"] = "lecture"
 
     def __post_init__(self) -> None:
-        if not self.job_id or not self.revision:
+        _require_uuid4(self.job_id, "job_id")
+        if not self.revision:
             raise ValueError("job_id e revision non possono essere vuoti")
         if self.segment_index < 0:
             raise ValueError("segment_index deve essere >= 0")
+        if len(self.quote) > MAX_QUOTE_CHARS:
+            raise ValueError(f"quote non può superare {MAX_QUOTE_CHARS} caratteri")
         if not self.quote.strip():
             raise ValueError("quote non può essere vuoto")
 
@@ -49,10 +67,13 @@ class DocumentAnchor:
     kind: Literal["document"] = "document"
 
     def __post_init__(self) -> None:
-        if not self.doc_id or not self.sha256:
+        _require_uuid4(self.doc_id, "doc_id")
+        if not self.sha256:
             raise ValueError("doc_id e sha256 non possono essere vuoti")
         if self.page < 0:
             raise ValueError("page deve essere >= 0")
+        if len(self.quote) > MAX_QUOTE_CHARS:
+            raise ValueError(f"quote non può superare {MAX_QUOTE_CHARS} caratteri")
         if not self.quote.strip():
             raise ValueError("quote non può essere vuoto")
 
@@ -64,8 +85,7 @@ class GenerationAnchor:
     kind: Literal["generation"] = "generation"
 
     def __post_init__(self) -> None:
-        if not self.generation_id:
-            raise ValueError("generation_id non può essere vuoto")
+        _require_uuid4(self.generation_id, "generation_id")
         if self.question_index < 0:
             raise ValueError("question_index deve essere >= 0")
 
@@ -84,7 +104,7 @@ class CardDraft:
     dedup_key: str | None = None
 
     def __post_init__(self) -> None:
-        _validate_card_text(front=self.front, back=self.back)
+        validate_card_text(front=self.front, back=self.back)
 
 
 # Separate event types prevent unrelated lifecycle fields appearing together.
@@ -100,7 +120,7 @@ class CardCreated:
     kind: Literal["created"] = "created"
 
     def __post_init__(self) -> None:
-        _validate_card_text(front=self.front, back=self.back)
+        validate_card_text(front=self.front, back=self.back)
         require_aware(value=self.occurred_at, field="occurred_at")
 
 
@@ -113,7 +133,7 @@ class CardEdited:
     kind: Literal["edited"] = "edited"
 
     def __post_init__(self) -> None:
-        _validate_card_text(front=self.front, back=self.back)
+        validate_card_text(front=self.front, back=self.back)
         require_aware(value=self.occurred_at, field="occurred_at")
 
 
@@ -168,7 +188,7 @@ class Card:
     suspended: bool = False
 
     def __post_init__(self) -> None:
-        _validate_card_text(front=self.front, back=self.back)
+        validate_card_text(front=self.front, back=self.back)
 
 
 CARD_EVENT_ADAPTER: TypeAdapter[CardEvent] = TypeAdapter(CardEvent)

@@ -1,5 +1,6 @@
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -10,6 +11,7 @@ from sbobina.review_queue import due_today
 from sbobina.settings import Settings
 
 NOW = datetime(2026, 10, 4, 12, tzinfo=UTC)
+GENERATION_ID = str(uuid4())
 
 
 def card_fixture(identifier: str = "card", due: datetime | None = None) -> Card:
@@ -29,7 +31,7 @@ def card_fixture(identifier: str = "card", due: datetime | None = None) -> Card:
         front="Fronte",
         back="Retro",
         source="manual",
-        anchor=GenerationAnchor(generation_id="generation", question_index=0),
+        anchor=GenerationAnchor(generation_id=GENERATION_ID, question_index=0),
         fsrs=state,
     )
 

@@ -1,6 +1,7 @@
 from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from study_fixtures import QUOTE, transcript_fixture
@@ -97,7 +98,9 @@ def test_resolve_lecture_changed_quote_relocates_and_disappears(
 
 
 def test_resolve_lecture_invalid_index_relocates_without_io() -> None:
-    anchor = LectureAnchor(job_id="job", revision="old", segment_index=999, quote=QUOTE)
+    anchor = LectureAnchor(
+        job_id=str(uuid4()), revision="old", segment_index=999, quote=QUOTE
+    )
     assert (
         resolve_lecture(
             anchor=anchor,
@@ -144,7 +147,7 @@ def test_resolve_lecture_deleted_job_returns_removed(store: JobStore) -> None:
 
 def _document() -> CourseDocument:
     return CourseDocument(
-        id="doc",
+        id=str(uuid4()),
         course_id=COURSE_ID,
         filename="appunti.txt",
         kind=DocumentKind.TXT,
@@ -166,7 +169,7 @@ def test_resolve_document_hash_changes_and_removal(store: JobStore) -> None:
     before = _snapshot(directory=store.jobs_dir.parent)
     result = resolve_anchor(anchor=anchor, store=store, course_id=COURSE_ID, key=KEY)
     assert result == AnchorResolution(
-        href="/corsi/diritto/documenti/doc?p=2", status="ok"
+        href=f"/corsi/diritto/documenti/{document.id}?p=2", status="ok"
     )
     assert _snapshot(directory=store.jobs_dir.parent) == before
     write_document(
@@ -177,7 +180,9 @@ def test_resolve_document_hash_changes_and_removal(store: JobStore) -> None:
         == "source_modified"
     )
     (
-        document_dir(courses_dir=store.courses_dir, course_id=COURSE_ID, doc_id="doc")
+        document_dir(
+            courses_dir=store.courses_dir, course_id=COURSE_ID, doc_id=document.id
+        )
         / "document.json"
     ).unlink()
     assert (
