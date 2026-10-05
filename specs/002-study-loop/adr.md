@@ -596,6 +596,8 @@ stessa finestra.
   giudicate corrette, 2 con errore giudicate errate). Domande generate dal corso reale, risposte ed
   etichette di Claude (U5 delegata): il giudizio resta "Suggerimento" finché l'utente non dà il sì
   sul passaggio a voto. Dettaglio in `eval-grading.md`. BASIS: measured.
+  **Aggiornamento (2026-10-05, F41): `valutazione-v2`.** Stesse 30 risposte: accordo 26/30 (87%),
+  zero errate giudicate corrette, risposte a metà giudicate parziali 5/7 (erano 4/7). BASIS: measured.
 - **V7** Precisione della regex O3 su 3 lezioni reali, frasi marcate a mano dall'utente.
   **Esito (2026-10-05): superata sulla soglia, provvisoria.** Precisione `strong` 1,00 (5/5)
   contro 0,80, `weak` 0,63 (15/24), recall stimato sulla rete larga 0,91 (20/22), stabilità

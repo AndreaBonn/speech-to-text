@@ -88,3 +88,36 @@ l'autovalutazione (adr.md D3).
   risposta a metà può prendere il punteggio pieno.
 
 BASIS: measured su accordo, matrice, stabilità e latenza GPU; unknown sulla latenza CPU.
+
+## Correzione di F41 (2026-10-05)
+
+Tutte le soluzioni generate hanno un punto solo. Due iterazioni del prompt `compito` (v3: regola
+con il motivo ed esempi a più frasi e a punti " | ") non hanno cambiato niente: 0 soluzioni su 9
+con più di un punto, contro 0 su 10 con v2. v3 non è stato spedito. Nel codice, una traccia orale
+scritta in prosa ora viene divisa per frasi (`solution_points.py`).
+
+La causa lato giudice: `valutazione-v1` chiedeva di copiare ogni punto "per intero" e di metterlo
+in un solo elenco, quindi vietava di dividere un punto coperto a metà (la validazione lo
+accettava già, confrontando per sottostringa). `valutazione-v2` permette di dividere il punto:
+la parte detta in `punti_coperti`, quella mancante in `punti_mancanti`, con un esempio.
+
+`BUDGET: 1 iterazione del prompt del giudice | ranking: accordo ≥ 80% > al massimo 1 errata
+giudicata corretta > risposte a metà giudicate parziali ≥ 6 su 7 > corrette invariate`
+
+Stesse 30 risposte, 3 esecuzioni su GPU:
+
+| | v1 | v2 |
+|---|---|---|
+| Accordo per esecuzione | 25/30 (83%) | **26/30 (87%)** |
+| Errate giudicate corrette | 0 | 0 |
+| Corrette giudicate corrette | 30/30 | 30/30 |
+| Risposte a metà giudicate parziali | 4/7 | **5/7** |
+| Risposte con errore giudicate parziali | 1/3 | 1/3 |
+| Verdetti instabili | 0 | 0 |
+| Latenza p50 / max | 8,3 / 21,5 s | 8,2 / 19,4 s |
+
+Restano corrette due risposte a metà: D1 (manca la condizione sugli accordi collettivi) e D3
+(manca l'autotutela). L'obiettivo di 6 su 7 non è raggiunto.
+
+`SPEDITO: iter 1/1 - valutazione-v2, migliore di v1 sulle risposte a metà e invariata sul resto.`
+BASIS: measured.
