@@ -230,6 +230,12 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
       fallisce se una voce ha estensione audio o è nel perimetro personale). Tipo (T6):
       `format_version: Literal[1]`; i path d'inventario sono validati nel field validator
       (assoluti, `..`, backslash → errore).
+- [ ] Lezioni senza testo (gate F5, 2026-10-05, F52/F55): l'export salta le lezioni del corso non
+      concluse e senza `audio.json` (annullate, interrotte, fallite, in coda), perché ne
+      esisterebbe solo l'audio, mai esportato; una lezione conclusa senza trascrizione resta un
+      errore. Il numero delle lezioni saltate arriva nell'header `X-Sbobina-Skipped-Lectures`, ogni
+      lezione saltata è registrata con un WARNING, e la finestra di export resta aperta con
+      l'avviso "Pacchetto scaricato. N lezioni non sono incluse…" e il pulsante "Chiudi".
 - [ ] Allowlist di `job.json` (S3, P2): ogni campo di `JobRecord` è classificato
       esportato/escluso in una costante; un test di regressione fallisce se `JobRecord` acquista un
       campo non classificato.
@@ -244,7 +250,9 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
         422 `PACKAGE_INVALID`, caso nei test ostili;
       - limiti (BASIS: inferred, fissati qui come chiede l'ADR): upload ≤ `web_max_upload_mb`,
         ≤ 5.000 membri, ≤ 500 MB decompressi in totale (`MAX_ARCHIVE_BYTES`), ≤ 200 MB per membro
-        (`course_doc_max_mb`), rapporto di compressione ≤ 100:1 per membro, byte contati in
+        (`course_doc_max_mb`, che a sua volta non può superare 200: un documento caricato
+        direttamente deve restare reimportabile; passato al figlio dalla rotta, gate F5, F58),
+        rapporto di compressione ≤ 100:1 per membro, byte contati in
         lettura → 413 `PACKAGE_TOO_LARGE`;
       - sha256 di ogni membro uguale al manifest, altrimenti 422; ZIP annidati non aperti;
         `format_version` sconosciuto → 422 "pacchetto creato da una versione più recente";
@@ -271,10 +279,13 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
       audio, con "Lezione importata: l'audio non è incluso"; i minuti restano visibili e il clic su
       una parola o su `?t=` scorre al punto senza seek; supervisor non la riprende al boot;
       download audio → 404 `AUDIO_NOT_INCLUDED`; cancellazione funziona.
-- [ ] Azioni sulle lezioni importate (B9, vedi § Divergenze 7): "Rigenera studio" e la correzione
-      LLM usano il testo e funzionano (202, accodate); le azioni che richiedono l'audio
-      (ritrascrizione) rispondono 409 `AUDIO_NOT_INCLUDED` con "Lezione importata senza audio:
-      non si può ritrascrivere", mai `STUDY_NOT_READY`.
+- [ ] Azioni sulle lezioni importate (B9, vedi § Divergenze 7): "Rigenera studio" usa il testo e
+      funziona (202, accodata); le azioni che richiedono l'audio (ritrascrizione) rispondono 409
+      `AUDIO_NOT_INCLUDED` con "Lezione importata senza audio: non si può ritrascrivere", mai
+      `STUDY_NOT_READY`. La correzione LLM non è disponibile su una lezione importata: oggi gira
+      solo dentro la pipeline di trascrizione, che richiede l'audio (emendato il 2026-10-05, gate
+      F5, A8); un'azione di sola correzione su testo esistente sarebbe una feature nuova, fuori da
+      v1.
 - [ ] V11: test di import ostile (zip slip, symlink, header con dimensione falsa, rapporto
       estremo, hash sbagliato, `format_version` futuro): ogni caso rifiutato senza file fuori dallo
       staging.

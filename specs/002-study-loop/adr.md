@@ -632,3 +632,16 @@ stessa finestra.
   falso e rapporto 1000:1; 422 `PACKAGE_VERSION_UNSUPPORTED` per la versione futura), nessun file
   nuovo nella data dir dopo ciascuno; il pacchetto valido di controllo è importato (201).
   BASIS: measured.
+- **T079** Round-trip del pacchetto corso (C5), prova a mano su un corso reale.
+  **Esito (2026-10-05): superata dopo la correzione di F52.** Copia di `data/` in una cartella
+  temporanea, mai la `data/` in uso; due istanze dell'app avviate in-process, la seconda su una
+  data dir vuota; corso "Diritto". Il primo export ha risposto 500: una lezione annullata prima
+  della trascrizione non aveva `audio.json` (F52, corretta in `73b4950`). Dopo la correzione, export
+  200 (813.700 byte) e import 201. Conteggi prima (copia) e dopo (import): lezioni 4 → 3 (quella
+  annullata ha solo l'audio e non entra nel pacchetto), documenti 1 → 1, generazioni 1 → 1, carte
+  0 → 0; citazioni della generazione 4 → 4, tutte con link e nessuna segnata come cambiata. La
+  ricerca di "contratto" trova passaggi di lezione e di documento senza riavvio. Una citazione per
+  tipo aperta nel browser: Lettore della lezione importata a 0:01 con la prima parola citata
+  evidenziata e l'avviso "Lezione importata: l'audio non è incluso"; pagina del documento
+  (risposte 200, nessun errore nella pagina). Il test automatico è
+  `tests/web/test_package_round_trip.py` (`fa87ebd`). BASIS: measured.
