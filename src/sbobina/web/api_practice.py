@@ -52,6 +52,24 @@ class ChoiceSubmission(BaseModel):
     choice: int = Field(strict=True, ge=0, lt=EXPECTED_OPTION_COUNT)
 
 
+def _text_answer(
+    target: AnswerTarget,
+    body: TextSubmission,
+    course: CourseRecord,
+    services: PracticeServices,
+) -> dict[str, Any]:
+    location = AnswerLocation(
+        courses_dir=services.store.courses_dir, course_id=course.id, target=target
+    )
+    attempt = submit_text(location=location, body=body, services=services)
+    return text_payload(
+        attempt=attempt,
+        index=target.question_index,
+        mode=grading_mode(settings=services.settings),
+        context=citation_context(store=services.store, course=course, attempt=attempt),
+    )
+
+
 @router.post("/{attempt_id}/answers/{question_index}")
 def add_choice_answer(
     target: Annotated[AnswerTarget, Depends()],
@@ -61,18 +79,9 @@ def add_choice_answer(
 ) -> dict[str, Any]:
     _validate_generation_id(gen_id=target.gen_id)
     if isinstance(body, TextSubmission):
-        location = AnswerLocation(
-            courses_dir=services.store.courses_dir, course_id=course.id, target=target
-        )
-        attempt = submit_text(location=location, body=body, services=services)
         return {
-            "data": text_payload(
-                attempt=attempt,
-                index=target.question_index,
-                mode=grading_mode(settings=services.settings),
-                context=citation_context(
-                    store=services.store, course=course, attempt=attempt
-                ),
+            "data": _text_answer(
+                target=target, body=body, course=course, services=services
             )
         }
     attempt = submit_choice(
@@ -156,15 +165,19 @@ def _question_payload(
     return payload
 
 
-def _attempt_payload(
-    attempt: PracticeAttempt, context: CitationContext
-) -> dict[str, Any]:
-    submitted = {
+def _submitted_indexes(attempt: PracticeAttempt) -> set[int]:
+    return {
         answer.question_index
         for answer in attempt.answers
         if answer.status
         in (AnswerStatus.UNGRADED, AnswerStatus.GRADED, AnswerStatus.SELF_GRADED)
     }
+
+
+def _attempt_payload(
+    attempt: PracticeAttempt, context: CitationContext
+) -> dict[str, Any]:
+    submitted = _submitted_indexes(attempt=attempt)
     payload: dict[str, Any] = jsonable_encoder(
         obj={
             "id": attempt.id,
