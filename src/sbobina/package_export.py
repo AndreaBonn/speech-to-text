@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
@@ -28,13 +29,16 @@ from sbobina.web.document_store import (
     original_path,
 )
 from sbobina.web.generation_store import generation_dir
-from sbobina.web.job_models import JobRecord
+from sbobina.web.job_models import JobRecord, JobStatus
 from sbobina.web.job_store import JobStore
 
 OPTIONAL_LECTURE_FILES: tuple[tuple[str, str, PackageKind], ...] = (
     ("audio.corretto.json", "corrected.json", "corrected"),
     ("audio.studio.json", "study.json", "study"),
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -66,8 +70,23 @@ def _course_jobs(request: ExportRequest) -> Iterator[JobRecord]:
             yield record
 
 
+def _exportable_jobs(request: ExportRequest) -> Iterator[JobRecord]:
+    """Course lectures with text; one never transcribed has only its audio.
+
+    A finished lecture without a transcript stays in, so the read fails loudly.
+    """
+    for record in _course_jobs(request=request):
+        directory = request.store.jobs_dir / str(record.id)
+        if record.status is JobStatus.DONE or (directory / "audio.json").is_file():
+            yield record
+        else:
+            logger.info(
+                "Export skips lecture %s (%s): no transcript", record.id, record.status
+            )
+
+
 def _lecture_members(request: ExportRequest) -> Iterator[PackageMember]:
-    for index, record in enumerate(_course_jobs(request=request)):
+    for index, record in enumerate(_exportable_jobs(request=request)):
         directory = request.store.jobs_dir / str(record.id)
         prefix = f"lectures/{index}"
         yield _make_member(

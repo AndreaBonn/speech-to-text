@@ -15,6 +15,7 @@ from sbobina.settings import Settings
 from sbobina.web import api_package
 from sbobina.web.app import create_app
 from sbobina.web.course_dependencies import ReviewServices
+from sbobina.web.job_models import JobStatus
 
 
 def spy_temporary_files(monkeypatch: pytest.MonkeyPatch) -> list[IO[bytes]]:
@@ -98,6 +99,9 @@ def test_export_write_failure_closes_temporary_and_propagates(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     data = seed_package(tmp_path=tmp_path)
+    # A finished lecture without its transcript makes the write fail.
+    record = data.store.get(job_id=data.job_id)
+    data.store.update(record=record.model_copy(update={"status": JobStatus.DONE}))
     (data.store.jobs_dir / data.job_id / "audio.json").unlink()
     created = spy_temporary_files(monkeypatch=monkeypatch)
     services = ReviewServices(

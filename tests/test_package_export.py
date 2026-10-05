@@ -1,4 +1,5 @@
 import json
+import logging
 from hashlib import sha256
 from pathlib import Path, PurePosixPath
 
@@ -18,6 +19,7 @@ from sbobina.package_models import ExportOptions, Manifest
 from sbobina.web.card_store import cards_path, reviews_path
 from sbobina.web.document_store import document_dir
 from sbobina.web.generation_store import generation_dir
+from sbobina.web.job_models import JobConfig, JobStatus
 
 
 @pytest.fixture
@@ -188,9 +190,32 @@ def test_inventory_optional_files_absent_keeps_required_files(
 def test_inventory_missing_required_transcript_raises(
     course_data: PackageFixture,
 ) -> None:
-    (course_data.store.jobs_dir / course_data.job_id / "audio.json").unlink()
+    # A finished lecture must have its transcript: losing it is not a skip.
+    store = course_data.store
+    record = store.get(job_id=course_data.job_id)
+    store.update(record=record.model_copy(update={"status": JobStatus.DONE}))
+    (store.jobs_dir / course_data.job_id / "audio.json").unlink()
     with pytest.raises(FileNotFoundError):
         list(iter_package_members(request=make_request(data=course_data)))
+
+
+@pytest.mark.parametrize(
+    "status", [status for status in JobStatus if status is not JobStatus.DONE]
+)
+def test_inventory_skips_course_lecture_never_transcribed(
+    course_data: PackageFixture, status: JobStatus, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(level=logging.INFO, logger="sbobina.package_export")
+    store = course_data.store
+    untranscribed = store.create(config=JobConfig(subject="Fisica"))
+    store.update(record=untranscribed.model_copy(update={"status": status}))
+    contents = {
+        member.entry.path: member.data
+        for member in iter_package_members(request=make_request(data=course_data))
+    }
+    assert json.loads(contents["lectures/0/meta.json"])["id"] == course_data.job_id
+    assert not any(path.startswith("lectures/1/") for path in contents)
+    assert f"Export skips lecture {untranscribed.id} ({status})" in caplog.text
 
 
 def test_write_package_empty_course_writes_empty_manifest(tmp_path: Path) -> None:
