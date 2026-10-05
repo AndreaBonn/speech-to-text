@@ -269,8 +269,8 @@
     showSkeleton();
     emptyEl.hidden = true;
     clearStatus(statusEl);
-    // Lecture titles come from the same API the lecture table already uses;
-    // cues render with a short job-id fallback until they arrive.
+    // Lecture titles come from the same API the lecture table already uses.
+    // Cues load after them; a failed title fetch falls back to short job ids.
     loadTitles(key).then(function (map) {
       if (currentKey !== key) {
         return;
