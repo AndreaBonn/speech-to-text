@@ -1,4 +1,5 @@
 import json
+import logging
 from functools import partial
 from importlib import resources
 from unittest.mock import Mock
@@ -104,13 +105,10 @@ def test_grade_obedient_fake_invented_evidence_has_zero_coverage() -> None:
     result = grade(
         request=request(answer=instruction), chat=obedient_chat, model="fake"
     )
-    assert result.judgement is not None
-    assert result.judgement.covered_points == ()
-    assert result.judgement.missing_points == (POINT,)
-    assert (result.judgement.outcome, result.judgement.score) == ("errata", 0)
-    assert [(item.reason, item.count) for item in result.discarded] == [
-        ("EVIDENCE_NOT_IN_ANSWER", 1)
-    ]
+    # F42: credit with no anchored evidence is no grade at all, never a free
+    # point; the answer stays ungraded and the student can grade it.
+    assert result.judgement is None
+    assert result.error == "GRADING_FAILED"
 
 
 def test_grade_unavailable_propagates_without_retry() -> None:
@@ -141,3 +139,38 @@ def test_grade_oral_points_are_numbered_separately() -> None:
         f"[1] {POINT}\n[2] Gli investimenti coprono gli ammortamenti"
         in sent.user_message
     )
+
+
+def test_grade_credit_without_anchored_evidence_is_retried(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # F42: a judge that paraphrased the evidence must not turn a right answer
+    # into "errata"; the second reply anchors it.
+    paraphrased = json.dumps(
+        {
+            "punti_coperti": [{"punto": POINT, "prova": "il capitale non cambia mai"}],
+            "punti_mancanti": [],
+            "errori": [],
+        }
+    )
+    chat = Mock(side_effect=[paraphrased, VALID])
+
+    with caplog.at_level(logging.WARNING, logger="sbobina.grading"):
+        result = grade(request=request(), chat=chat, model="fake")
+
+    assert result.judgement is not None
+    assert result.judgement.outcome == "corretta"
+    assert chat.call_count == 2
+    assert "no evidence found in the answer" in caplog.text
+
+
+def test_grade_invalid_replies_are_logged(caplog: pytest.LogCaptureFixture) -> None:
+    # F43: a judge that keeps answering badly must show up in the logs.
+    chat = Mock(side_effect=["broken", "{}"])
+
+    with caplog.at_level(logging.WARNING, logger="sbobina.grading"):
+        result = grade(request=request(), chat=chat, model="fake")
+
+    assert result.error == "GRADING_FAILED"
+    assert caplog.text.count("Invalid judge reply") == 2
+    assert "Grading failed after 2 attempts" in caplog.text

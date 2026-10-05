@@ -151,9 +151,13 @@ def test_unanchored_judge_evidence_is_discarded(
         json={**submission(), "text": "Non so rispondere alla domanda."},
     )
     data = response.json()["data"]
-    assert data["outcome"] == "errata"
-    assert data["discarded"] == [{"reason": "EVIDENCE_NOT_IN_ANSWER", "count": 1}]
-    assert data["judgement"]["covered_points"] == []
+    # F42: credit with no evidence in the answer is no grade, never "errata".
+    assert (data["outcome"], data["status"], data["reason"]) == (
+        None,
+        "ungraded",
+        "GRADING_FAILED",
+    )
+    assert data["judgement"] is None
     valid = client.post(url=f"{attempt_url}/answers/1", json=submission()).json()[
         "data"
     ]
