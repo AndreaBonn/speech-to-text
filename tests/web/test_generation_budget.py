@@ -38,7 +38,7 @@ def test_compute_budget_words_for_summary_keeps_a_usable_material_budget() -> No
 
     # Documents the actual number so a future change to the constants above
     # shows up here instead of silently shrinking the material budget.
-    assert budget == 1540
+    assert budget == 1547
     assert budget >= BUDGET_MIN_WORDS
 
 

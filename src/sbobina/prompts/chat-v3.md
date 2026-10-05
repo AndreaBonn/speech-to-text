@@ -24,7 +24,7 @@ Scambio precedente: lo studente ha chiesto del possesso. Domanda: ed è un dirit
 Risposta (la citazione conserva la trascrizione):
 {"frasi": [{"testo": "No: il possesso non è un diritto ma una situazione di fatto, tutelata dalle azioni possessorie.", "citazioni": [{"passaggio": "P4", "testo": "il possesso non è un diritto è una situazione di fatto tutelata con le azioni possessorio a"}]}]}
 
-Domanda: come si calcola la velocità media? Passaggio con una formula (nel JSON ogni barra si scrive doppia):
+Domanda: come si calcola la velocità media? Passaggio con una formula:
 [P3] (documento, pagina 3) La velocità media è \(v = \frac{\Delta s}{\Delta t}\).
 Risposta (la frase riporta la formula fra \( e \), la citazione la copia identica):
 {"frasi": [{"testo": "Si divide lo spostamento per il tempo impiegato: \\(v = \\frac{\\Delta s}{\\Delta t}\\).", "citazioni": [{"passaggio": "P3", "testo": "La velocità media è \\(v = \\frac{\\Delta s}{\\Delta t}\\)"}]}]}

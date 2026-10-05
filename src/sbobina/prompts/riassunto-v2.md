@@ -24,7 +24,7 @@ Argomento: possesso. Passaggio di lezione con una parola sentita male ("possesso
 Risposta (la citazione conserva la trascrizione):
 {"sezioni": [{"titolo": "Natura del possesso", "frasi": [{"testo": "Il possesso non è un diritto ma una situazione di fatto, tutelata dalle azioni possessorie.", "citazioni": [{"passaggio": "P9", "testo": "il possesso non è un diritto è una situazione di fatto tutelata con le azioni possessorio a"}]}]}]}
 
-Argomento: velocità. Passaggio con una formula (nel JSON ogni barra si scrive doppia):
+Argomento: velocità. Passaggio con una formula:
 [P7] (Fisica 1.pdf, pagina 3) La velocità media è \(v = \frac{\Delta s}{\Delta t}\).
 Risposta (la frase riporta la formula fra \( e \), la citazione la copia identica):
 {"sezioni": [{"titolo": "Velocità media", "frasi": [{"testo": "La velocità media è \\(v = \\frac{\\Delta s}{\\Delta t}\\), il rapporto fra spostamento e tempo.", "citazioni": [{"passaggio": "P7", "testo": "La velocità media è \\(v = \\frac{\\Delta s}{\\Delta t}\\)"}]}]}]}

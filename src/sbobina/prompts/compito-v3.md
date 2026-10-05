@@ -30,7 +30,7 @@ Formato: aperte. Numero: 1. Argomento: (nessuno). Passaggio di lezione con una p
 Risposta (la citazione conserva "capitate"):
 {"domande": [{"domanda": "Che cosa caratterizza lo stato stazionario nel modello di Solow?", "soluzione": "Nello stato stazionario gli investimenti coprono soltanto l'ammortamento, quindi il capitale per occupato resta costante.", "citazioni": [{"passaggio": "P5", "testo": "se gli investimenti coprono solo l'ammortamento il capitate per occupato rimane costante"}]}]}
 
-Formato: aperte. Numero: 1. Argomento: velocità. Con una formula (nel JSON la barra si scrive doppia):
+Formato: aperte. Numero: 1. Argomento: velocità. Con una formula:
 [P7] (Fisica 1.pdf, pagina 3) La velocità media è \(v = \frac{\Delta s}{\Delta t}\).
 Risposta (la citazione copia la formula identica):
 {"domande": [{"domanda": "Come si definisce la velocità media?", "soluzione": "È lo spostamento diviso il tempo, \\(v = \\frac{\\Delta s}{\\Delta t}\\).", "citazioni": [{"passaggio": "P7", "testo": "La velocità media è \\(v = \\frac{\\Delta s}{\\Delta t}\\)"}]}]}
