@@ -97,3 +97,17 @@ def test_extract_solution_points_numbered_list_items_become_points(
         extract_solution_points(solution=solution, format=GenerationFormat.OPEN)
         == expected
     )
+
+
+def test_extract_solution_points_oral_without_separator_splits_sentences() -> None:
+    # F41: the model sometimes writes an oral outline as prose; one point per
+    # sentence still lets the judge tell an incomplete answer apart.
+    solution = "Il possesso è una situazione di fatto. Anche quello di malafede è tutelato."
+
+    assert extract_solution_points(solution=solution, format=GenerationFormat.ORAL) == (
+        "Il possesso è una situazione di fatto",
+        "Anche quello di malafede è tutelato",
+    )
+    assert extract_solution_points(
+        solution="Primo | secondo. Ancora secondo", format=GenerationFormat.ORAL
+    ) == ("Primo", "secondo. Ancora secondo")

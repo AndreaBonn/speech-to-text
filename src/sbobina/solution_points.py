@@ -28,9 +28,11 @@ def extract_solution_points(solution: str, format: GenerationFormat) -> tuple[st
         GenerationFormat.OPEN,
     ):
         return ()
+    # An oral outline written as prose (no " | ") is split like an open
+    # solution: one point per sentence beats one point for the whole answer.
     parts = (
         solution.split(sep=ORAL_POINT_SEPARATOR)
-        if format == GenerationFormat.ORAL
+        if format == GenerationFormat.ORAL and ORAL_POINT_SEPARATOR in solution
         else [
             sentence
             for item in _list_items(solution=solution)
