@@ -1,3 +1,4 @@
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -151,3 +152,23 @@ def test_import_real_exported_package_end_to_end(
     )
     assert len(documents) == 1
     assert documents[0].filename == "Notes.txt"
+
+
+def test_import_real_package_is_searchable_and_listed_at_once(
+    client: TestClient, tmp_path: Path
+) -> None:
+    # T077: no restart and no manual reindex between import and search.
+    package = make_package(directory=tmp_path)
+    data = upload(client=client, content=package.read_bytes()).json()["data"]
+    imported_jobs = {
+        path.parent.name for path in (tmp_path / "jobs").glob("*/audio.json")
+    }
+
+    lectures = client.get(url="/api/v1/search", params={"q": "lezione"}).json()
+    documents = client.get(url="/api/v1/search", params={"q": "notes"}).json()
+    courses = client.get(url="/api/v1/courses").json()["data"]
+
+    lecture_hits = {item["id"] for item in lectures["data"] if "passages" in item}
+    assert imported_jobs and imported_jobs <= lecture_hits
+    assert [item["kind"] for item in documents["data"]] == ["document"]
+    assert data["course_label"] in json.dumps(courses, ensure_ascii=False)
