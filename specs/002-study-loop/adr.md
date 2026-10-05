@@ -620,3 +620,15 @@ stessa finestra.
 - **V11** Test di import ostile: zip slip, symlink, membro con header falso sulla dimensione,
   rapporto di compressione estremo, manifest con hash sbagliato, `format_version` futuro. Ogni caso
   rifiutato senza file scritti fuori dallo staging.
+  **Esito (2026-10-05): superata.** Sulla validazione: 50 test ostili verdi
+  (`tests/test_package_validate.py`, `test_package_validate_limits.py`,
+  `test_package_import_validation.py`), con path assoluti, `..`, backslash, lettere di unità,
+  symlink, nomi duplicati anche dopo normalizzazione, header falso (10 B dichiarati, 10 MB reali,
+  con e senza CRC contraffatto), rapporto 1000:1, limiti di membri e byte, deflate malformato,
+  hash e dimensione sbagliati, `format_version` 2, contenuti non validi per i loader di dominio.
+  Sull'import completo via HTTP (`POST /api/v1/courses/import` di un'app avviata su una data dir
+  vuota): 9 pacchetti ostili su 9 rifiutati (422 `PACKAGE_INVALID` per zip slip, path assoluto,
+  lettera di unità, symlink, nome duplicato, hash sbagliato; 413 `PACKAGE_TOO_LARGE` per header
+  falso e rapporto 1000:1; 422 `PACKAGE_VERSION_UNSUPPORTED` per la versione futura), nessun file
+  nuovo nella data dir dopo ciascuno; il pacchetto valido di controllo è importato (201).
+  BASIS: measured.
