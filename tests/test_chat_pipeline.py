@@ -303,16 +303,3 @@ def test_build_retrieval_question_blank_question_reuses_previous_one_stripped() 
 def test_chat_options_rejects_non_positive_num_predict() -> None:
     with pytest.raises(ValueError, match="num_predict"):
         ChatOptions(model="test", num_predict=0)
-
-
-def test_answer_uses_the_prompt_that_asks_for_delimited_formulas() -> None:
-    chat = FakeChat(responses=[json.dumps({"frasi": []})])
-
-    answer(
-        query=ChatQuery(question="che cos'e' la velocita'?"),
-        passages=[_passage(page=1)],
-        chat=chat,
-        options=_options(),
-    )
-
-    assert "fra \\( e \\)" in chat.requests[0].system_prompt

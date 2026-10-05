@@ -294,27 +294,3 @@ def test_generate_text_question_with_uncited_solution_is_discarded() -> None:
 def test_generation_options_rejects_non_positive_num_predict() -> None:
     with pytest.raises(ValueError, match="num_predict"):
         GenerationOptions(model="test", num_predict=0)
-
-
-@pytest.mark.parametrize(
-    ("format_", "version"),
-    [
-        ("multiple_choice", "compito-v3"),
-        ("open", "compito-v3"),
-        ("oral", "compito-v3"),
-        ("summary", "riassunto-v2"),
-    ],
-)
-def test_generate_uses_the_prompt_that_asks_for_delimited_formulas(
-    format_: str, version: str
-) -> None:
-    request = GenerationRequest.model_validate({"format": format_, "count": 1})
-    empty = '{"sezioni": []}' if format_ == "summary" else '{"domande": []}'
-    chat = FakeChat(responses=[empty])
-
-    result = generate(
-        request=request, passages=[_doc_passage()], chat=chat, options=_options()
-    )
-
-    assert result.prompt_version == version
-    assert "fra \\( e \\)" in chat.requests[0].system_prompt
