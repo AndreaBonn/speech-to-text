@@ -37,7 +37,11 @@ from sbobina.generation_models import (
     SummaryResponse,
     TextQuestionResponse,
 )
-from sbobina.generation_pipeline import GenerationResult, generate
+from sbobina.generation_pipeline import (
+    GenerationOptions,
+    GenerationResult,
+    generate,
+)
 from sbobina.ollama_chat import ChatRequest, chat_json, strip_markdown_fence
 from sbobina.retrieval import DocumentSource, RetrievedPassage, cut_to_budget
 from sbobina.settings import Settings
@@ -130,16 +134,10 @@ def proposed_citations(raw: str, format_: GenerationFormat) -> list[ProposedCita
     return [c for q in reply.questions for c in q.citations]
 
 
-def run_one(
+def build_inputs(
     topic: str, format_: GenerationFormat, ranked: list[RetrievedPassage]
-) -> Run:
-    client = Client(host=Settings().ollama_host)
-    replies: list[str] = []
-
-    def chat(request: ChatRequest) -> str:
-        replies.append(chat_json(client=client, request=request))
-        return replies[-1]
-
+) -> tuple[GenerationRequest, list[RetrievedPassage], GenerationOptions]:
+    """Request, budgeted passages and options, as the generation runner sets them."""
     count = 1 if format_ is GenerationFormat.SUMMARY else QUESTION_COUNT
     options = compute_options(
         count=count, format_=format_, model=Settings().ollama_model
@@ -151,9 +149,15 @@ def run_one(
     request = GenerationRequest.model_validate(
         {"format": format_.value, "count": count, "topic": topic}
     )
-    result = generate(request=request, passages=passages, chat=chat, options=options)
+    return request, passages, options
+
+
+def resolve_all(
+    raw: str, format_: GenerationFormat, passages: list[RetrievedPassage]
+) -> list[tuple[str, str]]:
+    """(quote, outcome) for every citation the model proposed in its reply."""
     citations = []
-    for proposed in proposed_citations(raw=replies[-1], format_=format_):
+    for proposed in proposed_citations(raw=raw, format_=format_):
         resolved = resolve_citation(
             passages=passages,
             citation=ProposedSourceCitation(
@@ -162,6 +166,23 @@ def run_one(
         )
         outcome = resolved.reason if isinstance(resolved, SourceRejection) else KEPT
         citations.append((proposed.quote, str(outcome)))
+    return citations
+
+
+def run_one(
+    topic: str, format_: GenerationFormat, ranked: list[RetrievedPassage]
+) -> Run:
+    client = Client(host=Settings().ollama_host)
+    replies: list[str] = []
+
+    def chat(request: ChatRequest) -> str:
+        replies.append(chat_json(client=client, request=request))
+        return replies[-1]
+
+    request, passages, options = build_inputs(
+        topic=topic, format_=format_, ranked=ranked
+    )
+    result = generate(request=request, passages=passages, chat=chat, options=options)
     return Run(
         topic=topic,
         format=format_.value,
@@ -170,7 +191,7 @@ def run_one(
         items_kept=len(result.questions)
         + sum(len(s.sentences) for s in result.sections),
         items_discarded={d.reason: d.count for d in result.discarded},
-        citations=citations,
+        citations=resolve_all(raw=replies[-1], format_=format_, passages=passages),
         **count_texts(result=result),
     )
 
