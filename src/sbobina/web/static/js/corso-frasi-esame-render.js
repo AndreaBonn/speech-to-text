@@ -103,7 +103,19 @@
     }
   }
 
-  function emptyMessage(level) {
+  function unavailableCount(meta) {
+    return (meta && meta.unavailable_jobs ? meta.unavailable_jobs : []).length;
+  }
+
+  function emptyMessage(level, meta) {
+    // With unreadable lectures, "no cues" is only true of the readable ones.
+    if (unavailableCount(meta) > 0) {
+      return (
+        "Nelle lezioni che riesco a leggere non trovo frasi in cui il docente " +
+        "parla dell'esame. Le altre non sono leggibili ora." +
+        (level === ALL_LEVELS ? "" : " Con i segnali deboli attivi se ne vedono di più.")
+      );
+    }
     if (level === ALL_LEVELS) {
       return (
         "In queste lezioni non trovo frasi in cui il docente parla " +
@@ -121,7 +133,7 @@
 
   // Lessons the server could not read are listed in meta, not silently dropped.
   function showUnavailable(unavailableEl, meta) {
-    var count = (meta && meta.unavailable_jobs ? meta.unavailable_jobs : []).length;
+    var count = unavailableCount(meta);
     unavailableEl.hidden = count === 0;
     unavailableEl.textContent = count === 1
       ? "Una lezione non è leggibile ora: le sue frasi non compaiono."

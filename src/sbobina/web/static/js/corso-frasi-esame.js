@@ -57,24 +57,42 @@
     );
   }
 
-  function loadTitles(key) {
-    return fetch(
-      "/api/v1/jobs?course=" + encodeURIComponent(key) + "&per_page=" + JOBS_PER_PAGE
-    )
+  function titlesUrl(key, page) {
+    return (
+      "/api/v1/jobs?course=" +
+      encodeURIComponent(key) +
+      "&page=" +
+      page +
+      "&per_page=" +
+      JOBS_PER_PAGE
+    );
+  }
+
+  // Every page, so a course past JOBS_PER_PAGE lectures keeps real titles.
+  function fetchTitles(key, page, map) {
+    return fetch(titlesUrl(key, page))
       .then(function (response) {
-        return response.ok ? response.json() : { data: [] };
+        return response.ok ? response.json() : { data: [], meta: {} };
       })
       .then(function (body) {
-        var map = {};
         body.data.forEach(function (job) {
           map[job.id] = jobTitle(job);
         });
-        return map;
-      })
-      .catch(function (error) {
-        console.error(error);
-        return {};
+        var pages = (body.meta && body.meta.total_pages) || 1;
+        // Another course was opened meanwhile: its own show() loads titles.
+        if (currentKey !== key) {
+          return map;
+        }
+        return page < pages ? fetchTitles(key, page + 1, map) : map;
       });
+  }
+
+  function loadTitles(key) {
+    var map = {};
+    return fetchTitles(key, 1, map).catch(function (error) {
+      console.error(error);
+      return map;
+    });
   }
 
   function lectureTitle(jobId) {
@@ -116,7 +134,7 @@
       load(key, 1);
       return;
     }
-    emptyTextEl.textContent = render.emptyMessage(level);
+    emptyTextEl.textContent = render.emptyMessage(level, body.meta);
     emptyEl.hidden = false;
   }
 
