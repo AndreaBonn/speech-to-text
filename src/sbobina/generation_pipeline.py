@@ -8,13 +8,16 @@ topic is empty) is a separate module built on retrieve_windows, so generate()
 stays testable with passages given directly, no I/O.
 """
 
+import json
 import math
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from enum import StrEnum
 from functools import partial
 from importlib import resources
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
@@ -145,15 +148,63 @@ def _build_request(
     )
 
 
+_LIST_SEPARATORS = " \t\r\n,"
+_QUESTIONS_ARRAY = re.compile(r'"domande"\s*:\s*\[')
+
+
+def complete_questions(content: str) -> list[Any]:
+    """The question objects a reply wrote in full before it broke off."""
+    match = _QUESTIONS_ARRAY.search(content)
+    if match is None:
+        return []
+    decoder = json.JSONDecoder()
+    items: list[Any] = []
+    index = match.end()
+    while True:
+        while index < len(content) and content[index] in _LIST_SEPARATORS:
+            index += 1
+        try:
+            item, index = decoder.raw_decode(content, index)
+        except json.JSONDecodeError:
+            return items
+        items.append(item)
+
+
+def _salvage(
+    content: str, schema_model: type[BaseModel], wanted: int | None
+) -> BaseModel | None:
+    """Keep the requested questions of an unreadable reply that holds them all.
+
+    Measured (F40): asked for 1 oral question, qwen wrote more and hit
+    num_predict inside the second, the same at every attempt. A reply missing
+    some requested question is still discarded.
+    """
+    items = complete_questions(content=content) if wanted else []
+    if not wanted or len(items) < wanted:
+        return None
+    try:
+        return schema_model.model_validate({"domande": items[:wanted]})
+    except ValidationError:
+        return None
+
+
 def _request_response(
-    chat: GenerationChat, request: ChatRequest, schema_model: type[BaseModel]
+    chat: GenerationChat,
+    request: ChatRequest,
+    schema_model: type[BaseModel],
+    wanted: int | None,
 ) -> BaseModel | None:
     for _ in range(MAX_ATTEMPTS):
+        content = ""
         try:
             content = strip_markdown_fence(content=chat(request))
             return schema_model.model_validate_json(content)
         except (InvalidResponseError, ValidationError):
-            continue
+            salvaged = _salvage(
+                content=content, schema_model=schema_model, wanted=wanted
+            )
+            if salvaged is not None:
+                return salvaged
     return None
 
 
@@ -205,6 +256,7 @@ def generate(
         chat=chat,
         request=_build_request(request=request, passages=passages, options=options),
         schema_model=_RESPONSE_SCHEMAS[request.format],
+        wanted=None if request.format is GenerationFormat.SUMMARY else request.count,
     )
     if response is None:
         failed = result(outcome=GenerationOutcome.FAILED)
