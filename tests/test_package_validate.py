@@ -25,6 +25,7 @@ from sbobina.package_models import ExportOptions, Manifest
 from sbobina.package_validate import (
     PackageInvalidError,
     PackageTooLargeError,
+    PackageVersionError,
     ValidationLimits,
     validate_package,
 )
@@ -152,12 +153,14 @@ def test_validate_package_inventory_mismatch_rejected(
 
 def test_validate_package_future_version_rejected(exported: bytes) -> None:
     valid_manifest(data=exported)
-    with pytest.raises(PackageInvalidError, match="Package created by a newer version"):
+    with pytest.raises(PackageVersionError) as raised:
         validate_package(
             source=BytesIO(
                 change_manifest(data=exported, changes={"format_version": 2})
             )
         )
+    assert raised.value.code == "PACKAGE_VERSION_UNSUPPORTED"
+    assert isinstance(raised.value, PackageInvalidError)
 
 
 def test_validate_package_nested_zip_is_opaque(exported: bytes) -> None:

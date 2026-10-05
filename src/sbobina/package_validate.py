@@ -1,5 +1,6 @@
 """Validate package bytes without extraction; the HTTP layer limits upload size."""
 
+import json
 import stat
 import zlib
 from dataclasses import dataclass
@@ -31,6 +32,23 @@ class PackageInvalidError(PackageValidationError):
 
 class PackageTooLargeError(PackageValidationError):
     code = "PACKAGE_TOO_LARGE"
+
+
+class PackageVersionError(PackageInvalidError):
+    """Made by a newer Sbobina: the student can fix it by updating."""
+
+    code = "PACKAGE_VERSION_UNSUPPORTED"
+
+
+def _check_format_version(data: bytes) -> None:
+    # Read before the full model, so a newer package is named as such even
+    # when the rest of its manifest uses fields this version does not know.
+    try:
+        version = json.loads(data).get("format_version")
+    except (ValueError, AttributeError):
+        return  # the manifest validation below reports the malformed JSON
+    if isinstance(version, int) and not isinstance(version, bool) and version > 1:
+        raise PackageVersionError(f"Package format version {version} is newer than 1")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -142,6 +160,7 @@ def _validate(archive: ZipFile, limits: ValidationLimits) -> ValidatedPackage:
         raise PackageInvalidError("Missing manifest.json")
     reader = _Reader(archive=archive, limits=limits)
     content = reader.read(info=index[MANIFEST_PATH], total=0, retain=True)
+    _check_format_version(data=content.data)
     manifest = Manifest.model_validate_json(json_data=content.data)
     total = content.size
     for entry in _inventory(manifest=manifest, limits=limits):
