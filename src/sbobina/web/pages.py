@@ -179,6 +179,7 @@ def lettore(request: Request, store: JobStoreDep, job_id: str) -> HTMLResponse:
         page_title="Lettore",
         not_found=False,
         job_id=job_id,
+        has_audio=not record.imported,
         title=_reader_title(record),
         created_at=record.created_at.strftime("%d/%m/%Y"),
         course=_reader_course(store=store, record=record),

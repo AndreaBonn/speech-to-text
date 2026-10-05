@@ -13,7 +13,7 @@ from sbobina.models import save_transcript
 from sbobina.settings import Settings
 from sbobina.web.api_files import transcript_revision
 from sbobina.web.app import create_app
-from sbobina.web.job_models import JobConfig
+from sbobina.web.job_models import JobConfig, JobStage, JobStatus
 from sbobina.web.job_store import JobStore
 
 BASE_URL = "http://127.0.0.1:8765"
@@ -237,3 +237,21 @@ def test_get_audio_when_recording_was_removed_returns_not_found(
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_get_audio_imported_lecture_returns_audio_not_included(
+    client: TestClient, job_dir: Path
+) -> None:
+    store: JobStore = cast(FastAPI, client.app).state.job_store
+    record = store.get(job_id=job_dir.name)
+    store.update(
+        record=record.model_copy(
+            update={"status": JobStatus.DONE, "stage": JobStage.DONE, "imported": True}
+        )
+    )
+    (job_dir / "audio.wav").unlink()
+
+    response = client.get(url=f"/api/v1/jobs/{job_dir.name}/audio")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "AUDIO_NOT_INCLUDED"

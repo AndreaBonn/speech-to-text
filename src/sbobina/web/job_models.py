@@ -144,3 +144,5 @@ class JobRecord(BaseModel):
     study: StudyRun | None = None
     # Name of the uploaded file as the user knows it; empty for older jobs.
     source_name: str = ""
+    imported: bool = False
+    import_id: str | None = None

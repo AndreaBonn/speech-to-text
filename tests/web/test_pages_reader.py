@@ -9,10 +9,34 @@ from page_fixtures import (
 
 from sbobina.settings import Settings
 from sbobina.web.app import create_app
-from sbobina.web.job_models import JobConfig, JobStatus, LectureMeta
+from sbobina.web.job_models import JobConfig, JobStage, JobStatus, LectureMeta
 from sbobina.web.job_store import JobStore
 
 __all__ = ["_models"]
+
+
+@pytest.mark.parametrize("imported,has_audio", [(False, "true"), (True, "false")])
+def test_reader_page_exposes_audio_availability(
+    tmp_path: Path, imported: bool, has_audio: str
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig())
+    store.update(
+        record=record.model_copy(
+            update={
+                "status": JobStatus.DONE,
+                "stage": JobStage.DONE,
+                "imported": imported,
+            }
+        )
+    )
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        response = client.get(url=f"/lettore/{record.id}")
+
+    assert response.status_code == 200
+    assert f'data-job-id="{record.id}"' in response.text
+    assert f'data-has-audio="{has_audio}"' in response.text
 
 
 def test_rail_disables_reader_link_without_a_done_job(tmp_path: Path) -> None:

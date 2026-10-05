@@ -9,7 +9,7 @@
   <a class="btn btn--secondary" href="/storico">Vai allo storico</a>
 </div>
 {% else %}
-<div class="reader" data-job-id="{{ job_id }}">
+<div class="reader" data-job-id="{{ job_id }}" data-has-audio="{{ has_audio | lower }}">
   <div class="reader__toolbar">
     <div class="reader__toolbar-title">
       <h2 class="reader__title">{{ title }}</h2>

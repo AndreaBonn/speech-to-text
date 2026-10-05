@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Literal
 
@@ -13,6 +14,7 @@ from sbobina.web.job_models import (
     JobStatus,
     WorkItem,
 )
+from sbobina.web.job_store import JobStore
 
 
 @pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1"])
@@ -104,6 +106,34 @@ def test_record_round_trips_json() -> None:
     )
     assert JobRecord.model_validate_json(record.model_dump_json()) == record
     assert record.pid is None
+
+
+def test_job_record_legacy_json_loads_without_import_fields(tmp_path: Path) -> None:
+    raw = {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "status": "done",
+        "stage": "done",
+        "config": {},
+        "created_at": "2026-10-05T00:00:00Z",
+        "updated_at": "2026-10-05T00:00:00Z",
+    }
+    directory = tmp_path / "jobs" / str(raw["id"])
+    directory.mkdir(parents=True)
+    (directory / "job.json").write_text(data=json.dumps(obj=raw), encoding="utf-8")
+
+    record = JobStore(data_dir=tmp_path).get(job_id=str(raw["id"]))
+
+    assert record.status == JobStatus.DONE
+    assert record.imported is False
+    assert record.import_id is None
+    imported = JobRecord.model_validate(
+        obj=raw | {"imported": True, "import_id": raw["id"]}
+    )
+    assert imported.imported is True
+    assert imported.import_id == raw["id"]
+    assert (
+        JobRecord.model_validate_json(json_data=imported.model_dump_json()) == imported
+    )
 
 
 @pytest.mark.parametrize(

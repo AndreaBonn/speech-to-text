@@ -31,6 +31,10 @@ JOB_FIELD_EXPORT = {
     "updated_at": True,
     "source_name": True,
     # Runtime state, device configuration and nested study errors stay local.
+    # So does the import marker: import_id names a course on this machine and
+    # the recipient's import sets both fields for its own course.
+    "imported": False,
+    "import_id": False,
     "status": False,
     "stage": False,
     "config": False,

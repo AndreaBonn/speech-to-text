@@ -26,6 +26,21 @@ def test_post_study_ready_job_returns_202(client: TestClient) -> None:
     assert current.study is not None and current.study.status == StudyStatus.QUEUED
 
 
+def test_post_study_imported_lecture_returns_202_queued(client: TestClient) -> None:
+    record, _ = create_job(client=client)
+    store = job_store(client=client)
+    store.update(record=record.model_copy(update={"imported": True}))
+
+    response = client.post(url=f"/api/v1/jobs/{record.id}/study")
+
+    assert response.status_code == 202
+    assert response.json() == {"data": {"status": "queued"}, "meta": {}}
+    current = store.get(job_id=str(record.id))
+    assert current.imported is True
+    assert current.status == JobStatus.DONE
+    assert current.study is not None and current.study.status == StudyStatus.QUEUED
+
+
 @pytest.mark.parametrize("status", [JobStatus.QUEUED, JobStatus.RUNNING])
 def test_post_study_pipeline_active_returns_409(
     client: TestClient, status: JobStatus

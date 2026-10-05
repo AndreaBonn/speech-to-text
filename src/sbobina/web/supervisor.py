@@ -24,6 +24,7 @@ from sbobina.web.transcription_gate import execute_pipeline_action
 from sbobina.web.work_items import (
     action_status,
     cancel_action,
+    ensure_retranscribable,
     finish_action,
     prepare_study,
     recover_queue,
@@ -98,6 +99,7 @@ class Supervisor:
     def submit(self, job_id: str) -> None:
         with self._condition:
             record = self._store.get(job_id=job_id)
+            ensure_retranscribable(record=record)
             item = WorkItem(job_id=str(record.id), action="pipeline")
             if record.status == JobStatus.QUEUED and item not in self._queue:
                 self._queue.append(item)

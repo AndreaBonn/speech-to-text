@@ -34,7 +34,6 @@ from sbobina.web.job_models import (
 )
 
 COURSE_ADAPTER = TypeAdapter(CourseRecord)
-IMPORT_MARKER_FILENAME = "import.json"
 PROVENANCE_FILENAME = "imported_from.json"
 
 
@@ -51,12 +50,14 @@ def _write(path: Path, data: bytes) -> None:
     path.write_bytes(data=data)
 
 
-def _job_record(job: PackageJob, label: str) -> JobRecord:
+def _job_record(job: PackageJob, course: CourseRecord) -> JobRecord:
     return JobRecord(
         id=UUID(hex=job.id),
         status=JobStatus.DONE,
         stage=JobStage.DONE,
-        config=JobConfig(subject=label),
+        config=JobConfig(subject=course.label),
+        imported=True,
+        import_id=course.id,
         source_name=job.source_name,
         created_at=job.created_at,
         updated_at=job.updated_at,
@@ -69,15 +70,12 @@ def _stage_lectures(request: StageRequest) -> None:
         request.loaded.lectures, request.remapped.content.jobs, strict=True
     ):
         directory = request.staging.jobs / job.id
-        record = _job_record(job=job, label=course.label)
+        record = _job_record(job=job, course=course)
         files = loaded.files | {
             "job.json": record.model_dump_json().encode(encoding="utf-8"),
             "meta.json": LectureMeta(course=course.label)
             .model_dump_json()
             .encode(encoding="utf-8"),
-            IMPORT_MARKER_FILENAME: json.dumps(obj={"import_id": course.id}).encode(
-                encoding="utf-8"
-            ),
         }
         for name, payload in files.items():
             _write(path=directory / name, data=payload)

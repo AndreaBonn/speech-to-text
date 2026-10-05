@@ -9,7 +9,7 @@ from starlette.responses import FileResponse
 from sbobina.models import Transcript, load_transcript
 from sbobina.render import RenderOptions
 from sbobina.settings import Settings
-from sbobina.web.errors import NotFoundError
+from sbobina.web.errors import AudioNotIncludedError, NotFoundError
 from sbobina.web.job_models import JobRecord
 from sbobina.web.job_store import JobStore
 from sbobina.web.reader import build_paragraphs, build_review_points
@@ -56,13 +56,15 @@ def existing_file(directory: Path, name: str) -> Path:
 @router.get("/{job_id}/audio")
 def get_audio(request: Request, job_id: str) -> FileResponse:
     """Serve the uploaded recording; Starlette answers Range requests with 206."""
-    _, directory = find_job(request=request, job_id=job_id)
+    record, directory = find_job(request=request, job_id=job_id)
     candidates = [
         path
         for path in directory.glob("audio.*")
         if path.suffix.lower() in AUDIO_MEDIA_TYPES
     ]
     if not candidates:
+        if record.imported:
+            raise AudioNotIncludedError()
         raise NotFoundError(entity="Audio", id=job_id)
     audio = candidates[0]
     return FileResponse(path=audio, media_type=AUDIO_MEDIA_TYPES[audio.suffix.lower()])

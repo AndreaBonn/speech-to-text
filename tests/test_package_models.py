@@ -81,8 +81,9 @@ def test_job_allowlist_classifies_every_field() -> None:
     assert JOB_FIELD_EXPORT.keys() == JobRecord.model_fields.keys()
 
 
-def test_project_job_keeps_identity_without_excluded_fields() -> None:
-    record = JobRecord(
+@pytest.fixture
+def record_with_local_state() -> JobRecord:
+    return JobRecord(
         id=uuid4(),
         status=JobStatus.DONE,
         stage=JobStage.DONE,
@@ -96,6 +97,16 @@ def test_project_job_keeps_identity_without_excluded_fields() -> None:
             status=StudyStatus.FAILED, updated_at=NOW, error={"path": "secret"}
         ),
     )
+
+
+@pytest.mark.parametrize("imported", [False, True])
+def test_project_job_keeps_identity_without_excluded_fields(
+    imported: bool, record_with_local_state: JobRecord
+) -> None:
+    import_id = str(uuid4()) if imported else None
+    record = record_with_local_state.model_copy(
+        update={"imported": imported, "import_id": import_id}
+    )
     projection = project_job(record=record)
     assert projection == {
         "id": str(record.id),
@@ -103,6 +114,10 @@ def test_project_job_keeps_identity_without_excluded_fields() -> None:
         "updated_at": "2026-10-05T00:00:00Z",
         "source_name": "Lecture.m4a",
     }
+    # import_id names a course on this machine; the recipient's import sets
+    # its own, so neither field travels in the package.
+    assert "import_id" not in projection
+    assert "imported" not in projection
     assert all(
         field not in projection
         for field, exported in JOB_FIELD_EXPORT.items()

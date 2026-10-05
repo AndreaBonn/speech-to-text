@@ -14,6 +14,7 @@ from sbobina.package_import import PackageStorageError, import_package
 from sbobina.web.card_store import load_cards
 from sbobina.web.document_store import document_dir, iter_documents, read_text
 from sbobina.web.generation_store import iter_generations
+from sbobina.web.job_models import JobRecord, JobStage, JobStatus
 from sbobina.web.job_store import JobStore
 
 
@@ -22,9 +23,13 @@ def assert_lecture(directory: Path, course_id: str) -> None:
     assert (
         load_transcript(path=directory / "audio.corretto.json") == transcript_fixture()
     )
-    assert json.loads((directory / "import.json").read_text()) == {
-        "import_id": course_id
-    }
+    record = JobRecord.model_validate_json(
+        json_data=(directory / "job.json").read_text(encoding="utf-8")
+    )
+    assert record.imported is True
+    assert record.import_id == course_id
+    assert record.status == JobStatus.DONE
+    assert record.stage == JobStage.DONE
     assert (directory / "audio.studio.json").is_file()
 
 

@@ -124,7 +124,7 @@ def import_package(
         Local storage root. New parent directories are removed on rollback.
     now : datetime
         Aware import time persisted in course ``imported_from.json`` alongside
-        package_id and ID maps. Job ``import.json`` holds import_id=course.id;
+        package_id and ID maps. Job ``job.json`` holds import_id=course.id;
         readers will consume this visibility marker in T092.
     limits : ValidationLimits
         Archive budgets. Reimports create a new course and return a dated warning.

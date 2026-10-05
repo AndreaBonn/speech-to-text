@@ -5,7 +5,12 @@ from datetime import UTC, datetime
 from pydantic import JsonValue
 
 from sbobina.study_command import select_study_paths
-from sbobina.web.errors import ConflictError, JobNotCancellableError, NotFoundError
+from sbobina.web.errors import (
+    AudioNotIncludedConflictError,
+    ConflictError,
+    JobNotCancellableError,
+    NotFoundError,
+)
 from sbobina.web.job_models import (
     JobRecord,
     JobStage,
@@ -42,6 +47,11 @@ def transition(
     if status == JobStatus.DONE:
         update["stage"] = JobStage.DONE
     return record.model_copy(update=update)
+
+
+def ensure_retranscribable(record: JobRecord) -> None:
+    if record.imported:
+        raise AudioNotIncludedConflictError()
 
 
 def prepare_study(store: JobStore, job_id: str) -> JobRecord:

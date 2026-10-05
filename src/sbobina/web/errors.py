@@ -19,6 +19,23 @@ class ConflictError(AppError):
     """The request clashes with the current state of the resource (HTTP 409)."""
 
 
+class AudioNotIncludedError(NotFoundError):
+    def __init__(self) -> None:
+        AppError.__init__(
+            self,
+            message="Lezione importata: l'audio non è incluso",
+            code="AUDIO_NOT_INCLUDED",
+        )
+
+
+class AudioNotIncludedConflictError(ConflictError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="Lezione importata senza audio: non si può ritrascrivere",
+            code="AUDIO_NOT_INCLUDED",
+        )
+
+
 class ServiceUnavailableError(AppError):
     """A dependency the request needs is unreachable (HTTP 503)."""
 
