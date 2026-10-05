@@ -1,6 +1,7 @@
 """Pure orchestration for filling in no-text pages with OCR (F5)."""
 
 import logging
+import re
 from collections.abc import Callable
 from dataclasses import replace
 
@@ -11,12 +12,20 @@ ReadPage = Callable[[int], str]
 OcrProgress = Callable[[int, int], None]
 
 logger = logging.getLogger(__name__)
+# ocr-v2 writes page headings as LaTeX (\section*{Serie}): measured on 5 of
+# 10 pages (T069). The viewer renders formulas only, so keep the heading text.
+# A heading with nested braces is left as is (not seen in the measured pages).
+_LATEX_HEADING = re.compile(r"\\(?:sub)*section\*?\{([^{}]*)\}")
+
+
+def _strip_latex_headings(text: str) -> str:
+    return _LATEX_HEADING.sub(r"\1", text)
 
 
 def _ocr_page(
     page: Page, index: int, read_page: ReadPage, prompt_version: str | None
 ) -> Page:
-    text = normalize_pages(texts=(read_page(index),))[0]
+    text = normalize_pages(texts=(_strip_latex_headings(text=read_page(index)),))[0]
     if not text.strip():
         logger.warning("OCR returned no text for page %d", index + 1)
         return page

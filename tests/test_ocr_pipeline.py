@@ -146,3 +146,29 @@ def test_ocr_pages_record_the_prompt_version_and_native_pages_do_not() -> None:
     )
 
     assert [page.ocr_prompt for page in result.pages] == ["ocr-v2", None]
+
+
+@pytest.mark.parametrize(
+    ("read", "stored"),
+    [
+        (
+            "\\section*{Limiti e derivate}\n\nIl limite \\(x \\to 0\\) vale 1.",
+            "Limiti e derivate\n\nIl limite \\(x \\to 0\\) vale 1.",
+        ),
+        ("\\section{Serie}\n\nTesto", "Serie\n\nTesto"),
+        ("\\subsection*{Esempio}\n\nTesto", "Esempio\n\nTesto"),
+    ],
+)
+def test_ocr_page_keeps_the_heading_text_without_latex_section_commands(
+    read: str, stored: str
+) -> None:
+    # Measured on ocr-v2 (T069): 5 of 10 pages open with \section*{...},
+    # which the document viewer showed as raw source.
+    result = ocr_missing_pages(
+        extracted=_extracted((Page(text="", no_text=True),)),
+        read_page=lambda index: read,
+        on_progress=lambda done, total: None,
+        prompt_version="ocr-v2",
+    )
+
+    assert result.pages[0].text == stored
