@@ -19,6 +19,7 @@ data/eval/math/citations.json.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from collections import Counter
 from dataclasses import asdict, dataclass, field
@@ -36,7 +37,7 @@ from sbobina.generation_models import (
     SummaryResponse,
     TextQuestionResponse,
 )
-from sbobina.generation_pipeline import generate
+from sbobina.generation_pipeline import GenerationResult, generate
 from sbobina.ollama_chat import ChatRequest, chat_json, strip_markdown_fence
 from sbobina.retrieval import DocumentSource, RetrievedPassage, cut_to_budget
 from sbobina.settings import Settings
@@ -51,6 +52,9 @@ DATA = Path("data/eval/math")
 DOC_ID = "eval-math"
 QUESTION_COUNT = 3
 DROP_THRESHOLD = 0.20
+DELIMITER = re.compile(r"\\\(|\\\[")
+# Two literal backslashes before a letter: the model escaped twice (T069).
+DOUBLE_BACKSLASH = re.compile(r"\\\\[A-Za-z]")
 FORMATS = (GenerationFormat.OPEN, GenerationFormat.SUMMARY)
 KEPT = "KEPT"
 RUNS_FILE = DATA / "citations-runs.jsonl"
@@ -66,6 +70,11 @@ class Run:
     items_discarded: dict[str, int]
     # (quote, outcome) for every citation the model proposed.
     citations: list[tuple[str, str]]
+    # Generated texts (questions, solutions, summary sentences): how many
+    # carry a delimited formula, how many a doubly escaped command.
+    texts: int = 0
+    texts_with_formula: int = 0
+    texts_double_backslash: int = 0
 
 
 @dataclass
@@ -162,7 +171,20 @@ def run_one(
         + sum(len(s.sentences) for s in result.sections),
         items_discarded={d.reason: d.count for d in result.discarded},
         citations=citations,
+        **count_texts(result=result),
     )
+
+
+def count_texts(result: GenerationResult) -> dict[str, int]:
+    texts = [q.question for q in result.questions] + [
+        q.solution for q in result.questions
+    ]
+    texts += [s.text for section in result.sections for s in section.sentences]
+    return {
+        "texts": len(texts),
+        "texts_with_formula": sum(bool(DELIMITER.search(t)) for t in texts),
+        "texts_double_backslash": sum(bool(DOUBLE_BACKSLASH.search(t)) for t in texts),
+    }
 
 
 def summarize(runs: list[Run]) -> Tally:
@@ -225,6 +247,12 @@ def main() -> int:
     print(f"con formula: {rate(tally.formula)} {dict(tally.formula)}")
     print(f"senza formula: {rate(tally.plain)} {dict(tally.plain)}")
     print(f"totale: {rate(total)}")
+    texts = sum(run.texts for run in runs)
+    print(
+        f"testi: {texts}, con formula fra delimitatori "
+        f"{sum(run.texts_with_formula for run in runs)}, con barre doppie "
+        f"{sum(run.texts_double_backslash for run in runs)}"
+    )
     dropped = sum(total.values()) - total[KEPT]
     over = bool(total) and dropped / sum(total.values()) > DROP_THRESHOLD
     print(f"T069a: {'sì' if over else 'no'} (soglia {DROP_THRESHOLD:.0%})")
