@@ -76,3 +76,51 @@ errori di contenuto. BASIS: measured.
 - Tempo su GPU: `qwen2.5vl:7b` con il proiettore visivo richiede 12,5 GiB e non entra nella RTX
   4060 da 8 GB; Ollama lo carica tutto sulla CPU (circa 7 GiB di RAM di sistema). Con lo swap
   pieno il caricamento fallisce: è servito liberare memoria prima della misura.
+
+# T068 - Misura V9: citazioni su pagine con formule (2026-10-06)
+
+Generazioni reali con `qwen3.5:9b` via Ollama 0.18 sul testo che `ocr-v2` ha letto dalle 10 pagine
+di V10, con il percorso dell'app: `chunk_document_pages`, la pagina dell'argomento prima delle
+altre (come la metterebbe il retrieval) tagliate al budget di parole del formato,
+`generation_pipeline.generate` con i prompt `compito-v3` e `riassunto-v2`. Per pagina un compito
+a domande aperte da 3 e un riassunto, argomento uguale al titolo della pagina: 20 generazioni.
+Ogni citazione proposta dal modello viene risolta di nuovo con `resolve_citation`, così il tasso
+conta le citazioni e non le domande o frasi che la pipeline tiene. Una citazione "con formula"
+contiene `\(` o `\[`.
+
+Script: `scripts/eval_citations_math.py`; risultati per generazione in
+`data/eval/math/citations-runs.jsonl` e `citations.json` (fuori dal repo).
+`BUDGET: 1 esecuzione per pagina e formato, prompt invariati durante la misura | soglia 20% dal
+piano (T068)`
+
+## Risultati
+
+| Citazioni | Proposte | Scartate | Motivi |
+|---|---|---|---|
+| Con formula | 57 | 0 (0%) | - |
+| Senza formula | 60 | 2 (3%) | 1 `QUOTE_NOT_FOUND`, 1 `QUOTE_LENGTH` |
+| Totale | 117 | 2 (2%) | |
+
+Tutte le 20 generazioni sono finite `DONE` al primo tentativo: 30 domande aperte e 84 frasi di
+riassunto tenute, una frase scartata in due riassunti. Le due citazioni scartate:
+
+- riassunto di statistica descrittiva: `det A = 2 \cdot 3 - 1 \cdot 1 = 5, ...`, copiata dalla
+  pagina delle matrici. Il testo OCR di quella pagina aveva perso "det" (errore di contenuto di
+  V10), quindi la citazione corretta rispetto all'originale non si trova nel testo letto. Lo
+  stesso riassunto cita la pagina delle matrici anche altrove: l'aderenza all'argomento non è
+  oggetto di V9 e non è stata misurata.
+- riassunto di elettromagnetismo: `\section*{Probabilità}`, un titolo di 1 parola sotto il minimo
+  di 3.
+
+**Decisione T069a: no.** Il 2% è sotto la soglia del 20% e nessuna citazione con formula è stata
+scartata; la normalizzazione dei segmenti matematici in `normalize_tokens` non serve. BASIS:
+measured.
+
+## Non misurato
+
+- Pagine reali e materiale più lungo: le pagine sono corte e pulite, con una formula ogni poche
+  righe. BASIS: unknown.
+- Variabilità fra esecuzioni: una esecuzione per pagina e formato.
+- Quante soluzioni e frasi riportano davvero una formula fra delimitatori: i testi generati non
+  sono stati contati, solo le citazioni.
+- Formati a crocette e orale: stesso prompt `compito-v3`, non eseguiti.

@@ -615,6 +615,14 @@ stessa finestra.
   `d8e49f2fea6eeed7cdae2cf4fd48e2f1d348758aa9e5740715e4533c2c96d1ee`, sha512 uguale al
   `dist.integrity` del registry npm. BASIS: measured.
 - **V9** Tasso di citazioni scartate su pagine con formule, soglia 20%.
+  **Esito (2026-10-06): superata, provvisoria.** 20 generazioni reali con `qwen3.5:9b` sul testo
+  `ocr-v2` delle 10 pagine di V10 (un compito a domande aperte da 3 e un riassunto per pagina, con
+  `compito-v3` e `riassunto-v2`): 2 citazioni scartate su 117 (2%). Le 57 citazioni che
+  contengono una formula sono tutte valide; le 2 scartate sono senza delimitatori (una ripete un
+  "det" che l'OCR aveva perso, una è il titolo `\section*{Probabilità}`, troppo corto). Nessuna
+  generazione fallita né ritentata. **T069a non si apre**: la normalizzazione dei segmenti
+  matematici non serve sotto soglia. Stessi limiti di V10 (pagine sintetiche, una esecuzione).
+  Dettaglio in `eval-math.md`. BASIS: measured su pagine sintetiche, unknown su pagine reali.
 - **V10** OCR `qwen2.5vl:7b` con prompt `ocr-v2.md` su 10 pagine con formule: formule parsabili da
   KaTeX e corrette a confronto con la pagina.
   **Esito (2026-10-05): misurata, provvisoria.** Su 10 pagine sintetiche di Claude (U5 delegata,
