@@ -45,6 +45,21 @@ la prova copre anche la variazione introdotta dalla correzione, ma solo su 2 cue
 Latenza di `find_exam_cues`, una chiamata per lezione senza riscaldamento: 2,7 / 3,3 / 2,7 ms
 (totale 8,8 ms per tre lezioni).
 
+Latenza della rotta `GET /api/v1/courses/diritto/exam-cues?level=all` (criterio di C1: < 500 ms a
+cache fredda per 3 lezioni da 25k parole), prima richiesta in un processo nuovo, con le pagine dei
+file di `data/jobs` e `data/courses` tolte dalla cache del sistema con `posix_fadvise(DONTNEED)`.
+Lo svuotamento è verificato con `mincore`: una trascrizione passa da 284/284 a 0/284 pagine.
+
+| Corso | Parole | Cue | Freddo, prima richiesta |
+|---|---|---|---|
+| Diritto reale (4 job; completati: 2) | 7.592 + 9.079 nei completati | 44 | 109-201 ms (6 esecuzioni) |
+| Sintetico, 3 lezioni | 3 × 25.000 | 2.919 | 266-292 ms (3 esecuzioni) |
+
+Il caso sintetico ha un cue in ogni frase, quindi è un limite superiore del lavoro sui cue. A caldo
+il corso reale dà 97-132 ms: il costo è CPU (lettura del JSON e rilevamento), non disco. La
+forbice sul corso reale viene da due sessioni diverse; la più lenta girava col disco quasi pieno.
+Esito: criterio rispettato. BASIS: measured.
+
 ## Errori osservati
 
 Segnali persi (2, entrambi `strong`):

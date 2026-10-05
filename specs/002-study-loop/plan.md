@@ -64,18 +64,19 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
       (frase, minuto cliccabile verso il Lettore), con interruttore "Mostra anche i segnali deboli".
       Stati: loading, empty ("In queste lezioni non trovo frasi in cui il docente parla
       dell'esame"), error, populated, edge (lezione con 40+ cue). Dalla frase, "Crea carta" (F2).
-- [ ] Misura V7 (T015): gold set etichettato a mano dall'utente sui cue candidati delle 3 lezioni
+- [ ] Misura V7 (T015): gold set etichettato a mano sui cue candidati delle 3 lezioni
       reali di Diritto, che sono 2 audio distinti (il duplicato serve da prova di stabilità: cue
       `strong` confrontati fra le due trascrizioni dello stesso audio). In `eval-exam-cues.md`:
       precisione `strong` e `weak`, conteggi per lezione. Soglia proposta: precisione `strong`
       ≥ 0,8 (BASIS: inferred, dichiarata prima dei numeri). Sotto soglia: budget di iterazioni sui
       pattern dichiarato prima (`BUDGET:`/`SPEDITO:`), mai soglia abbassata dopo; finché V7 non
       passa, la sezione resta sobria (nessuna evidenziazione nel Lettore). Recall solo rispetto a
-      una "rete larga" lessicale etichettata, dichiarato così.
-- [ ] Il gold set contiene testo delle lezioni: sta in `data/eval/exam-cues-gold.jsonl` (non
+      una "rete larga" lessicale etichettata, dichiarato così. Emendato il 2026-10-05: U5
+      delegata a Claude, etichette di Claude, esito V7 provvisorio (adr.md V7).
+- [ ] Il gold set contiene testo delle lezioni: sta in `data/eval/exam-cues-gold-<timestamp ns>.jsonl` (non
       versionato); in `specs/` vanno solo metriche e script.
 - [ ] Latenza: l'elenco di un corso da 3 lezioni da 25k parole si calcola in < 500 ms a cache
-      fredda (BASIS: inferred finché non misurato in T015).
+      fredda. Misurato il 2026-10-05: 266-292 ms (`eval-exam-cues.md`).
 
 ### C2 - Ripasso a intervalli (O2, fase F2)
 
@@ -340,7 +341,9 @@ Punti 5-7: rilievi degli specialisti integrati con una correzione, da confermare
 - **U3 - Orale: (A)** risposta scritta, valutata sui punti della traccia.
 - **U4 - Carte dai concetti: (A)** su richiesta, per lezione (non chiesta, default assunto).
 - **U5 - Materiale per le misure: (A)** l'utente etichetta il gold set O3 (~150 frasi), scrive i
-  30 verdetti attesi O1 e fornisce 10 pagine con formule.
+  30 verdetti attesi O1 e fornisce 10 pagine con formule. Emendato il 2026-10-05: U5 delegata a
+  Claude, che produce i tre dataset; le misure su di essi sono provvisorie fino al sì
+  dell'utente.
 
 ## Rischi e mitigazioni
 
