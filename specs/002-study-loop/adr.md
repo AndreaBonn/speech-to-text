@@ -617,6 +617,16 @@ stessa finestra.
 - **V9** Tasso di citazioni scartate su pagine con formule, soglia 20%.
 - **V10** OCR `qwen2.5vl:7b` con prompt `ocr-v2.md` su 10 pagine con formule: formule parsabili da
   KaTeX e corrette a confronto con la pagina.
+  **Esito (2026-10-05): misurata, provvisoria.** Su 10 pagine sintetiche di Claude (U5 delegata,
+  scelta dell'utente: pagine generate e sporcate come una scansione) con 39 formule, `ocr-v2`
+  trova 39/39 formule fra `\(…\)`/`\[…\]`, tutte leggibili da KaTeX, 31/39 con MathML identico
+  all'originale (36/39 escluse 5 differenze di spaziatura o di glifo), nessun `$` usato come
+  delimitatore; 3 errori di contenuto (un "det" perso, il grassetto dei vettori perso, pedici
+  maiuscoli letti minuscoli). Base `ocr-v1`: 30/39 trovate, 22/39 corrette, 3 `$` come
+  delimitatore. 118-123 s per pagina, tutto su CPU: il modello non entra nella GPU da 8 GB. Le
+  pagine sono più pulite di una scansione vera, quindi i numeri sono un limite superiore; né ADR
+  né piano fissano una soglia. Dettaglio in `eval-math.md`. BASIS: measured su pagine sintetiche,
+  unknown su pagine reali.
 - **V11** Test di import ostile: zip slip, symlink, membro con header falso sulla dimensione,
   rapporto di compressione estremo, manifest con hash sbagliato, `format_version` futuro. Ogni caso
   rifiutato senza file scritti fuori dallo staging.
