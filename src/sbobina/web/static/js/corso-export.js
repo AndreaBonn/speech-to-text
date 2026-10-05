@@ -14,12 +14,15 @@
   }
 
   var DOCS_PER_PAGE = 100;
+  var SKIPPED_HEADER = "X-Sbobina-Skipped-Lectures";
   var form = document.getElementById("export-form");
   var docsList = document.getElementById("export-docs");
   var docsStatus = document.getElementById("export-docs-status");
   var weightEl = document.getElementById("export-weight");
   var errorEl = document.getElementById("export-error");
+  var resultEl = document.getElementById("export-result");
   var submitButton = document.getElementById("export-submit");
+  var cancelButton = document.getElementById("export-cancel");
   var currentKey = null;
   var documents = [];
 
@@ -96,6 +99,8 @@
   function openDialog() {
     var key = currentKey;
     errorEl.textContent = "";
+    resultEl.hidden = true;
+    cancelButton.textContent = "Annulla";
     docsList.hidden = true;
     weightEl.hidden = true;
     docsStatus.hidden = false;
@@ -136,6 +141,20 @@
     );
   }
 
+  // Lectures cancelled or stopped before transcription have only their
+  // audio, which is never exported: say so instead of closing silently.
+  function showSkipped(count) {
+    resultEl.textContent =
+      count === 1
+        ? "Pacchetto scaricato. Una lezione non è inclusa: non ha una trascrizione (annullata o non conclusa)."
+        : "Pacchetto scaricato. " + count +
+          " lezioni non sono incluse: non hanno una trascrizione (annullate o non concluse).";
+    resultEl.hidden = false;
+    cancelButton.textContent = "Chiudi";
+    // Esporta was disabled while exporting and lost focus: keep it in the dialog.
+    cancelButton.focus();
+  }
+
   function exportPackage() {
     var excluded = documents
       .map(function (doc) { return doc.id; })
@@ -143,6 +162,7 @@
     submitButton.disabled = true;
     submitButton.textContent = "Preparo il pacchetto…";
     errorEl.textContent = "";
+    resultEl.hidden = true;
     fetch(courseApi(currentKey) + "/export?docs=" + encodeURIComponent(excluded.join(",")))
       .then(function (response) {
         if (!response.ok) {
@@ -150,7 +170,12 @@
         }
         return response.blob().then(function (blob) {
           saveBlob(blob, packageName(response));
-          dialog.close();
+          var skipped = Number(response.headers.get(SKIPPED_HEADER)) || 0;
+          if (skipped > 0) {
+            showSkipped(skipped);
+          } else {
+            dialog.close();
+          }
         });
       })
       .catch(function (error) {
@@ -164,7 +189,7 @@
 
   openButton.addEventListener("click", openDialog);
   docsList.addEventListener("change", updateWeight);
-  document.getElementById("export-cancel").addEventListener("click", function () {
+  cancelButton.addEventListener("click", function () {
     dialog.close();
   });
   form.addEventListener("submit", function (event) {

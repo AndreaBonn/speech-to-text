@@ -1,5 +1,4 @@
 import json
-import logging
 from hashlib import sha256
 from pathlib import Path, PurePosixPath
 
@@ -14,7 +13,12 @@ from package_fixtures import (
 )
 
 from sbobina.course_registry import get_or_create
-from sbobina.package_export import ExportRequest, iter_package_members, write_package
+from sbobina.package_export import (
+    ExportRequest,
+    iter_package_members,
+    skipped_lectures,
+    write_package,
+)
 from sbobina.package_models import ExportOptions, Manifest
 from sbobina.web.card_store import cards_path, reviews_path
 from sbobina.web.document_store import document_dir
@@ -205,7 +209,6 @@ def test_inventory_missing_required_transcript_raises(
 def test_inventory_skips_course_lecture_never_transcribed(
     course_data: PackageFixture, status: JobStatus, caplog: pytest.LogCaptureFixture
 ) -> None:
-    caplog.set_level(level=logging.INFO, logger="sbobina.package_export")
     store = course_data.store
     untranscribed = store.create(config=JobConfig(subject="Fisica"))
     store.update(record=untranscribed.model_copy(update={"status": status}))
@@ -216,6 +219,16 @@ def test_inventory_skips_course_lecture_never_transcribed(
     assert json.loads(contents["lectures/0/meta.json"])["id"] == course_data.job_id
     assert not any(path.startswith("lectures/1/") for path in contents)
     assert f"Export skips lecture {untranscribed.id} ({status})" in caplog.text
+    assert {record.levelname for record in caplog.records} == {"WARNING"}
+    assert skipped_lectures(request=make_request(data=course_data)) == (
+        str(untranscribed.id),
+    )
+
+
+def test_skipped_lectures_is_empty_when_every_lecture_has_text(
+    course_data: PackageFixture,
+) -> None:
+    assert skipped_lectures(request=make_request(data=course_data)) == ()
 
 
 def test_write_package_empty_course_writes_empty_manifest(tmp_path: Path) -> None:

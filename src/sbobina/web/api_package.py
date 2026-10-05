@@ -13,12 +13,14 @@ from starlette.responses import StreamingResponse
 
 from sbobina.course_registry import CourseRecord
 from sbobina.courses import course_key, effective_course
-from sbobina.package_export import ExportRequest, write_package
+from sbobina.package_export import ExportRequest, skipped_lectures, write_package
 from sbobina.package_models import ExportOptions
 from sbobina.web.course_dependencies import ListedCourse, ReviewServices, Services
 
 router = APIRouter(prefix="/api/v1/courses/{key:path}/export")
 CHUNK_BYTES = 1024 * 1024
+# Read by corso-export.js to tell the student which lectures stayed out.
+SKIPPED_LECTURES_HEADER = "X-Sbobina-Skipped-Lectures"
 
 
 def _package_file(request: ExportRequest) -> IO[bytes]:
@@ -97,14 +99,11 @@ def export_course(
             part.strip() for part in docs.split(",") if part.strip()
         )
     )
-    handle = _package_file(
-        request=ExportRequest(
-            course=course,
-            store=services.store,
-            options=options,
-            now=services.now,
-        )
+    request = ExportRequest(
+        course=course, store=services.store, options=options, now=services.now
     )
+    skipped = skipped_lectures(request=request)
+    handle = _package_file(request=request)
     name = (
         re.sub(pattern=r"[^\w.-]+", repl="-", string=course.label).strip(".-")
         or "course"
@@ -117,5 +116,6 @@ def export_course(
             "Content-Disposition": content_disposition(filename=filename),
             "Content-Length": str(os.fstat(handle.fileno()).st_size),
             "X-Content-Type-Options": "nosniff",
+            SKIPPED_LECTURES_HEADER: str(len(skipped)),
         },
     )

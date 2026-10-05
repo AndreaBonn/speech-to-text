@@ -148,6 +148,26 @@ def test_export_lecture_only_course_packs_its_lectures(
     assert sorted(path.name for path in store.courses_dir.iterdir()) == before
 
 
+def test_export_counts_lectures_left_out_in_a_header(
+    client: TestClient, course_data: PackageFixture
+) -> None:
+    store = course_data.store
+    store.create(config=JobConfig(subject="Fisica/Uno"))
+
+    response = client.get(url="/api/v1/courses/fisica/uno/export")
+
+    assert response.status_code == 200
+    assert response.headers["X-Sbobina-Skipped-Lectures"] == "1"
+
+
+def test_export_with_every_lecture_transcribed_reports_none_skipped(
+    client: TestClient,
+) -> None:
+    response = client.get(url="/api/v1/courses/fisica/uno/export")
+
+    assert response.headers["X-Sbobina-Skipped-Lectures"] == "0"
+
+
 OLDER_SPELLINGS = 5
 
 

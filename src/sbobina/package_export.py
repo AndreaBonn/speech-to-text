@@ -70,17 +70,31 @@ def _course_jobs(request: ExportRequest) -> Iterator[JobRecord]:
             yield record
 
 
-def _exportable_jobs(request: ExportRequest) -> Iterator[JobRecord]:
-    """Course lectures with text; one never transcribed has only its audio.
+def _has_text(request: ExportRequest, record: JobRecord) -> bool:
+    """A lecture never transcribed has only its audio, which is never exported.
 
-    A finished lecture without a transcript stays in, so the read fails loudly.
+    A finished lecture without a transcript counts as having text, so its
+    missing file fails the export loudly instead of being dropped.
     """
+    directory = request.store.jobs_dir / str(record.id)
+    return record.status is JobStatus.DONE or (directory / "audio.json").is_file()
+
+
+def skipped_lectures(request: ExportRequest) -> tuple[str, ...]:
+    """IDs of the course lectures left out of the package for lack of text."""
+    return tuple(
+        str(record.id)
+        for record in _course_jobs(request=request)
+        if not _has_text(request=request, record=record)
+    )
+
+
+def _exportable_jobs(request: ExportRequest) -> Iterator[JobRecord]:
     for record in _course_jobs(request=request):
-        directory = request.store.jobs_dir / str(record.id)
-        if record.status is JobStatus.DONE or (directory / "audio.json").is_file():
+        if _has_text(request=request, record=record):
             yield record
         else:
-            logger.info(
+            logger.warning(
                 "Export skips lecture %s (%s): no transcript", record.id, record.status
             )
 
