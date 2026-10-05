@@ -127,9 +127,8 @@ def _hostile_chapter() -> StudyChapter:
     )
 
 
-def _seed_study(source: SourceCourse) -> str:
-    """Study materials whose items pass the citation check on read."""
-    job_dir = source.store.jobs_dir / source.job_ids[0]
+def _save_transcript(job_dir: Path) -> str:
+    """Two short segments the study quotes come from; returns the file revision."""
     segments = (
         Segment(
             start=0.0, end=10.0, words=_words(text="inizio della lezione", start=0.0)
@@ -145,12 +144,17 @@ def _seed_study(source: SourceCourse) -> str:
     )
     save_transcript(transcript=transcript, path=job_dir / "audio.json")
     (job_dir / "audio.corretto.json").unlink()
-    revision = transcript_revision(
+    return transcript_revision(
         content=(job_dir / "audio.json").read_text(encoding="utf-8")
     )
+
+
+def _seed_study(source: SourceCourse) -> str:
+    """Study materials whose items pass the citation check on read."""
+    job_dir = source.store.jobs_dir / source.job_ids[0]
     study = StudyResult(
         source_variant="original",
-        source_revision=revision,
+        source_revision=_save_transcript(job_dir=job_dir),
         model="m",
         prompt_version="studio-v1",
         generated_at=NOW.isoformat(),

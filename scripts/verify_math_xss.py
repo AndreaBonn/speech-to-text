@@ -164,9 +164,34 @@ def visit(page: Page, url: str, selector: str, name: str) -> list[str]:
     return check(page=page, name=name, load=load)
 
 
+def practice_pages(page: Page, base: str, ids: tuple[str, str]) -> list[str]:
+    problems = []
+    for attempt_id in ids:
+        url = f"{base}/corsi/fisica/esercitazioni/{attempt_id}"
+        problems += visit(
+            page=page,
+            url=url,
+            selector=".practice-question__text",
+            name="esercitazione",
+        )
+    return problems + review_page(page=page, base=base)
+
+
+def material_pages(page: Page, base: str, job_id: str, doc_id: str) -> list[str]:
+    studio = visit(
+        page=page,
+        url=f"{base}/studio/{job_id}",
+        selector=".study__chapter",
+        name="studio",
+    )
+    url = f"{base}/corsi/fisica/documenti/{doc_id}"
+    return studio + visit(
+        page=page, url=url, selector=".document__paragraph", name="documento"
+    )
+
+
 def run(base: str, job_id: str, doc_id: str, ids: tuple[str, str]) -> list[str]:
     dialogs: list[str] = []
-    problems: list[str] = []
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(channel="chrome")
         page = browser.new_page()
@@ -176,26 +201,9 @@ def run(base: str, job_id: str, doc_id: str, ids: tuple[str, str]) -> list[str]:
             dialog.dismiss()
 
         page.on("dialog", record_dialog)
-        problems += course_pages(page=page, base=base)
-        for attempt_id in ids:
-            url = f"{base}/corsi/fisica/esercitazioni/{attempt_id}"
-            problems += visit(
-                page=page,
-                url=url,
-                selector=".practice-question__text",
-                name="esercitazione",
-            )
-        problems += review_page(page=page, base=base)
-        problems += visit(
-            page=page,
-            url=f"{base}/studio/{job_id}",
-            selector=".study__chapter",
-            name="studio",
-        )
-        url = f"{base}/corsi/fisica/documenti/{doc_id}"
-        problems += visit(
-            page=page, url=url, selector=".document__paragraph", name="documento"
-        )
+        problems = course_pages(page=page, base=base)
+        problems += practice_pages(page=page, base=base, ids=ids)
+        problems += material_pages(page=page, base=base, job_id=job_id, doc_id=doc_id)
         browser.close()
     return problems + [f"{len(dialogs)} dialog(s): {dialogs}"] * bool(dialogs)
 
