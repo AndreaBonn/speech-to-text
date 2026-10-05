@@ -149,9 +149,10 @@
   }
 
   // Questions are measured against what was asked ("8 su 10 richieste");
-  // a summary has no requested count, so against what the model wrote.
+  // a summary has no requested count (the form still sends 1), so against
+  // what the model wrote.
   function counterText(record, kept, discarded) {
-    if (record.requested_count) {
+    if (record.format !== "summary" && record.requested_count) {
       return kept + " su " + record.requested_count + " richieste";
     }
     return kept + " su " + (kept + discarded) + " tenute";
