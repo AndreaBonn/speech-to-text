@@ -1,3 +1,4 @@
+import json
 from typing import cast
 
 import httpx
@@ -5,7 +6,12 @@ import ollama
 import pytest
 
 from sbobina.correction import CorrectorUnavailableError, InvalidResponseError
-from sbobina.ollama_chat import ChatRequest, chat_json, close_open_brackets
+from sbobina.ollama_chat import (
+    ChatRequest,
+    chat_json,
+    close_open_brackets,
+    escape_latex_backslashes,
+)
 
 
 class FakeClient:
@@ -195,3 +201,51 @@ def test_chat_json_leaves_a_truncated_reply_unrepaired() -> None:
     )
 
     assert content == '{"a": [{"x": 1}'
+
+
+@pytest.mark.parametrize(
+    ("written", "meant"),
+    [
+        ("\\(x^2\\)", "\\(x^2\\)"),
+        ("\\[\\eta = 1 - \\frac{T_C}{T_H}\\]", "\\[\\eta = 1 - \\frac{T_C}{T_H}\\]"),
+        ("\\lim_{h \\to 0}", "\\lim_{h \\to 0}"),
+        ("\\nabla f, \\beta, \\rho, \\theta", "\\nabla f, \\beta, \\rho, \\theta"),
+        ("\\underline{x}", "\\underline{x}"),
+    ],
+)
+def test_escape_latex_backslashes_keeps_single_backslash_latex(
+    written: str, meant: str
+) -> None:
+    # qwen3.5:9b writes LaTeX with one backslash inside JSON strings: "\(" is
+    # an invalid escape, "\frac" and "\to" are valid ones that would turn into
+    # control characters.
+    content = '{"testo": "' + written + '"}'
+
+    repaired = escape_latex_backslashes(content=content)
+
+    assert json.loads(repaired) == {"testo": meant}
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        '{"testo": "\\\\(v = \\\\frac{a}{b}\\\\)"}',
+        '{"testo": "va\\"le \\u00e8 a\\/b"}',
+        '{"testo": "riga\\n e\\t fine\\n"}',
+        '{"testo": "nessuna barra"}',
+        # An escaped quote before a comma is valid JSON, not a lone backslash
+        # closing the field: the backslash is left as an escape.
+        '{"testo": "disse \\"ciao\\", poi", "altro": "x"}',
+    ],
+)
+def test_escape_latex_backslashes_leaves_valid_json_alone(content: str) -> None:
+    assert escape_latex_backslashes(content=content) == content
+
+
+def test_chat_json_returns_a_reply_with_latex_as_valid_json() -> None:
+    raw = '{"frasi": [{"testo": "vale \\(\\frac{a}{b}\\)"}]}'
+    client = FakeClient(content=raw)
+
+    content = chat_json(client=cast(ollama.Client, client), request=request())
+
+    assert json.loads(content) == {"frasi": [{"testo": "vale \\(\\frac{a}{b}\\)"}]}

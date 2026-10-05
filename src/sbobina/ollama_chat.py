@@ -25,6 +25,37 @@ class ChatRequest:
 
 
 _CLOSERS = {"{": "}", "[": "]"}
+# What may follow a backslash that starts a real JSON escape. b/f/n/r/t
+# followed by a letter are LaTeX commands instead (\frac, \to, \nabla, \beta).
+_JSON_ESCAPE = re.compile(r'["\\/]|u[0-9a-fA-F]{4}|[bfnrt](?![A-Za-z])')
+
+
+def escape_latex_backslashes(content: str) -> str:
+    r"""Double the backslashes of LaTeX commands written inside JSON strings.
+
+    Measured on qwen3.5:9b with formula passages (T067): replies carry "\(",
+    "\eta", "\frac" with a single backslash. "\(" breaks parsing, while
+    "\frac" and "\to" parse silently as form feed and tab. A newline escape
+    written right before a letter ("\nOra") is read as LaTeX too: the fields
+    are sentences, where a newline has no use.
+    """
+    parts: list[str] = []
+    in_string = False
+    index = 0
+    while index < len(content):
+        char = content[index]
+        if in_string and char == "\\":
+            if _JSON_ESCAPE.match(content, pos=index + 1):
+                parts.append(content[index : index + 2])
+                index += 2
+            else:
+                parts.append("\\\\")
+                index += 1
+            continue
+        in_string = in_string != (char == '"')
+        parts.append(char)
+        index += 1
+    return "".join(parts)
 
 
 def _open_brackets(content: str) -> list[str] | None:
@@ -98,7 +129,9 @@ def chat_json(client: Client, request: ChatRequest) -> str:
     except ValueError as err:
         raise InvalidResponseError(f"{type(err).__name__}: {err}") from err
     _log_usage(response=response)
-    content = strip_markdown_fence(content=response.message.content or "")
+    content = escape_latex_backslashes(
+        content=strip_markdown_fence(content=response.message.content or "")
+    )
     if response.done_reason == "length":
         return content
     closed = close_open_brackets(content=content)
