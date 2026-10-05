@@ -8,7 +8,7 @@ from zipfile import ZipFile
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from package_fixtures import NOW, ORIGINAL, PackageFixture, seed_package
+from package_fixtures import NOW, ORIGINAL, TRANSCRIPT, PackageFixture, seed_package
 
 from sbobina.package_export import ExportRequest, write_package
 from sbobina.package_models import Manifest
@@ -16,6 +16,7 @@ from sbobina.settings import Settings
 from sbobina.web import api_package
 from sbobina.web.app import create_app
 from sbobina.web.course_dependencies import review_clock
+from sbobina.web.job_models import JobConfig
 
 BASE_URL = "http://127.0.0.1:8765"
 
@@ -122,3 +123,26 @@ def test_export_and_nested_document_route_resolve_same_course(
     assert (
         downloaded.headers["content-disposition"] == 'attachment; filename="Notes.txt"'
     )
+
+
+def test_export_lecture_only_course_packs_its_lectures(
+    client: TestClient, course_data: PackageFixture
+) -> None:
+    # F49: a course whose lectures were only transcribed has no registry
+    # record; exporting it must not 404, and must not create one either.
+    store = course_data.store
+    lecture = store.create(config=JobConfig(subject="Storia"), source_name="Lezione")
+    (store.jobs_dir / str(lecture.id) / "audio.json").write_text(
+        data=TRANSCRIPT.decode(), encoding="utf-8"
+    )
+    before = sorted(path.name for path in store.courses_dir.iterdir())
+
+    response = client.get(url="/api/v1/courses/storia/export")
+
+    assert response.status_code == 200
+    with ZipFile(file=io.BytesIO(response.content)) as archive:
+        manifest = Manifest.model_validate_json(archive.read("manifest.json"))
+        names = archive.namelist()
+    assert manifest.course.label == "Storia"
+    assert sum(name.endswith("/transcript.json") for name in names) == 1
+    assert sorted(path.name for path in store.courses_dir.iterdir()) == before

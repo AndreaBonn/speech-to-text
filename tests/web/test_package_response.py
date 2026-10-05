@@ -48,7 +48,9 @@ def test_export_response_streams_package_with_no_named_file(
         store=data.store, settings=Settings(), now=NOW, scheduler=Scheduler()
     )
 
-    response = api_package.export_course(course=data.course, services=services, docs="")
+    response = api_package.export_course(
+        key=data.course.key, listed=data.course, services=services, docs=""
+    )
 
     assert list(temporary_dir.iterdir()) == []
     assert response.media_type == "application/zip"
@@ -75,7 +77,9 @@ def test_export_stream_closed_early_closes_the_file(
     services = ReviewServices(
         store=data.store, settings=Settings(), now=NOW, scheduler=Scheduler()
     )
-    response = api_package.export_course(course=data.course, services=services, docs="")
+    response = api_package.export_course(
+        key=data.course.key, listed=data.course, services=services, docs=""
+    )
     # export_course hands Starlette its own async generator.
     iterator = cast(AsyncGenerator[bytes, None], response.body_iterator)
 
@@ -101,7 +105,9 @@ def test_export_write_failure_closes_temporary_and_propagates(
     )
 
     with pytest.raises(FileNotFoundError):
-        api_package.export_course(course=data.course, services=services, docs="")
+        api_package.export_course(
+            key=data.course.key, listed=data.course, services=services, docs=""
+        )
 
     assert [handle.closed for handle in created] == [True]
 

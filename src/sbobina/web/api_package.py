@@ -5,14 +5,17 @@ from contextlib import ExitStack
 from tempfile import TemporaryFile
 from typing import IO
 from urllib.parse import quote
+from uuid import uuid4
 
 import anyio
 from fastapi import APIRouter
 from starlette.responses import StreamingResponse
 
+from sbobina.course_registry import CourseRecord
+from sbobina.courses import course_key, effective_course
 from sbobina.package_export import ExportRequest, write_package
 from sbobina.package_models import ExportOptions
-from sbobina.web.course_dependencies import Course, Services
+from sbobina.web.course_dependencies import ListedCourse, ReviewServices, Services
 
 router = APIRouter(prefix="/api/v1/courses/{key:path}/export")
 CHUNK_BYTES = 1024 * 1024
@@ -50,11 +53,41 @@ def content_disposition(filename: str) -> str:
     return f"attachment; filename=\"{fallback}\"; filename*=utf-8''{quote(filename)}"
 
 
+def _lecture_label(key: str, services: ReviewServices) -> str:
+    """The course name as its lectures spell it, for the package manifest."""
+    store = services.store
+    for record in store.iter_records():
+        label = effective_course(
+            course=store.read_meta(job_id=str(record.id)).course,
+            subject=record.config.subject,
+        )
+        if label and course_key(label=label) == key:
+            return label
+    return key
+
+
+def _lecture_only_course(key: str, services: ReviewServices) -> CourseRecord:
+    """A stand-in record for a course that has lectures but no registry entry.
+
+    F49: it has no documents, generations or cards, so the package only needs
+    its key (which lectures) and label; nothing is written to the registry.
+    """
+    normalized = course_key(label=key)
+    return CourseRecord(
+        id=str(uuid4()),
+        key=normalized,
+        label=_lecture_label(key=normalized, services=services),
+        created_at=services.now,
+        updated_at=services.now,
+    )
+
+
 @router.get("")
 def export_course(
-    course: Course, services: Services, docs: str = ""
+    key: str, listed: ListedCourse, services: Services, docs: str = ""
 ) -> StreamingResponse:
     """Download a course package streamed from an anonymous temporary file."""
+    course = listed or _lecture_only_course(key=key, services=services)
     # docs is a comma-separated set of excluded document IDs; empty includes all.
     options = ExportOptions(
         excluded_document_ids=frozenset(
