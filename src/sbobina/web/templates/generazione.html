@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if not_found %}
+<div class="empty-state" role="alert">
+  <p class="empty-state__text">
+    Generazione non trovata: è stata eliminata, oppure appartiene a un altro corso.
+  </p>
+  <a class="btn btn--secondary" href="/corsi?corso={{ course_key | urlencode }}">Torna al corso</a>
+</div>
+{% else %}
+<div
+  id="generazione-root"
+  class="practice"
+  data-course-key="{{ course_key }}"
+  data-generation-id="{{ generation_id }}"
+>
+  <div class="practice__head">
+    <p class="practice__course">
+      <a class="table__link" href="/corsi?corso={{ course_key | urlencode }}">{{ course_label }}</a>
+    </p>
+    {% if topic %}<p class="practice__progress">Argomento: {{ topic }}</p>{% endif %}
+  </div>
+  <div id="generazione-detail" class="generations__detail" aria-live="polite"></div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if not not_found %}
+{% include "_math-assets.html" %}
+<script src="/static/js/dom.js" defer></script>
+<script src="/static/js/corso-generazioni-dettaglio.js" defer></script>
+<script src="/static/js/generazione.js" defer></script>
+{% endif %}
+{% endblock %}

@@ -50,6 +50,7 @@ from sbobina.web.middleware import (
 from sbobina.web.package_import_worker import remove_import_staging
 from sbobina.web.pages import router as pages_router
 from sbobina.web.pages_esercitazione import router as practice_pages_router
+from sbobina.web.pages_generazione import router as generation_pages_router
 from sbobina.web.responses import (
     app_error_handler,
     http_error_handler,
@@ -224,8 +225,8 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(corrected_router)
     app.include_router(wer_router)
     app.include_router(events_router)
-    app.include_router(pages_router)
-    app.include_router(practice_pages_router)
+    for page_router in (pages_router, practice_pages_router, generation_pages_router):
+        app.include_router(page_router)
     _mount_static(app=app)
 
 
