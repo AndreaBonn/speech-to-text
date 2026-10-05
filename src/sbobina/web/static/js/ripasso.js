@@ -1,6 +1,7 @@
 // sbobina · Ripasso: per-course summary (GET /api/v1/review/summary) and one
 // FSRS session at a time (GET .../review/today, POST .../cards/<id>/review).
-// Front/back/source text is the user's own notes: textContent only (dom.js).
+// Front/back go through math-text.js (formulas between \( \) or \[ \], text
+// nodes otherwise); source text is textContent only (dom.js).
 (function () {
   "use strict";
   var dom = window.SbobinaDom;
