@@ -379,7 +379,8 @@ hash di contenuto solo per la deduplicazione.
   disponibili.
 - Contro: ~560 KB di asset statici (js + css + woff2), serviti in locale. Il parser di KaTeX
   diventa superficie di attacco per testo LLM e OCR: si limita con `maxExpand: 1000` esplicito,
-  `maxSize: 10`, `throwOnError: false`, `strict: "ignore"`, lunghezza massima per formula (2.000
+  `maxSize: 10`, `throwOnError: true` con ripiego sul sorgente (vedi "Resa ed errori" sotto),
+  `strict: "ignore"`, lunghezza massima per formula (2.000
   caratteri, sopra si mostra il sorgente) e la versione pinnata con controllo degli advisory a ogni
   aggiornamento (in passato KaTeX ha avuto advisory su `maxExpand` e su `\url` con `trust` attivo:
   UNVERIFIED nei dettagli, da training data).
@@ -411,6 +412,37 @@ hash di contenuto solo per la deduplicazione.
   risposte della chat, carte. **Mai** nelle trascrizioni Whisper, che non contengono LaTeX.
 - Il testo persistito resta LaTeX: il rendering è solo presentazione.
 
+### Correzioni emerse in F4 (2026-10-06)
+
+Premesse che il piano non prevedeva, scoperte con generazioni reali e corrette nel codice:
+
+- **Barre nel JSON** (5e2bd04). `qwen3.5:9b` scrive il LaTeX dentro le stringhe JSON con una
+  barra sola: `\(` rende la risposta illeggibile (2 risposte su 3 su passaggi con formule),
+  `\frac`, `\to`, `\nabla` diventerebbero caratteri di controllo senza errore. `chat_json`
+  raddoppia ogni barra che non apre un vero escape JSON; `b/f/n/r/t` seguiti da una lettera
+  contano come comandi LaTeX.
+- **Niente istruzioni sull'escape nei prompt** (0687ae7). L'indicazione "nel JSON la barra si
+  scrive doppia" negli esempi faceva raddoppiare il modello due volte (`\\lim`) e togliere i
+  delimitatori: tolta, compito, riassunto e chat danno barre singole e formule fra delimitatori.
+- **Un passaggio per riga** (c8a59e3). Una pagina fino a 400 parole è un passaggio unico con i
+  suoi a capo; mandato così rompeva il formato `[P<n>] (fonte) testo` e 2 compiti su 10
+  fallivano due volte. `render_passages` unisce gli spazi; le citazioni si confrontano per token.
+- **Titoli dell'OCR** (c09973e). `ocr-v2` apre 5 pagine su 10 con `\section*{...}`: il passo OCR
+  salva il testo del titolo.
+
+### Resa ed errori
+
+- Citazioni (b9c219a): le formule si rendono nelle citazioni da documento; quelle da lezione sono
+  trascrizioni e restano letterali, come le citazioni dei materiali di studio.
+- Errori (e582e0b): con `throwOnError: false` KaTeX disegna uno span d'errore con stile inline, che
+  la CSP blocca con un errore in console a ogni formula invalida. Con `throwOnError: true` l'errore
+  arriva a `math-text.js`, che mostra il sorgente come testo.
+- Larghezza (c051593): una formula su riga propria scorre in orizzontale nel suo blocco e riceve
+  un `tabindex` per lo scorrimento da tastiera; il sorgente mostrato come testo va a capo ovunque
+  (`static/css/math.css`).
+- Colore (c051593): i comandi bloccati da `trust: false` restano nel colore del testo
+  (`errorColor: "inherit"`): il rosso di KaTeX non reggeva il contrasto in tema scuro.
+
 ### Conseguenze D5 su citazioni e FTS5
 
 - Citazioni: `normalize_tokens` trasforma `\(\frac{a}{b}\)` in `frac a b`; il match resta esatto
@@ -423,8 +455,8 @@ hash di contenuto solo per la deduplicazione.
   simbolo trovano rumore, ricerche testuali funzionano. Nessun cambio di schema; limite dichiarato
   nella guida.
 - OCR: `qwen2.5vl:7b` che restituisce LaTeX va valutato su pagine reali con formule (V10): un
-  modello vision da 7B può inventare comandi; il fallback è il testo grezzo, che `throwOnError:
-  false` mostra comunque.
+  modello vision da 7B può inventare comandi; il fallback è il testo grezzo, che `math-text.js`
+  mostra come sorgente.
 
 ---
 
@@ -617,12 +649,14 @@ stessa finestra.
 - **V9** Tasso di citazioni scartate su pagine con formule, soglia 20%.
   **Esito (2026-10-06): superata, provvisoria.** 20 generazioni reali con `qwen3.5:9b` sul testo
   `ocr-v2` delle 10 pagine di V10 (un compito a domande aperte da 3 e un riassunto per pagina, con
-  `compito-v3` e `riassunto-v2`): 2 citazioni scartate su 117 (2%). Le 57 citazioni che
-  contengono una formula sono tutte valide; le 2 scartate sono senza delimitatori (una ripete un
-  "det" che l'OCR aveva perso, una è il titolo `\section*{Probabilità}`, troppo corto). Nessuna
-  generazione fallita né ritentata. **T069a non si apre**: la normalizzazione dei segmenti
-  matematici non serve sotto soglia. Stessi limiti di V10 (pagine sintetiche, una esecuzione).
-  Dettaglio in `eval-math.md`. BASIS: measured su pagine sintetiche, unknown su pagine reali.
+  `compito-v3` e `riassunto-v2`), con il codice spedito dopo le correzioni di F4: 20/20 `DONE` al
+  primo tentativo, 1 citazione scartata su 89 (1%), nessuna delle 75 con formula; 47 testi su 118
+  portano una formula fra delimitatori, nessuno con barre doppie. La scartata ripete "Ax = b" dove
+  l'OCR aveva letto "A x = b". **T069a non si apre**. Due esecuzioni precedenti (con
+  l'indicazione sull'escape nei prompt, poi con i passaggi su più righe) hanno fatto emergere le
+  correzioni registrate in D5. Stessi limiti di V10 (pagine sintetiche, una esecuzione per
+  versione). Dettaglio in `eval-math.md`. BASIS: measured su pagine sintetiche, unknown su pagine
+  reali.
 - **V10** OCR `qwen2.5vl:7b` con prompt `ocr-v2.md` su 10 pagine con formule: formule parsabili da
   KaTeX e corrette a confronto con la pagina.
   **Esito (2026-10-05): misurata, provvisoria.** Su 10 pagine sintetiche di Claude (U5 delegata,

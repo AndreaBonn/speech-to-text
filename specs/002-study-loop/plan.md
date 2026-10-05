@@ -179,7 +179,8 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
 
 ### C4 - Formule (O9, fase F4)
 
-- [ ] Misura V10 (T060), prima del codice: 10 pagine reali con formule (U5) all'OCR con
+- [ ] Misura V10 (T060), prima del codice: 10 pagine con formule (U5; il 2026-10-05 l'utente ha
+      scelto pagine sintetiche generate da Claude, vedi V10 in `adr.md`) all'OCR con
       `ocr-v2.md` che chiede le formule fra `\(...\)` e `\[...\]`; in `eval-math.md`: formule
       parsabili da KaTeX e corrette a confronto con la pagina, tempo per pagina.
 - [ ] V8: notice di licenza dei font KaTeX verificata nel repo upstream prima di vendorizzare.
@@ -189,7 +190,8 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
       `127.0.0.1`).
 - [ ] `math-text.js` (ADR D5): parser proprio dei soli delimitatori `\(...\)` e `\[...\]`, **mai
       `$`**; testo via `textContent`, ogni formula in uno `<span>` con `katex.render(expr, span,
-      {trust: false, throwOnError: false, strict: "ignore", maxExpand: 1000, maxSize: 10})`;
+      {trust: false, throwOnError: true, strict: "ignore", maxExpand: 1000, maxSize: 10})`
+      (`true` dal 2026-10-06: lo span d'errore di KaTeX usa uno stile inline bloccato dalla CSP);
       formula oltre 2000 caratteri o con errore → sorgente come testo, nessun errore in console.
       Esempi: `"\(\frac{a}{b}\)"` → frazione resa; `"costa 5$ e $6"` → testo intatto;
       `"$x^2$"` → testo intatto (i `$` non sono delimitatori).
@@ -214,6 +216,9 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
       di tutte le pagine esistenti più le nuove con zero violazioni CSP in console.
 - [ ] Prompt nuovi `ocr-v2`, `compito-v3`, `riassunto-v2`, `chat-v3`, `studio-v2` che chiedono le
       formule fra `\(` / `\[` (via prompt-master); le versioni vecchie restano per i record salvati.
+- [ ] Risposte JSON degli LLM con formule: `chat_json` ripara le barre singole, i prompt non danno
+      istruzioni sull'escape, `render_passages` manda ogni passaggio su una riga (ADR D5,
+      "Correzioni emerse in F4").
 - [ ] Misura V9 (T068): tasso di citazioni scartate su generazioni da pagine con formule. Soglia
       ADR 20%: sotto, nessuna normalizzazione speciale; sopra, normalizzazione dei segmenti
       matematici (spazi tolti dentro i delimitatori) in `normalize_tokens` con test, perché tocca

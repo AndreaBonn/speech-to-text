@@ -95,32 +95,37 @@ piano (T068)`
 
 ## Risultati
 
-| Citazioni | Proposte | Scartate | Motivi |
-|---|---|---|---|
-| Con formula | 57 | 0 (0%) | - |
-| Senza formula | 60 | 2 (3%) | 1 `QUOTE_NOT_FOUND`, 1 `QUOTE_LENGTH` |
-| Totale | 117 | 2 (2%) | |
+Tre esecuzioni, una per ogni correzione emersa durante il gate F4 (ADR D5, "Correzioni emerse in
+F4"). Vale l'ultima, fatta con il codice spedito; le prime due restano come storia, con i
+risultati in `data/eval/math/citations-hint.json` e `citations-multiline.json`.
 
-Tutte le 20 generazioni sono finite `DONE` al primo tentativo: 30 domande aperte e 84 frasi di
-riassunto tenute, una frase scartata in due riassunti. Le due citazioni scartate:
+| Esecuzione | Generazioni `DONE` | Citazioni scartate | Con formula scartate | Testi con formula fra delimitatori | Testi con barre doppie |
+|---|---|---|---|---|---|
+| 1. prompt con "la barra si scrive doppia" | 20/20 | 2/117 (2%) | 0/57 | non contati | non contati |
+| 2. indicazione tolta, passaggi su più righe | 18/20 | 0/90 | 0/66 | 35/113 | 0 |
+| 3. passaggi su una riga (codice spedito) | **20/20** | **1/89 (1%)** | **0/75** | **47/118** | **0** |
 
-- riassunto di statistica descrittiva: `det A = 2 \cdot 3 - 1 \cdot 1 = 5, ...`, copiata dalla
-  pagina delle matrici. Il testo OCR di quella pagina aveva perso "det" (errore di contenuto di
-  V10), quindi la citazione corretta rispetto all'originale non si trova nel testo letto. Lo
-  stesso riassunto cita la pagina delle matrici anche altrove: l'aderenza all'argomento non è
-  oggetto di V9 e non è stata misurata.
-- riassunto di elettromagnetismo: `\section*{Probabilità}`, un titolo di 1 parola sotto il minimo
-  di 3.
+Nella prima esecuzione le citazioni passavano, ma un riassunto reale nell'app è uscito con
+`\\lim` (due barre letterali) e senza delimitatori, quindi con la formula come sorgente: il
+conteggio delle sole citazioni non lo vedeva. Nella seconda, due compiti (serie, matrici) sono
+falliti due volte: una citazione fatta di soli a capo fino al limite di token, e una parentesi in
+più nel JSON. Con i passaggi su una riga entrambi riescono al primo tentativo.
 
-**Decisione T069a: no.** Il 2% è sotto la soglia del 20% e nessuna citazione con formula è stata
-scartata; la normalizzazione dei segmenti matematici in `normalize_tokens` non serve. BASIS:
-measured.
+Nell'esecuzione 3 tutte le 20 generazioni sono finite `DONE` al primo tentativo: 30 domande
+aperte e 58 frasi di riassunto tenute. L'unica citazione scartata (`QUOTE_NOT_FOUND`) è
+"quindi il sistema Ax = b ha una sola soluzione": l'OCR aveva letto `A x = b` (spazio e grassetto
+persi, errore di V10), e per il controllo `Ax` è una parola sola. È il caso di riformattazione
+previsto da D5, sotto soglia.
+
+**Decisione T069a: no.** L'1% è sotto la soglia del 20% e nessuna delle 75 citazioni con formula è
+stata scartata; la normalizzazione dei segmenti matematici in `normalize_tokens` non serve.
+BASIS: measured.
 
 ## Non misurato
 
 - Pagine reali e materiale più lungo: le pagine sono corte e pulite, con una formula ogni poche
   righe. BASIS: unknown.
-- Variabilità fra esecuzioni: una esecuzione per pagina e formato.
-- Quante soluzioni e frasi riportano davvero una formula fra delimitatori: i testi generati non
-  sono stati contati, solo le citazioni.
+- Variabilità fra esecuzioni: una esecuzione per pagina e formato per ogni versione del codice.
 - Formati a crocette e orale: stesso prompt `compito-v3`, non eseguiti.
+- Aderenza all'argomento: un riassunto dell'esecuzione 1 citava la pagina di un altro argomento;
+  non è oggetto di V9 e non è stata misurata.
