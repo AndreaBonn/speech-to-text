@@ -1,0 +1,10 @@
+/* Formulas rendered by math-text.js (F76): never wider than their column. */
+.math--display {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.math--source {
+  overflow-wrap: anywhere;
+}

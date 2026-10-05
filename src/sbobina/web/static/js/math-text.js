@@ -16,6 +16,9 @@
     // Errors reach the catch below: KaTeX's own error span uses an inline
     // style, which the CSP blocks (F75).
     throwOnError: true,
+    // Commands blocked by trust: false keep the text colour: KaTeX's red fails
+    // contrast in dark mode (F80).
+    errorColor: "inherit",
     strict: "ignore",
     maxExpand: 1000,
     maxSize: 10,
@@ -77,17 +80,31 @@
     });
   }
 
+  // Source shown as text (no KaTeX, too long, invalid): a span so math.css can
+  // wrap it, since a long formula source has no spaces to break at (F76).
+  function sourceNode(source) {
+    var span = document.createElement("span");
+    span.className = "math math--source";
+    span.textContent = source;
+    return span;
+  }
+
   function formulaNode(part) {
     var katex = window.katex;
     if (!katex || part.value.length > MAX_FORMULA_CHARS || part.value.trim() === "") {
-      return document.createTextNode(part.source);
+      return sourceNode(part.source);
     }
     var span = document.createElement("span");
     span.className = part.display ? "math math--display" : "math";
+    if (part.display) {
+      // math.css lets a wide display formula scroll: keyboard users need a stop
+      // to scroll it (axe scrollable-region-focusable, F78).
+      span.tabIndex = 0;
+    }
     try {
       katex.render(part.value, span, Object.assign({ displayMode: part.display }, KATEX_OPTIONS));
     } catch (error) {
-      return document.createTextNode(part.source);
+      return sourceNode(part.source);
     }
     return span;
   }
