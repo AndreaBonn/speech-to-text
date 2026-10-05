@@ -100,9 +100,14 @@ def estimate_tokens(text: str) -> int:
 
 
 def render_passages(passages: Sequence[RetrievedPassage]) -> str:
-    """Passages as numbered data, ``[P<n>] (fonte) testo``, one per line."""
+    """Passages as numbered data, ``[P<n>] (fonte) testo``, one per line.
+
+    A passage's own line breaks are collapsed: citations match on tokens, so
+    the quote is unaffected, while a multi-line passage made qwen degenerate.
+    """
     return "\n".join(
-        f"[P{index}] ({format_passage_source(source=passage.source)}) {passage.text}"
+        f"[P{index}] ({format_passage_source(source=passage.source)}) "
+        + " ".join(passage.text.split())
         for index, passage in enumerate(passages, start=1)
     )
 
