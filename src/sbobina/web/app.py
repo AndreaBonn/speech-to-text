@@ -42,7 +42,11 @@ from sbobina.web.extraction_worker import ExtractionWorker, ExtractionWorkerOpti
 from sbobina.web.gpu_lock import GpuArbiter
 from sbobina.web.gpu_release import unload_ollama_models
 from sbobina.web.job_store import JobStore
-from sbobina.web.middleware import OriginMiddleware, web_origin
+from sbobina.web.middleware import (
+    ContentSecurityPolicyMiddleware,
+    OriginMiddleware,
+    web_origin,
+)
 from sbobina.web.package_import_worker import remove_import_staging
 from sbobina.web.pages import router as pages_router
 from sbobina.web.pages_esercitazione import router as practice_pages_router
@@ -165,6 +169,7 @@ def _initialize_services(
 
 
 def _add_middleware(app: FastAPI, settings: Settings) -> None:
+    app.add_middleware(middleware_class=ContentSecurityPolicyMiddleware)
     app.add_middleware(
         middleware_class=OriginMiddleware, origin=web_origin(settings=settings)
     )
