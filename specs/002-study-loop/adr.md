@@ -589,6 +589,12 @@ stessa finestra.
 - **V6** 30 risposte etichettate a mano dall'utente (corretta, parziale, errata): accordo del
   giudice ≥ 80% per mostrare l'esito come voto e non come suggerimento.
 - **V7** Precisione della regex O3 su 3 lezioni reali, frasi marcate a mano dall'utente.
+  **Esito (2026-10-05): superata sulla soglia, provvisoria.** Precisione `strong` 1,00 (5/5)
+  contro 0,80, `weak` 0,63 (15/24), recall stimato sulla rete larga 0,91 (20/22), stabilità
+  sul duplicato Jaccard 100% (2 cue), 2,7-3,3 ms per lezione. Etichette di Claude, non
+  dell'utente (U5 delegata il 2026-10-05): con 5 rilevazioni l'intervallo di Wilson al 95%
+  parte da 0,57, e la misura diventa definitiva con un sì dell'utente sui 7 `strong`.
+  Dettaglio ed errori in `eval-exam-cues.md`. BASIS: measured, recall inferred.
 - **V8** Notice di licenza dei font KaTeX nel repo upstream.
   **Esito: superata** (2026-10-05). `KaTeX/katex-fonts/LICENSE` è MIT, Copyright (c) 2018 Khan
   Academy; la `LICENSE` del tarball `katex@0.19.0` è MIT, Copyright (c) 2013-2020 Khan Academy e
