@@ -118,3 +118,10 @@ Il segnale recuperato è "ricordatevelo sempre" (8319d0b3, 42:03). Resta perso "
 non tocca, quindi erano già fuori dall'export con v1 (dedotto, non rieseguito con v1).
 
 `SPEDITO: iter 2/2 - pattern v2.` BASIS: measured sulle metriche, inferred sulle due frasi non etichettate.
+
+## Prestazioni: tentativi tenuti e scartati (2026-10-05)
+
+| Idea | Baseline → Risultato | Verdetto | Perché |
+|---|---|---|---|
+| Caricare titoli delle lezioni e frasi da esame in parallelo (F36) | non misurato in pagina: titoli 3 ms (35 ms la prima), frasi 46 ms (88 ms la prima), sul corso reale | scartata | Il guadagno massimo (3-35 ms) sta nella variazione della richiesta delle frasi |
+| Un solo parse per trascrizione nella GET di un tentativo (F12, `file_cache.read_parsed`) | 810 ms → 37-51 ms a freddo, 10 risposte e 30 citazioni sul corso reale | tenuta | Ogni citazione rileggeva e riparsava la trascrizione tre volte (cProfile) |
