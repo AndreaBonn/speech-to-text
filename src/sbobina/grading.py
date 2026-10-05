@@ -11,7 +11,7 @@ from sbobina.grading_models import Judgement, ProposedJudgement, validate_judgem
 from sbobina.ollama_chat import ChatRequest, strip_markdown_fence
 from sbobina.solution_points import extract_solution_points
 
-PROMPT_FILE = "valutazione-v1.md"
+PROMPT_FILE = "valutazione-v2.md"
 MAX_ATTEMPTS = 2
 GRADING_FAILED = "GRADING_FAILED"
 FORMAT_LABELS = {GenerationFormat.OPEN: "aperta", GenerationFormat.ORAL: "orale"}

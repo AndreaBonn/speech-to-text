@@ -8,7 +8,7 @@ from ollama import ChatResponse, Message
 
 from sbobina.correction import CorrectorUnavailableError, InvalidResponseError
 from sbobina.generation_models import GenerationFormat, GenerationQuestion
-from sbobina.grading import GradingRequest, grade
+from sbobina.grading import PROMPT_FILE, GradingRequest, grade
 from sbobina.ollama_chat import ChatRequest, chat_json
 
 POINT = "Il capitale resta costante"
@@ -61,7 +61,7 @@ def test_grade_valid_fake_ollama_returns_judgement(
     assert sent["model"] == "test-model"
     assert sent["messages"][0]["content"] == resources.files(
         "sbobina.prompts"
-    ).joinpath("valutazione-v1.md").read_text(encoding="utf-8")
+    ).joinpath(PROMPT_FILE).read_text(encoding="utf-8")
     message = sent["messages"][1]["content"]
     assert f"Formato: {label}" in message
     assert f"[1] {POINT}" in message
