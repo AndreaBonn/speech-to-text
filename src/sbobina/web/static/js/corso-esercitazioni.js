@@ -79,15 +79,18 @@
         }
       })
       .catch(function () {
-        if (key !== currentKey) {
-          return;
+        if (key === currentKey) {
+          showListError(options);
         }
-        dom.clearChildren(options.parts.list);
-        options.parts.list.hidden = true;
-        dom.showRetryStatus(options.parts.status, options.errorText, function () {
-          loadList(options);
-        });
       });
+  }
+
+  function showListError(options) {
+    dom.clearChildren(options.parts.list);
+    options.parts.list.hidden = true;
+    dom.showRetryStatus(options.parts.status, options.errorText, function () {
+      loadList(options);
+    });
   }
 
   // ---------- attempts ----------
@@ -171,15 +174,18 @@
         button.textContent = "Nel Ripasso";
       })
       .catch(function () {
-        if (key !== currentKey) {
-          return;
+        if (key === currentKey) {
+          showCardError(button, item);
         }
-        button.disabled = false;
-        var error = item.querySelector(".field__error") || el("p", "field__error");
-        error.setAttribute("role", "alert");
-        error.textContent = "Impossibile creare la carta: riprova.";
-        item.appendChild(error);
       });
+  }
+
+  function showCardError(button, item) {
+    button.disabled = false;
+    var error = item.querySelector(".field__error") || el("p", "field__error");
+    error.setAttribute("role", "alert");
+    error.textContent = "Impossibile creare la carta: riprova.";
+    item.appendChild(error);
   }
 
   function mistakeActions(mistake, item) {
