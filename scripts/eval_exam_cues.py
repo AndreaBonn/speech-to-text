@@ -8,6 +8,9 @@ once per job, without warm-up. The total is the sum of detector call times,
 excluding loading and aggregation, not an end-to-end course API benchmark.
 --duplicate-pair compares fresh strong cue sets, normalizing case and whitespace;
 overlap is Jaccard (intersection / union), null when both sets are empty.
+--redetect (needs --job-dirs) scores the current detector instead of the
+predictions stored at export, so a pattern change shows up; fresh cues with no
+gold row are listed apart, unlabeled.
 """
 
 import argparse
@@ -24,6 +27,7 @@ from sbobina.exam_cues_eval import (
     LEVELS,
     aggregate,
     compare_strong,
+    redetect,
 )
 from sbobina.models import load_transcript
 
@@ -103,7 +107,9 @@ def build_report(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return report
 
 
-def runtime_report(directories: list[Path], pair: list[str] | None) -> dict[str, Any]:
+def runtime_report(
+    directories: list[Path], pair: list[str] | None
+) -> tuple[dict[str, Any], dict[str, tuple[ExamCue, ...]]]:
     if pair and (
         pair[0] == pair[1] or not set(pair) <= {path.name for path in directories}
     ):
@@ -124,7 +130,7 @@ def runtime_report(directories: list[Path], pair: list[str] | None) -> dict[str,
             job_b=pair[1],
             **compare_strong(cues_a=cues[pair[0]], cues_b=cues[pair[1]]),
         )
-    return {"latency": latency, "stability": stability}
+    return {"latency": latency, "stability": stability}, cues
 
 
 def format_metric(metric: dict[str, Any], numerator: str) -> str:
@@ -185,8 +191,19 @@ def format_stability(stability: dict[str, Any] | None) -> list[str]:
     return lines
 
 
+def format_unlabeled(report: dict[str, Any]) -> list[str]:
+    if "unlabeled_detections" not in report:
+        return []
+    found = report["unlabeled_detections"]
+    return [
+        f"Rilevamenti senza etichetta ({len(found)}): "
+        + json.dumps([item["quote"] for item in found], ensure_ascii=False)
+    ]
+
+
 def format_report(report: dict[str, Any]) -> str:
     lines = format_metrics(report=report)
+    lines.extend(format_unlabeled(report=report))
     lines.append("La rete larga non è esaustiva: il recall è soltanto una stima.")
     for job, metrics in report["by_job"].items():
         lines.append(f"Lezione {job}:")
@@ -203,7 +220,22 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--job-dirs", type=Path, nargs="+", default=[])
     parser.add_argument("--duplicate-pair", nargs=2, metavar=("JOB_A", "JOB_B"))
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--redetect", action="store_true")
     return parser.parse_args(args=argv)
+
+
+def evaluate(args: argparse.Namespace, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    if args.redetect and not args.job_dirs:
+        raise ValueError("--redetect requires --job-dirs")
+    runtime, cues = runtime_report(directories=args.job_dirs, pair=args.duplicate_pair)
+    unlabeled = None
+    if args.redetect:
+        rows, unlabeled = redetect(rows=rows, cues=cues)
+    report = build_report(rows=rows)
+    report.update(runtime)
+    if unlabeled is not None:
+        report["unlabeled_detections"] = unlabeled
+    return report
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -218,10 +250,7 @@ def main(argv: list[str] | None = None) -> None:
                     location = f"{path}:{number}"
                     rows.append(parse_row(text=text, location=location))
         location = "job directories"
-        report = build_report(rows=rows)
-        report.update(
-            runtime_report(directories=args.job_dirs, pair=args.duplicate_pair)
-        )
+        report = evaluate(args=args, rows=rows)
         for warning in report["warnings"]:
             logger.warning("%s", warning)
         output = (

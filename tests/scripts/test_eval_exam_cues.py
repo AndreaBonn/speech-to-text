@@ -242,3 +242,47 @@ def test_compare_strong_empty_sets_reports_undefined_overlap() -> None:
     assert report["common_count"] == 0
     assert report["only_a_count"] == 0
     assert report["only_b_count"] == 0
+
+
+def test_main_redetect_scores_the_current_detector(tmp_path: Path) -> None:
+    # The stored prediction says "none detected"; the transcript has a cue.
+    gold = tmp_path / "gold.jsonl"
+    row = {
+        "job_id": "lecture",
+        "segment_index": 0,
+        "start": 0.0,
+        "quote": "Segnatevelo",
+        "predicted": None,
+        "source": "wide_net",
+        "label": "strong",
+    }
+    gold.write_text(json.dumps(row), encoding="utf-8")
+    write_job(directory=tmp_path / "lecture", text="Segnatevelo")
+
+    stored = json.loads(run_eval(arguments=[str(gold), "--json"], cwd=tmp_path).stdout)
+    fresh = json.loads(
+        run_eval(
+            arguments=[
+                str(gold),
+                "--json",
+                "--redetect",
+                "--job-dirs",
+                str(tmp_path / "lecture"),
+            ],
+            cwd=tmp_path,
+        ).stdout
+    )
+
+    assert stored["precision"]["strong"]["total"] == 0
+    assert fresh["precision"]["strong"] == {"correct": 1, "total": 1, "value": 1.0}
+    assert fresh["unlabeled_detections"] == []
+
+
+def test_main_redetect_without_job_dirs_is_an_error(tmp_path: Path) -> None:
+    gold = tmp_path / "gold.jsonl"
+    write_gold(path=gold, labels=["strong"])
+
+    result = run_eval(arguments=[str(gold), "--redetect"], cwd=tmp_path)
+
+    assert result.returncode == 1
+    assert "--redetect" in result.stderr
