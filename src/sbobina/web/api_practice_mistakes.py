@@ -6,7 +6,12 @@ from fastapi.responses import JSONResponse
 
 from sbobina.card_models import CardDraft, GenerationAnchor
 from sbobina.web.card_store import create_card_result
-from sbobina.web.course_dependencies import Course, Services, card_payload
+from sbobina.web.course_dependencies import (
+    Course,
+    ListedCourse,
+    Services,
+    card_payload,
+)
 from sbobina.web.errors import NotFoundError, ValidationError
 from sbobina.web.generation_citations_api import CitationContext
 from sbobina.web.pagination import Page, page_bounds, page_meta
@@ -46,7 +51,14 @@ def mistake_payload(item: PracticeMistake, context: CitationContext) -> dict[str
 
 
 @router.get("")
-def get_mistakes(course: Course, services: Services, query: Page) -> dict[str, Any]:
+def get_mistakes(
+    course: ListedCourse, services: Services, query: Page
+) -> dict[str, Any]:
+    if course is None:
+        return {
+            "data": [],
+            "meta": {**page_meta(total=0, query=query), "unavailable_attempts": []},
+        }
     scan = list_attempts(courses_dir=services.store.courses_dir, course_id=course.id)
     mistakes = latest_mistakes(attempts=scan.attempts, course_id=course.id)
     return {

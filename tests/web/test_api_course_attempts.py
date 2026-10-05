@@ -2,6 +2,7 @@ from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from generation_api_fixtures import _register_course, _store, client
 from test_api_practice import make_url
@@ -10,6 +11,7 @@ from test_practice_store import make_generation
 from sbobina.generation_models import GenerationFormat
 from sbobina.grading_models import CoveredPoint, Judgement, JudgementOutcome
 from sbobina.practice_models import AnswerStatus, OpenAnswer
+from sbobina.web.job_models import JobConfig
 from sbobina.web.practice_store import create_attempt, practice_dir, save_attempt
 
 __all__ = ["client"]
@@ -158,3 +160,30 @@ def test_course_attempts_judge_suggestion_is_pending_self_grade_scores(
 
     assert (summary["answered"], summary["pending"]) == (2, 1)
     assert summary["score"] == 0.5
+
+
+EMPTY_PAGE = {
+    "data": [],
+    "meta": {
+        "page": 1,
+        "per_page": 20,
+        "total": 0,
+        "total_pages": 0,
+        "unavailable_attempts": [],
+    },
+}
+
+
+@pytest.mark.parametrize("resource", ["attempts", "mistakes"])
+def test_course_lists_lecture_only_course_is_empty_not_missing(
+    client: TestClient, tmp_path: Path, resource: str
+) -> None:
+    # A course whose lectures were only transcribed has no registry record yet:
+    # the course page must show "no attempts", not "could not load".
+    _store(tmp_path=tmp_path).create(config=JobConfig(subject="Fisica"))
+
+    response = client.get(url=f"/api/v1/courses/fisica/{resource}")
+
+    assert response.status_code == 200
+    assert response.json() == EMPTY_PAGE
+    assert client.get(url=f"/api/v1/courses/chimica/{resource}").status_code == 404

@@ -12,7 +12,7 @@ from fastapi import APIRouter
 from fastapi.encoders import jsonable_encoder
 
 from sbobina.practice_models import Answer, MultipleChoiceAnswer, PracticeAttempt
-from sbobina.web.course_dependencies import Course, Services
+from sbobina.web.course_dependencies import ListedCourse, Services
 from sbobina.web.pagination import Page, page_bounds, page_meta
 from sbobina.web.practice_payloads import OUTCOME_SCORES, answer_outcome
 from sbobina.web.practice_store import list_attempts
@@ -60,8 +60,13 @@ def attempt_summary(attempt: PracticeAttempt, key: str) -> dict[str, Any]:
 
 @router.get("")
 def get_course_attempts(
-    course: Course, services: Services, query: Page
+    course: ListedCourse, services: Services, query: Page
 ) -> dict[str, Any]:
+    if course is None:
+        return {
+            "data": [],
+            "meta": {**page_meta(total=0, query=query), "unavailable_attempts": []},
+        }
     scan = list_attempts(courses_dir=services.store.courses_dir, course_id=course.id)
     attempts = [attempt for attempt in scan.attempts if attempt.course_id == course.id]
     return {
