@@ -49,6 +49,13 @@
     quote.className = "examcues__quote";
     quote.textContent = cue.quote;
     li.appendChild(quote);
+    // The quote alone ("e all'esame") may not say what will be asked.
+    if (cue.followup) {
+      var followup = document.createElement("p");
+      followup.className = "examcues__followup";
+      followup.textContent = "Segue: «" + cue.followup + "»";
+      li.appendChild(followup);
+    }
     li.appendChild(cardButton(cue));
     return li;
   }

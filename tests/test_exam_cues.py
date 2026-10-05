@@ -75,6 +75,7 @@ def test_find_exam_cues_three_segments_preserve_segment_start() -> None:
             quote="Ricordatevi il termine",
             start=12.5,
             level="strong",
+            followup="Questo è importante",
         ),
         ExamCue(
             job_id="lecture",
@@ -205,3 +206,69 @@ def test_exam_cue_is_frozen() -> None:
     )
     with pytest.raises(FrozenInstanceError):
         cue.__setattr__("quote", "changed")
+
+
+def test_find_exam_cues_short_quote_carries_the_following_words() -> None:
+    # F33: "e all'esame" alone tells the student nothing; what the teacher
+    # asks comes in the next segments.
+    transcript = make_transcript(
+        segments=[
+            make_segment(words=[make_word(text="e all'esame", start=10.0)]),
+            make_segment(words=[make_word(text="la classica domanda è", start=11.0)]),
+            make_segment(
+                words=[
+                    make_word(
+                        text="che differenza c'è tra l'azione negatoria e la confessoria "
+                        + "parola " * 40,
+                        start=12.0,
+                    )
+                ]
+            ),
+        ]
+    )
+
+    (cue,) = find_exam_cues(transcript=transcript, job_id="lecture")
+
+    assert cue.quote == "e all'esame"
+    assert cue.followup.startswith(
+        "la classica domanda è che differenza c'è tra l'azione negatoria"
+    )
+    assert len(cue.followup.split()) == 30
+
+
+def test_find_exam_cues_long_quote_or_last_segment_has_no_followup() -> None:
+    long_quote = "all'esame vi chiederò la differenza fra possesso e detenzione"
+    transcript = make_transcript(
+        segments=[
+            make_segment(words=[make_word(text=long_quote, start=0.0)]),
+            make_segment(words=[make_word(text="segue altro testo", start=5.0)]),
+            make_segment(words=[make_word(text="ricordatevelo", start=9.0)]),
+        ]
+    )
+
+    cues = find_exam_cues(transcript=transcript, job_id="lecture")
+
+    assert [(cue.quote, cue.followup) for cue in cues] == [
+        (long_quote, ""),
+        ("ricordatevelo", ""),
+    ]
+
+
+def test_find_exam_cues_followup_keeps_the_punctuation_of_the_segment() -> None:
+    transcript = make_transcript(
+        segments=[
+            make_segment(
+                words=[
+                    make_word(
+                        text="Attenzione. Il termine è annuale! Vale per tutti?",
+                        start=3.0,
+                    )
+                ]
+            )
+        ]
+    )
+
+    cue = find_exam_cues(transcript=transcript, job_id="lecture")[0]
+
+    assert cue.quote == "Attenzione"
+    assert cue.followup == "Il termine è annuale! Vale per tutti?"

@@ -236,6 +236,14 @@
   overflow-wrap: anywhere;
 }
 
+/* What the teacher says right after a short cue (F33): context, not quote. */
+.examcues__followup {
+  flex-basis: 100%;
+  margin: var(--space-2xs) 0 0;
+  color: var(--color-ink-2);
+  overflow-wrap: anywhere;
+}
+
 .examcues__card-btn {
   flex-basis: 100%;
   margin-top: var(--space-2xs);

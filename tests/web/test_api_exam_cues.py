@@ -71,6 +71,7 @@ def test_list_exam_cues_envelope_and_reader_link(
                 "quote": "Segnatevelo",
                 "start": 12.5,
                 "level": "strong",
+                "followup": "",
                 "href": f"/lettore/{job_id}?t=12.5&variant=original",
                 "revision": revision,
             }
