@@ -14,7 +14,7 @@ from sbobina import llm_corrector
 from sbobina.document_models import CourseDocument
 from sbobina.extracted_text import ExtractedText
 from sbobina.ocr_pipeline import ReadPage, ocr_missing_pages
-from sbobina.ollama_vision import read_page_image
+from sbobina.ollama_vision import PROMPT_VERSION, read_page_image
 from sbobina.pdf_text import render_pdf_page
 from sbobina.settings import settings
 from sbobina.web.child_limits import _apply_memory_limit
@@ -73,7 +73,10 @@ def run_ocr(document_dir: Path, read_page: ReadPage) -> None:
         )
 
     result = ocr_missing_pages(
-        extracted=extracted, read_page=read_page, on_progress=on_progress
+        extracted=extracted,
+        read_page=read_page,
+        on_progress=on_progress,
+        prompt_version=PROMPT_VERSION,
     )
     _persist(document_dir=document_dir, result=result)
 

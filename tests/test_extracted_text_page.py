@@ -25,3 +25,14 @@ def test_page_read_by_ocr_without_text_is_rejected() -> None:
 def test_page_read_by_ocr_marked_no_text_is_rejected() -> None:
     with pytest.raises(ValueError, match="OCR"):
         Page(text="Testo letto", no_text=True, ocr=True)
+
+
+def test_page_read_by_ocr_records_its_prompt_version() -> None:
+    page = Page(text="Testo letto", no_text=False, ocr=True, ocr_prompt="ocr-v2")
+
+    assert page.ocr_prompt == "ocr-v2"
+
+
+def test_page_not_read_by_ocr_with_a_prompt_version_is_rejected() -> None:
+    with pytest.raises(ValueError, match="OCR"):
+        Page(text="Testo nativo", no_text=False, ocr_prompt="ocr-v2")

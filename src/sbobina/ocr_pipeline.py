@@ -13,16 +13,21 @@ OcrProgress = Callable[[int, int], None]
 logger = logging.getLogger(__name__)
 
 
-def _ocr_page(page: Page, index: int, read_page: ReadPage) -> Page:
+def _ocr_page(
+    page: Page, index: int, read_page: ReadPage, prompt_version: str | None
+) -> Page:
     text = normalize_pages(texts=(read_page(index),))[0]
     if not text.strip():
         logger.warning("OCR returned no text for page %d", index + 1)
         return page
-    return replace(page, text=text, no_text=False, ocr=True)
+    return replace(page, text=text, no_text=False, ocr=True, ocr_prompt=prompt_version)
 
 
 def ocr_missing_pages(
-    extracted: ExtractedText, read_page: ReadPage, on_progress: OcrProgress
+    extracted: ExtractedText,
+    read_page: ReadPage,
+    on_progress: OcrProgress,
+    prompt_version: str,
 ) -> ExtractedText:
     """Replace every ``no_text`` page with the OCR transcript, if any text came back.
 
@@ -33,7 +38,12 @@ def ocr_missing_pages(
     missing = [index for index, page in enumerate(extracted.pages) if page.no_text]
     pages = list(extracted.pages)
     for done, index in enumerate(missing, start=1):
-        pages[index] = _ocr_page(page=pages[index], index=index, read_page=read_page)
+        pages[index] = _ocr_page(
+            page=pages[index],
+            index=index,
+            read_page=read_page,
+            prompt_version=prompt_version,
+        )
         on_progress(done, len(missing))
     status = (
         DocumentStatus.READY

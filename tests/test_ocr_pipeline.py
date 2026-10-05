@@ -22,7 +22,10 @@ def test_native_text_pages_are_never_sent_to_read_page() -> None:
         return "should not be called"
 
     result = ocr_missing_pages(
-        extracted=extracted, read_page=read_page, on_progress=lambda done, total: None
+        extracted=extracted,
+        read_page=read_page,
+        on_progress=lambda done, total: None,
+        prompt_version="ocr-v2",
     )
 
     assert calls == []
@@ -37,6 +40,7 @@ def test_ocr_page_with_text_is_marked_ready_and_flagged() -> None:
         extracted=extracted,
         read_page=lambda index: "Testo letto con OCR",
         on_progress=lambda done, total: None,
+        prompt_version="ocr-v2",
     )
 
     assert result.status == DocumentStatus.READY
@@ -52,6 +56,7 @@ def test_ocr_page_with_empty_result_stays_no_text() -> None:
         extracted=extracted,
         read_page=lambda index: "   ",
         on_progress=lambda d, t: None,
+        prompt_version="ocr-v2",
     )
 
     assert result.pages[0].no_text is True
@@ -70,6 +75,7 @@ def test_ocr_page_with_empty_result_logs_a_warning(
             extracted=extracted,
             read_page=lambda index: texts[index],
             on_progress=lambda d, t: None,
+            prompt_version="ocr-v2",
         )
 
     warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
@@ -90,6 +96,7 @@ def test_progress_reports_only_pages_actually_read() -> None:
         extracted=extracted,
         read_page=lambda index: "Pagina letta",
         on_progress=lambda done, total: progress_calls.append((done, total)),
+        prompt_version="ocr-v2",
     )
 
     assert progress_calls == [(1, 2), (2, 2)]
@@ -103,7 +110,10 @@ def test_read_page_exception_propagates_without_partial_result() -> None:
 
     with pytest.raises(RuntimeError):
         ocr_missing_pages(
-            extracted=extracted, read_page=read_page, on_progress=lambda d, t: None
+            extracted=extracted,
+            read_page=read_page,
+            on_progress=lambda d, t: None,
+            prompt_version="ocr-v2",
         )
 
 
@@ -112,9 +122,27 @@ def test_at_least_one_ocr_page_yields_ready_status() -> None:
     reads: Callable[[int], str] = lambda index: "x" if index == 0 else ""
 
     result = ocr_missing_pages(
-        extracted=extracted, read_page=reads, on_progress=lambda d, t: None
+        extracted=extracted,
+        read_page=reads,
+        on_progress=lambda d, t: None,
+        prompt_version="ocr-v2",
     )
 
     assert result.status == DocumentStatus.READY
     assert result.pages[0].ocr is True
     assert result.pages[1].no_text is True
+
+
+def test_ocr_pages_record_the_prompt_version_and_native_pages_do_not() -> None:
+    extracted = _extracted(
+        (Page(text="", no_text=True), Page(text="Already here", no_text=False))
+    )
+
+    result = ocr_missing_pages(
+        extracted=extracted,
+        read_page=lambda index: "letto",
+        on_progress=lambda done, total: None,
+        prompt_version="ocr-v2",
+    )
+
+    assert [page.ocr_prompt for page in result.pages] == ["ocr-v2", None]

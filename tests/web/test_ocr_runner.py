@@ -42,6 +42,18 @@ def test_run_ocr_fills_the_scanned_pages_and_marks_the_document_ready(
     assert (run.status, run.done, run.total) == (OcrStatus.DONE, 2, 2)
 
 
+def test_run_ocr_records_the_current_ocr_prompt_on_read_pages(
+    tmp_path: Path,
+) -> None:
+    course_id, doc_dir = add_scanned_document(courses_dir=tmp_path)
+    create_ocr(courses_dir=tmp_path, course_id=course_id, doc_id=DOC_ID)
+
+    run_ocr(document_dir=doc_dir, read_page=lambda index: "testo letto")
+
+    pages = read_text(doc_dir=doc_dir).pages
+    assert {page.ocr_prompt for page in pages if page.ocr} == {"ocr-v2"}
+
+
 def test_run_ocr_with_ollama_down_leaves_text_and_document_untouched(
     tmp_path: Path,
 ) -> None:

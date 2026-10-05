@@ -69,11 +69,11 @@ def katex_check(expressions: list[str]) -> list[dict[str, object]]:
     return checked
 
 
-def read_page(client: Client, pdf: Path) -> tuple[str, float]:
+def read_page(client: Client, pdf: Path, prompt: str) -> tuple[str, float]:
     png = render_pdf_page(path=pdf, index=0, scale=settings.ocr_scale)
     start = time.perf_counter()
     text = ollama_vision.read_page_image(
-        client=client, model=settings.ocr_model, png=png
+        client=client, model=settings.ocr_model, png=png, prompt_file=prompt
     )
     return text, time.perf_counter() - start
 
@@ -98,12 +98,13 @@ def score_page(text: str, truth: list[dict[str, object]]) -> dict[str, object]:
 
 
 def main(directory: Path, prompt: str) -> int:
-    ollama_vision.PROMPT_FILE = prompt
     client = Client(host=settings.ollama_host)
     truth = json.loads((directory / "truth.json").read_text(encoding="utf-8"))
     rows = []
     for page in truth:
-        text, seconds = read_page(client=client, pdf=directory / f"{page['page']}.pdf")
+        text, seconds = read_page(
+            client=client, pdf=directory / f"{page['page']}.pdf", prompt=prompt
+        )
         row = {"page": page["page"], "seconds": round(seconds, 1), "text": text}
         row.update(score_page(text=text, truth=page["formulas"]))
         rows.append(row)

@@ -10,15 +10,17 @@ from sbobina.correction import CorrectorUnavailableError
 
 logger = logging.getLogger("sbobina")
 
-PROMPT_FILE = "ocr-v1.md"
+# ocr-v2 asks for formulas in LaTeX between \( \) and \[ \] (V10, eval-math.md).
+PROMPT_FILE = "ocr-v2.md"
+PROMPT_VERSION = PROMPT_FILE.removesuffix(".md")
 # qwen2.5vl:7b on CPU (T050): ~172s per page at scale 1.0 with this context size.
 OCR_CONTEXT_TOKENS = 4096
 
 
-def _prompt() -> str:
+def _prompt(prompt_file: str) -> str:
     return (
         resources.files("sbobina.prompts")
-        .joinpath(PROMPT_FILE)
+        .joinpath(prompt_file)
         .read_text(encoding="utf-8")
     )
 
@@ -31,12 +33,14 @@ def _log_usage(response: GenerateResponse) -> None:
     )
 
 
-def read_page_image(client: Client, model: str, png: bytes) -> str:
+def read_page_image(
+    client: Client, model: str, png: bytes, prompt_file: str = PROMPT_FILE
+) -> str:
     """Return the page transcript, or raise if Ollama is unreachable."""
     try:
         response = client.generate(
             model=model,
-            prompt=_prompt(),
+            prompt=_prompt(prompt_file=prompt_file),
             images=[png],
             options={"temperature": 0, "num_ctx": OCR_CONTEXT_TOKENS},
         )

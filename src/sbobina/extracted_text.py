@@ -20,12 +20,16 @@ class Page:
     text: str
     no_text: bool
     ocr: bool = False
+    # Prompt file stem the page was read with (T063); None for older OCR pages.
+    ocr_prompt: str | None = None
 
     def __post_init__(self) -> None:
         # OCR only replaces a page when text came back (ocr_pipeline), so an
         # OCR page without text would be a page the reader labels as read.
         if self.ocr and (self.no_text or not self.text.strip()):
             raise ValueError("An OCR page must carry text and not be no_text")
+        if self.ocr_prompt is not None and not self.ocr:
+            raise ValueError("Only an OCR page records its OCR prompt")
 
 
 @dataclass(frozen=True)

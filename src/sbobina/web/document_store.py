@@ -110,7 +110,12 @@ def iter_extracting_documents(courses_dir: Path) -> Iterator[CourseDocument]:
 def write_text(doc_dir: Path, extracted: ExtractedText) -> None:
     values = {
         "pages": [
-            {"text": page.text, "no_text": page.no_text, "ocr": page.ocr}
+            {
+                "text": page.text,
+                "no_text": page.no_text,
+                "ocr": page.ocr,
+                "ocr_prompt": page.ocr_prompt,
+            }
             for page in extracted.pages
         ],
         "status": extracted.status.value,
@@ -121,6 +126,10 @@ def write_text(doc_dir: Path, extracted: ExtractedText) -> None:
     )
 
 
+def _optional_text(value: object) -> str | None:
+    return None if value is None else str(value)
+
+
 def read_text(doc_dir: Path) -> StoredText:
     raw = json.loads((doc_dir / TEXT_FILENAME).read_text(encoding="utf-8"))
     pages = tuple(
@@ -128,6 +137,7 @@ def read_text(doc_dir: Path) -> StoredText:
             text=str(item["text"]),
             no_text=bool(item["no_text"]),
             ocr=bool(item.get("ocr", False)),
+            ocr_prompt=_optional_text(value=item.get("ocr_prompt")),
         )
         for item in raw["pages"]
     )
