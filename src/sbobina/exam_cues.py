@@ -5,12 +5,20 @@ from typing import Literal
 from sbobina.models import Transcript
 
 CueLevel = Literal["strong", "weak"]
-STRONG_PATTERNS_V1 = (
+# v2 adds the enclitic forms ("ricordatevelo"), missed by v1 in a real lecture.
+STRONG_PATTERNS_V2 = (
     "all'esame",
     "vi chiederò",
     "domanda d'esame",
     "ricordatevi",
+    "ricordatevelo",
+    "ricordatevela",
+    "ricordateveli",
+    "ricordatevele",
     "segnatevelo",
+    "segnatevela",
+    "segnateveli",
+    "segnatevele",
     "lo chiedo",
 )
 WEAK_PATTERNS_V1 = ("importante", "fondamentale", "attenzione")
@@ -25,7 +33,7 @@ def _whole_words(patterns: tuple[str, ...]) -> re.Pattern[str]:
     return re.compile(rf"(?<!\w)(?:{alternatives})(?!\w)")
 
 
-STRONG_RE = _whole_words(patterns=STRONG_PATTERNS_V1)
+STRONG_RE = _whole_words(patterns=STRONG_PATTERNS_V2)
 WEAK_RE = _whole_words(patterns=WEAK_PATTERNS_V1)
 NEGATIVE_RE = _whole_words(patterns=NEGATIVE_PATTERNS_V1)
 
