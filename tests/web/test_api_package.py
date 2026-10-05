@@ -146,3 +146,37 @@ def test_export_lecture_only_course_packs_its_lectures(
     assert manifest.course.label == "Storia"
     assert sum(name.endswith("/transcript.json") for name in names) == 1
     assert sorted(path.name for path in store.courses_dir.iterdir()) == before
+
+
+OLDER_SPELLINGS = 5
+
+
+def test_export_lecture_only_course_takes_the_newest_spelling(
+    client: TestClient, course_data: PackageFixture
+) -> None:
+    # Same rule as the course list (group_courses): the newest lecture names it.
+    # The newest is created first, and update() keeps created_at, so the older
+    # ones are backdated by rewriting job.json. Several older lectures make a
+    # label picked in file-system order fail most runs.
+    store = course_data.store
+    newer = store.create(config=JobConfig(subject="Storia Antica"))
+    records = [newer]
+    for _ in range(OLDER_SPELLINGS):
+        older = store.create(config=JobConfig(subject="storia antica"))
+        backdated = older.model_copy(
+            update={"created_at": newer.created_at.replace(year=2020)}
+        )
+        (store.jobs_dir / str(older.id) / "job.json").write_text(
+            data=backdated.model_dump_json(), encoding="utf-8"
+        )
+        records.append(older)
+    for record in records:
+        (store.jobs_dir / str(record.id) / "audio.json").write_text(
+            data=TRANSCRIPT.decode(), encoding="utf-8"
+        )
+
+    response = client.get(url="/api/v1/courses/storia antica/export")
+
+    with ZipFile(file=io.BytesIO(response.content)) as archive:
+        manifest = Manifest.model_validate_json(archive.read("manifest.json"))
+    assert manifest.course.label == "Storia Antica"

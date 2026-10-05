@@ -54,9 +54,12 @@ def content_disposition(filename: str) -> str:
 
 
 def _lecture_label(key: str, services: ReviewServices) -> str:
-    """The course name as its lectures spell it, for the package manifest."""
+    """The course name as the newest lecture spells it, as the course list does."""
     store = services.store
-    for record in store.iter_records():
+    newest_first = sorted(
+        store.iter_records(), key=lambda record: record.created_at, reverse=True
+    )
+    for record in newest_first:
         label = effective_course(
             course=store.read_meta(job_id=str(record.id)).course,
             subject=record.config.subject,
