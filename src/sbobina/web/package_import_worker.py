@@ -147,9 +147,13 @@ def _late_publication(
     return None
 
 
-def _remove_staging(data_dir: Path) -> None:
-    # Safe only because _IMPORT_LOCK admits one import per process: the reaped
-    # child can no longer write here and no other import is staging.
+def remove_import_staging(data_dir: Path) -> None:
+    """Remove the .import-* folders an interrupted import left behind.
+
+    Safe after a timeout because _IMPORT_LOCK admits one import per process
+    (the reaped child no longer writes and no other import is staging), and at
+    startup because no import runs before the server accepts requests.
+    """
     for name in ("courses", "jobs"):
         for path in (data_dir / name).glob(pattern=".import-*"):
             if path.is_dir() and not path.is_symlink():
@@ -212,7 +216,7 @@ def _run_child(
             log_path=Path(temporary) / "import.log",
         )
         if not _wait_for_import(process=process, options=options):
-            _remove_staging(data_dir=data_dir)
+            remove_import_staging(data_dir=data_dir)
             return _late_publication(data_dir=data_dir, before=before) or (
                 PackageImportOutcome(
                     status=PackageImportStatus.TIMEOUT,

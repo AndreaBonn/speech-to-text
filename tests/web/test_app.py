@@ -184,3 +184,25 @@ def test_lifespan_recovers_jobs_and_stops_supervisor(tmp_path: Path) -> None:
     assert recovered.status == JobStatus.INTERRUPTED
     assert recovered.error == {"code": "SERVER_RESTARTED"}
     assert not supervisor.is_running()
+
+
+def test_lifespan_removes_import_staging_left_by_a_killed_import(
+    tmp_path: Path,
+) -> None:
+    # F25: a kill or OOM between two renames leaves .import-* folders behind.
+    staged = [
+        tmp_path / name / ".import-00000000-0000-4000-8000-000000000001"
+        for name in ("courses", "jobs")
+    ]
+    for directory in staged:
+        directory.mkdir(parents=True)
+        (directory / "partial.json").write_text(data="{}", encoding="utf-8")
+    normal = tmp_path / "courses" / "11111111-1111-4111-8111-111111111111"
+    normal.mkdir()
+    (normal / "course.json").write_text(data="{}", encoding="utf-8")
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+
+    with TestClient(app, base_url=BASE_URL):
+        assert [path for path in staged if path.exists()] == []
+
+    assert (normal / "course.json").read_text(encoding="utf-8") == "{}"

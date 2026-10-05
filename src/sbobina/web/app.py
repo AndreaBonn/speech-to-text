@@ -43,6 +43,7 @@ from sbobina.web.gpu_lock import GpuArbiter
 from sbobina.web.gpu_release import unload_ollama_models
 from sbobina.web.job_store import JobStore
 from sbobina.web.middleware import OriginMiddleware, web_origin
+from sbobina.web.package_import_worker import remove_import_staging
 from sbobina.web.pages import router as pages_router
 from sbobina.web.pages_esercitazione import router as practice_pages_router
 from sbobina.web.responses import (
@@ -84,6 +85,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await anyio.to_thread.run_sync(supervisor.start)
         await anyio.to_thread.run_sync(extraction_worker.recover_on_boot)
         await anyio.to_thread.run_sync(extraction_worker.start)
+        try:
+            await anyio.to_thread.run_sync(
+                partial(
+                    remove_import_staging, data_dir=app.state.job_store.jobs_dir.parent
+                )
+            )
+        except Exception as error:
+            # Leftover staging only wastes disk; it must not stop the server.
+            logger.warning("Import staging cleanup failed at startup", exc_info=error)
         try:
             await anyio.to_thread.run_sync(partial(_reconcile_search_index, app=app))
         except Exception as error:
