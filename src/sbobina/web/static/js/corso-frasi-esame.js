@@ -111,10 +111,13 @@
       return;
     }
     hideList();
-    if (page === 1) {
-      emptyTextEl.textContent = render.emptyMessage(level);
-      emptyEl.hidden = false;
+    if (page > 1) {
+      // Fewer cues than when the page was chosen (e.g. after a correction).
+      load(key, 1);
+      return;
     }
+    emptyTextEl.textContent = render.emptyMessage(level);
+    emptyEl.hidden = false;
   }
 
   function showLoadError(key) {
