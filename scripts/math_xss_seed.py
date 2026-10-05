@@ -21,6 +21,7 @@ from package_round_trip_fixtures import SourceCourse, citations, seed_round_trip
 from sbobina.card_models import CardDraft, GenerationAnchor
 from sbobina.chat_pipeline import ChatAnswer, ChatOutcome, ChatSentence
 from sbobina.generation_models import (
+    GenerationCitation,
     GenerationFormat,
     GenerationRecord,
     SummarySection,
@@ -63,16 +64,30 @@ CARD_TEXT = " ".join((*PAYLOADS[:-1], POSITIVE))
 ANSWER = "la mia risposta su questa domanda difficile"
 
 
+def _hostile_quotes(
+    citations: tuple[GenerationCitation, ...],
+) -> tuple[GenerationCitation, ...]:
+    # Quotes render formulas too (F67). A real quote is at most 40 words, so
+    # the over-long formula (2001 characters) cannot reach one.
+    return tuple(replace(c, quote=CARD_TEXT) for c in citations)
+
+
 def _hostile_generation(record: GenerationRecord) -> GenerationRecord:
     if record.format is GenerationFormat.SUMMARY:
-        cited = record.sections[0].sentences[0].citations
+        cited = _hostile_quotes(citations=record.sections[0].sentences[0].citations)
         sentence = SummarySentence(text=TEXT, citations=cited)
         section = SummarySection(title=TEXT, sentences=(sentence,))
         return replace(record, sections=(section,))
     is_mc = record.format is GenerationFormat.MULTIPLE_CHOICE
     options = (TEXT, POSITIVE, "\\(y\\)", "\\(z\\)") if is_mc else ()
     questions = tuple(
-        replace(q, question=TEXT, solution=TEXT, options=options)
+        replace(
+            q,
+            question=TEXT,
+            solution=TEXT,
+            options=options,
+            citations=_hostile_quotes(citations=q.citations),
+        )
         for q in record.questions
     )
     return replace(record, questions=questions)

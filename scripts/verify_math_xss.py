@@ -39,6 +39,10 @@ from sbobina.web.app import create_app
 
 RESPONSIVE_BUDGET_S = 5.0
 REVIEW_CARD_LIMIT = 15
+# Lecture quotes (no page in the label) that still show a delimiter as text.
+LITERAL_QUOTES = r"""() => [...document.querySelectorAll('.generations__citation')]
+  .filter((c) => !c.querySelector('.katex') && c.textContent.includes('\\('))
+  .length"""
 INSPECT = """() => {
   const main = document.querySelector('main');
   const withHandler = [...main.querySelectorAll('*')].filter(
@@ -129,7 +133,15 @@ def course_pages(page: Page, base: str) -> list[str]:
         page.locator(".chat__list-item-open").first.click()
         page.wait_for_selector(".chat__message--assistant")
 
-    return check(page=page, name="generazioni e chat", load=load)
+    problems = check(page=page, name="generazioni e chat", load=load)
+    # Quotes are a formula surface too (F67): the payloads must reach them.
+    if not page.locator(".generations__citation .katex").count():
+        problems.append("citazioni: no formula rendered (positive case)")
+    # Lecture quotes are transcripts and stay literal (D5).
+    literal = page.evaluate(LITERAL_QUOTES)
+    if not literal:
+        problems.append("citazioni da lezione: delimiters not shown as text")
+    return problems
 
 
 def review_page(page: Page, base: str) -> list[str]:
@@ -174,6 +186,12 @@ def practice_pages(page: Page, base: str, ids: tuple[str, str]) -> list[str]:
             selector=".practice-question__text",
             name="esercitazione",
         )
+        # The graded attempt (first id) shows the source quotes (F67).
+        if (
+            attempt_id == ids[0]
+            and not page.locator(".practice-result__citations .katex").count()
+        ):
+            problems.append("citazioni esito: no formula rendered (positive case)")
     return problems + review_page(page=page, base=base)
 
 

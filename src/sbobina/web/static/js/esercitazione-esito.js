@@ -1,8 +1,8 @@
 // sbobina · practice page: the result block of one submitted question
 // (outcome, the judge's grade, covered and missing points, errors,
 // solution with its citations). Split out of esercitazione.js to stay under
-// the file size limit. Everything from the LLM reaches the DOM only via
-// textContent (see dom.js).
+// the file size limit. LLM text reaches the DOM as text nodes or KaTeX
+// formulas (math-text.js), never as markup.
 (function () {
   "use strict";
 
@@ -203,7 +203,9 @@
     } else {
       li.appendChild(el("span", null, sourceLabel(citation)));
     }
-    li.appendChild(el("span", "practice-result__quote", "«" + citation.quote + "»"));
+    // Formulas only in document quotes: lecture quotes are transcripts (D5).
+    var quoteEl = citation.page ? mathEl : el;
+    li.appendChild(quoteEl("span", "practice-result__quote", "«" + citation.quote + "»"));
     return li;
   }
 

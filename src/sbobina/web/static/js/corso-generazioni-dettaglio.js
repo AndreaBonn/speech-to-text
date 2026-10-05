@@ -1,7 +1,7 @@
 // sbobina · course generations: rendering of one generation's detail
 // (questions/solutions/citations or summary sections). Split out of
-// corso-generazioni.js to stay under the file size limit. Everything from
-// the LLM reaches the DOM only via textContent (see dom.js).
+// corso-generazioni.js to stay under the file size limit. LLM text reaches
+// the DOM as text nodes or KaTeX formulas (math-text.js), never as markup.
 (function () {
   "use strict";
 
@@ -54,7 +54,8 @@
     } else {
       wrap.appendChild(el("span", "generations__citation-removed", citation.source));
     }
-    wrap.appendChild(document.createTextNode(" «" + citation.quote + "»"));
+    // Formulas only in document quotes: lecture quotes are transcripts (D5).
+    wrap.appendChild((citation.page ? mathEl : el)("span", null, " «" + citation.quote + "»"));
     if (citation.ocr) {
       wrap.appendChild(el("span", "generations__citation-ocr", " · testo da OCR"));
     }

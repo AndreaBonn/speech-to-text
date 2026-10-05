@@ -1,6 +1,6 @@
 // sbobina · study page: loads the generated material of one lecture, queues a
-// new generation and follows it over SSE. Every string from the LLM goes in
-// through textContent (see dom.js): titles, items and quotes are untrusted.
+// new generation and follows it over SSE. LLM strings are untrusted: text
+// nodes plus KaTeX formulas via math-text.js (trust: false), never markup.
 (function () {
   "use strict";
 
