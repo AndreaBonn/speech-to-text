@@ -96,6 +96,6 @@ class UploadLimitMiddleware:
 
 def _error(status_code: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(
-        content={"error": {"code": code, "message": message}},
+        content={"error": {"code": code, "message": message, "details": []}},
         status_code=status_code,
     )

@@ -26,6 +26,7 @@ from sbobina.web.api_jobs import router as jobs_router
 from sbobina.web.api_models import create_models_router
 from sbobina.web.api_ocr import router as ocr_router
 from sbobina.web.api_package import router as package_router
+from sbobina.web.api_package_import import router as package_import_router
 from sbobina.web.api_practice import router as practice_router
 from sbobina.web.api_practice_grading import router as practice_grading_router
 from sbobina.web.api_practice_mistakes import router as practice_mistakes_router
@@ -158,6 +159,9 @@ def _add_middleware(app: FastAPI, settings: Settings) -> None:
                 max_upload_mb=settings.web_max_upload_mb
             ),
             "/api/v1/wer": WER_REQUEST_LIMIT_BYTES,
+            "/api/v1/courses/import": upload_limit_bytes(
+                max_upload_mb=settings.web_max_upload_mb
+            ),
         },
         suffix_limits={
             "/documents": upload_limit_bytes(max_upload_mb=settings.course_doc_max_mb),
@@ -175,6 +179,7 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(create_system_router(settings=settings))
     app.include_router(create_models_router(settings=settings))
     app.include_router(jobs_router)
+    app.include_router(package_import_router)
     app.include_router(courses_router)
     app.include_router(chat_router)
     app.include_router(ocr_router)
