@@ -99,10 +99,12 @@ def _reconcile(store: JobStore, index: SearchIndex) -> int:
 
 def _reconcile_lectures(store: JobStore, index: SearchIndex) -> int:
     indexed = index.indexed_lectures()
+    # T092: an orphan import is not searchable either; once indexed, it drops.
+    hidden = store.orphan_import_ids()
     present = set()
     replaced = 0
     for directory in store.jobs_dir.glob("*"):
-        if not directory.is_dir():
+        if not directory.is_dir() or directory.name in hidden:
             continue
         preferred = _preferred_transcript(directory=directory)
         if preferred is None:

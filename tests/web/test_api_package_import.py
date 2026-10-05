@@ -1,4 +1,5 @@
 import json
+import shutil
 from dataclasses import replace
 from pathlib import Path
 
@@ -172,3 +173,28 @@ def test_import_real_package_is_searchable_and_listed_at_once(
     assert imported_jobs and imported_jobs <= lecture_hits
     assert [item["kind"] for item in documents["data"]] == ["document"]
     assert data["course_label"] in json.dumps(courses, ensure_ascii=False)
+
+
+def test_import_killed_before_course_rename_leaves_no_visible_lectures(
+    client: TestClient, tmp_path: Path
+) -> None:
+    # T092: lectures are renamed into place before the course (B7). Removing
+    # the published course reproduces a kill between the two renames.
+    package = make_package(directory=tmp_path)
+    data = upload(client=client, content=package.read_bytes()).json()["data"]
+    lectures = [path.parent for path in (tmp_path / "jobs").glob("*/job.json")]
+    # Indexed while the course existed, so the index must also drop them.
+    assert client.get(url="/api/v1/search", params={"q": "lezione"}).json()["data"]
+    shutil.rmtree(tmp_path / "courses" / data["course_id"])
+
+    courses = client.get(url="/api/v1/courses").json()["data"]
+    jobs = client.get(url="/api/v1/jobs").json()["data"]
+
+    assert len(lectures) == LECTURE_COUNT
+    assert courses == []
+    assert jobs == []
+    search = client.get(url="/api/v1/search", params={"q": "lezione"}).json()
+    assert search["data"] == []
+    with TestClient(app=client.app, base_url="http://127.0.0.1:8765"):
+        pass
+    assert [path for path in lectures if path.exists()] == []

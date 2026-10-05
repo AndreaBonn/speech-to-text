@@ -175,3 +175,33 @@ def test_corrupt_progress_json_is_not_silently_reset(tmp_path: Path) -> None:
 
     with pytest.raises(PydanticValidationError):
         store.read_progress(job_id=str(job.id))
+
+
+def _imported(store: JobStore, course_id: str, subject: str) -> str:
+    record = store.create(config=JobConfig(subject=subject))
+    store.update(
+        record=record.model_copy(update={"imported": True, "import_id": course_id})
+    )
+    return str(record.id)
+
+
+def test_orphan_imported_lecture_is_hidden_and_removed(tmp_path: Path) -> None:
+    # T092: an import killed after renaming its lectures but before its course
+    # leaves lectures whose course is not in the registry.
+    store = JobStore(data_dir=tmp_path)
+    normal = str(store.create(config=JobConfig(subject="Storia")).id)
+    kept_course = str(uuid4())
+    (store.courses_dir / kept_course).mkdir(parents=True)
+    (store.courses_dir / kept_course / "course.json").write_text("{}", encoding="utf-8")
+    kept = _imported(store=store, course_id=kept_course, subject="Fisica")
+    orphan = _imported(store=store, course_id=str(uuid4()), subject="Chimica")
+
+    listed = {str(record.id) for record in store.list(per_page=10).items}
+    iterated = {str(record.id) for record in store.iter_records()}
+    removed = store.remove_orphan_imports()
+
+    assert listed == iterated == {normal, kept}
+    assert removed == [orphan]
+    assert not (store.jobs_dir / orphan).exists()
+    assert (store.jobs_dir / normal).is_dir() and (store.jobs_dir / kept).is_dir()
+    assert store.remove_orphan_imports() == []

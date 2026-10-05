@@ -206,3 +206,33 @@ def test_lifespan_removes_import_staging_left_by_a_killed_import(
         assert [path for path in staged if path.exists()] == []
 
     assert (normal / "course.json").read_text(encoding="utf-8") == "{}"
+
+
+def test_lifespan_removes_orphan_imported_lectures(tmp_path: Path) -> None:
+    # T092: lectures of an import killed before its course was published are
+    # never shown and are gone after a restart; a normal lecture stays.
+    store = JobStore(data_dir=tmp_path)
+    normal = store.create(config=JobConfig(subject="Storia"))
+    orphan = store.create(config=JobConfig(subject="Chimica"))
+    store.update(
+        record=orphan.model_copy(
+            update={
+                "imported": True,
+                "import_id": "33333333-3333-4333-8333-333333333333",
+            }
+        )
+    )
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    labels_before = [
+        course["label"]
+        for course in TestClient(app, base_url=BASE_URL)
+        .get("/api/v1/courses")
+        .json()["data"]
+    ]
+
+    with TestClient(app, base_url=BASE_URL):
+        pass
+
+    assert labels_before == ["Storia"]
+    assert not (store.jobs_dir / str(orphan.id)).exists()
+    assert (store.jobs_dir / str(normal.id)).is_dir()

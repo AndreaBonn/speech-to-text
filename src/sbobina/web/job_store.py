@@ -100,9 +100,38 @@ class JobStore:
         path = self._job_dir(job_id=job_id) / "job.json"
         return JobRecord.model_validate_json(path.read_text(encoding="utf-8"))
 
-    def iter_records(self) -> Iterator[JobRecord]:
+    def _all_records(self) -> Iterator[JobRecord]:
         for path in self.jobs_dir.glob("*/job.json"):
             yield JobRecord.model_validate_json(path.read_text(encoding="utf-8"))
+
+    def _is_orphan_import(self, record: JobRecord) -> bool:
+        # T092: an import publishes its lectures before its course (B7); one
+        # killed in between leaves lectures whose course is not registered.
+        return (
+            record.import_id is not None
+            and not (self.courses_dir / record.import_id / "course.json").is_file()
+        )
+
+    def iter_records(self) -> Iterator[JobRecord]:
+        """Every lecture, except those of an import whose course never landed."""
+        for record in self._all_records():
+            if not self._is_orphan_import(record=record):
+                yield record
+
+    def orphan_import_ids(self) -> frozenset[str]:
+        """Lectures of an import whose course never landed, hidden everywhere."""
+        return frozenset(
+            str(record.id)
+            for record in self._all_records()
+            if self._is_orphan_import(record=record)
+        )
+
+    def remove_orphan_imports(self) -> list[str]:
+        """Delete orphan imported lectures; only safe while no import runs."""
+        orphans = sorted(self.orphan_import_ids())
+        for job_id in orphans:
+            self.delete(job_id=job_id)
+        return orphans
 
     def _course_key(self, record: JobRecord) -> str:
         meta = self.read_meta(job_id=str(record.id))

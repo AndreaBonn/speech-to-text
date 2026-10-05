@@ -123,7 +123,9 @@ def test_import_package_publishes_lectures_before_course(
 
     def observe_rename(self: Path, target: Path) -> Path:
         assert list(iter_courses(courses_dir=data / "courses")) == []
-        assert len(list(JobStore(data_dir=data).iter_records())) == len(destinations)
+        # On disk, not iter_records: lectures stay hidden until their course
+        # lands (T092), and this test is about what has been published.
+        assert len(list((data / "jobs").glob("*/job.json"))) == len(destinations)
         destinations.append(target)
         return rename(self, target=target)
 

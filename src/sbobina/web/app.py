@@ -74,6 +74,23 @@ def _reconcile_search_index(app: FastAPI) -> None:
         search_service.reconcile(store=app.state.job_store, index=index)
 
 
+def _clean_interrupted_imports(app: FastAPI) -> None:
+    """Staging folders and orphan lectures of an import killed midway (T092).
+
+    Runs before requests are served, so no import is running. A failure only
+    leaves clutter behind: it is logged and never stops the server.
+    """
+    store: JobStore = app.state.job_store
+    try:
+        remove_import_staging(data_dir=store.jobs_dir.parent)
+        removed = store.remove_orphan_imports()
+    except Exception as error:
+        logger.warning("Import cleanup failed at startup", exc_info=error)
+        return
+    if removed:
+        logger.warning("Removed %d lectures of an interrupted import", len(removed))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     supervisor: Supervisor = app.state.supervisor
@@ -85,15 +102,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await anyio.to_thread.run_sync(supervisor.start)
         await anyio.to_thread.run_sync(extraction_worker.recover_on_boot)
         await anyio.to_thread.run_sync(extraction_worker.start)
-        try:
-            await anyio.to_thread.run_sync(
-                partial(
-                    remove_import_staging, data_dir=app.state.job_store.jobs_dir.parent
-                )
-            )
-        except Exception as error:
-            # Leftover staging only wastes disk; it must not stop the server.
-            logger.warning("Import staging cleanup failed at startup", exc_info=error)
+        await anyio.to_thread.run_sync(partial(_clean_interrupted_imports, app=app))
         try:
             await anyio.to_thread.run_sync(partial(_reconcile_search_index, app=app))
         except Exception as error:
