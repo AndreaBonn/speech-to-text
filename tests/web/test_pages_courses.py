@@ -81,8 +81,11 @@ def test_corsi_page_includes_the_exam_cues_section(tmp_path: Path) -> None:
     assert 'id="examcues-empty"' in body
     assert "Mostra anche i segnali deboli" in body
     assert "/static/js/corso-frasi-esame.js" in body
-    assert body.index("/static/js/dom.js") < body.index(
-        "/static/js/corso-frasi-esame.js"
+    # The section reads its DOM builders from the render module at load time.
+    assert (
+        body.index("/static/js/dom.js")
+        < body.index("/static/js/corso-frasi-esame-render.js")
+        < body.index("/static/js/corso-frasi-esame.js")
     )
     assert body.index("/static/js/corso-frasi-esame.js") < body.index(
         "/static/js/corso-dettaglio.js"
