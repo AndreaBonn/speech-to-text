@@ -25,6 +25,7 @@ from sbobina.web.api_generations import router as generations_router
 from sbobina.web.api_jobs import router as jobs_router
 from sbobina.web.api_models import create_models_router
 from sbobina.web.api_ocr import router as ocr_router
+from sbobina.web.api_package import router as package_router
 from sbobina.web.api_practice import router as practice_router
 from sbobina.web.api_practice_grading import router as practice_grading_router
 from sbobina.web.api_practice_mistakes import router as practice_mistakes_router
@@ -186,6 +187,8 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(exam_cues_router)
     app.include_router(review_router)
     app.include_router(cards_router)
+    # Keep greedy course-key downloads after the nested document/practice routes.
+    app.include_router(package_router)
     app.include_router(search_router)
     app.include_router(study_router)
     app.include_router(files_router)
@@ -194,6 +197,10 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(events_router)
     app.include_router(pages_router)
     app.include_router(practice_pages_router)
+    _mount_static(app=app)
+
+
+def _mount_static(app: FastAPI) -> None:
     app.mount(
         "/static",
         StaticFiles(directory=Path(__file__).parent / "static"),
