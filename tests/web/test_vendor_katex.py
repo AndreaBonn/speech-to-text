@@ -25,7 +25,7 @@ def test_katex_vendor_ships_woff2_only_with_both_licences() -> None:
     fonts = sorted(path.suffix for path in (VENDOR / "fonts").iterdir())
 
     assert fonts == [".woff2"] * 20
-    assert (VENDOR / "LICENSE").read_text(encoding="utf-8").startswith(
-        "The MIT License"
+    assert (
+        (VENDOR / "LICENSE").read_text(encoding="utf-8").startswith("The MIT License")
     )
     assert "Khan Academy" in (VENDOR / "LICENSE-fonts").read_text(encoding="utf-8")
