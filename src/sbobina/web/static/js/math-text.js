@@ -13,7 +13,9 @@
   ];
   var KATEX_OPTIONS = {
     trust: false,
-    throwOnError: false,
+    // Errors reach the catch below: KaTeX's own error span uses an inline
+    // style, which the CSP blocks (F75).
+    throwOnError: true,
     strict: "ignore",
     maxExpand: 1000,
     maxSize: 10,

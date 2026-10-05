@@ -219,10 +219,16 @@ def run(base: str, job_id: str, doc_id: str, ids: tuple[str, str]) -> list[str]:
             dialog.dismiss()
 
         page.on("dialog", record_dialog)
+        # CSP reports land in the console (F75: KaTeX's inline error style).
+        errors: list[str] = []
+        page.on(
+            "console", lambda m: errors.append(m.text) if m.type == "error" else None
+        )
         problems = course_pages(page=page, base=base)
         problems += practice_pages(page=page, base=base, ids=ids)
         problems += material_pages(page=page, base=base, job_id=job_id, doc_id=doc_id)
         browser.close()
+    problems += [f"{len(errors)} console error(s): {errors[:3]}"] * bool(errors)
     return problems + [f"{len(dialogs)} dialog(s): {dialogs}"] * bool(dialogs)
 
 

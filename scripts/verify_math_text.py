@@ -121,10 +121,17 @@ def length_problems(page: Page) -> list[str]:
 
 
 def invalid_problems(page: Page) -> list[str]:
-    result = page.evaluate(RENDER, ["\\(\\frac{a}\\)"])
-    if "\\frac{a}" not in result["text"]:
-        return [f"formula invalida: testo {result['text']!r}"]
-    return []
+    problems = []
+    # KaTeX's own error span carries an inline style that the page CSP
+    # blocks with a console error (F75): an invalid formula must stay text.
+    for source in ("\\(\\frac{a}\\)", "\\(\\def\\a{\\a\\a}\\a\\)"):
+        result = page.evaluate(RENDER, [source])
+        if result["text"] != source or result["errorSpan"]:
+            problems.append(
+                f"formula invalida {source!r}: testo {result['text']!r},"
+                f" span di errore {result['errorSpan']}"
+            )
+    return problems
 
 
 def main() -> int:
