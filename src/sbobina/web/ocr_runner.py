@@ -13,7 +13,7 @@ from ollama import Client
 from sbobina import llm_corrector
 from sbobina.document_models import CourseDocument
 from sbobina.extracted_text import ExtractedText
-from sbobina.ocr_pipeline import ReadPage, ocr_missing_pages
+from sbobina.ocr_pipeline import OcrProgress, ReadPage, ocr_missing_pages
 from sbobina.ollama_vision import PROMPT_VERSION, read_page_image
 from sbobina.pdf_text import render_pdf_page
 from sbobina.settings import settings
@@ -56,12 +56,23 @@ def run_ocr(document_dir: Path, read_page: ReadPage) -> None:
     written after every missing page succeeded, so a mid-run failure leaves
     both, and the original file, untouched.
     """
-    courses_dir = document_dir.parent.parent.parent
-    course_id, doc_id = _course_and_doc_id(document_dir=document_dir)
     stored = read_text(doc_dir=document_dir)
     extracted = ExtractedText(
         pages=stored.pages, status=stored.status, encoding=stored.encoding
     )
+    result = ocr_missing_pages(
+        extracted=extracted,
+        read_page=read_page,
+        on_progress=_progress_writer(document_dir=document_dir),
+        prompt_version=PROMPT_VERSION,
+    )
+    _persist(document_dir=document_dir, result=result)
+
+
+def _progress_writer(document_dir: Path) -> OcrProgress:
+    """Record OCR progress in the document's ocr.json as pages are read."""
+    courses_dir = document_dir.parent.parent.parent
+    course_id, doc_id = _course_and_doc_id(document_dir=document_dir)
 
     def on_progress(done: int, total: int) -> None:
         _write_progress(
@@ -72,13 +83,7 @@ def run_ocr(document_dir: Path, read_page: ReadPage) -> None:
             total=total,
         )
 
-    result = ocr_missing_pages(
-        extracted=extracted,
-        read_page=read_page,
-        on_progress=on_progress,
-        prompt_version=PROMPT_VERSION,
-    )
-    _persist(document_dir=document_dir, result=result)
+    return on_progress
 
 
 def _persist(document_dir: Path, result: ExtractedText) -> None:
