@@ -61,3 +61,39 @@ def test_extract_solution_points_abbreviation_does_not_split_sentence(
         extract_solution_points(solution=solution, format=GenerationFormat.OPEN)
         == expected
     )
+
+
+@pytest.mark.parametrize(
+    ("solution", "expected"),
+    (
+        (
+            "1. Il possesso è un potere di fatto. 2. La detenzione è senza animo.",
+            ("Il possesso è un potere di fatto", "La detenzione è senza animo"),
+        ),
+        (
+            "Due requisiti:\n1) Il possesso dura da un anno.\n2) Non è violento.",
+            ("Due requisiti:", "Il possesso dura da un anno", "Non è violento"),
+        ),
+        # A legal reference after an abbreviation is not a list (review of F1).
+        (
+            "Si richiama il par. 3) il termine decorre. Poi si applica l'art. 5) Il rinvio.",
+            (
+                "Si richiama il par. 3) il termine decorre",
+                "Poi si applica l'art. 5) Il rinvio",
+            ),
+        ),
+        # A number inside a sentence is not a list marker: "comma 2" stays.
+        (
+            "Si applica il comma 2. Il termine è annuale.",
+            ("Si applica il comma 2", "Il termine è annuale"),
+        ),
+    ),
+)
+def test_extract_solution_points_numbered_list_items_become_points(
+    solution: str, expected: tuple[str, ...]
+) -> None:
+    # F1: list markers ("1.", "2)") are separators, never points of their own.
+    assert (
+        extract_solution_points(solution=solution, format=GenerationFormat.OPEN)
+        == expected
+    )
