@@ -27,7 +27,7 @@ def validate_card_text(*, front: str | None, back: str | None) -> None:
             )
 
 
-def _require_uuid4(value: str, field: str) -> None:
+def require_uuid4(value: str, field: str) -> None:
     """Reject anything that is not a canonical UUID4, so an anchor id can never
     double as a path segment (``../x``) when resolvers join it onto a directory."""
     try:
@@ -47,7 +47,7 @@ class LectureAnchor:
     kind: Literal["lecture"] = "lecture"
 
     def __post_init__(self) -> None:
-        _require_uuid4(self.job_id, "job_id")
+        require_uuid4(self.job_id, "job_id")
         if not self.revision:
             raise ValueError("job_id e revision non possono essere vuoti")
         if self.segment_index < 0:
@@ -67,7 +67,7 @@ class DocumentAnchor:
     kind: Literal["document"] = "document"
 
     def __post_init__(self) -> None:
-        _require_uuid4(self.doc_id, "doc_id")
+        require_uuid4(self.doc_id, "doc_id")
         if not self.sha256:
             raise ValueError("doc_id e sha256 non possono essere vuoti")
         if self.page < 0:
@@ -85,7 +85,7 @@ class GenerationAnchor:
     kind: Literal["generation"] = "generation"
 
     def __post_init__(self) -> None:
-        _require_uuid4(self.generation_id, "generation_id")
+        require_uuid4(self.generation_id, "generation_id")
         if self.question_index < 0:
             raise ValueError("question_index deve essere >= 0")
 

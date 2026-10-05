@@ -13,6 +13,7 @@ from pydantic import (
     model_validator,
 )
 
+from sbobina.card_models import require_uuid4
 from sbobina.courses import normalize_course_label
 from sbobina.platform_info import RuntimeChoice
 from sbobina.settings import ComputeType, Device, Settings, settings
@@ -146,3 +147,11 @@ class JobRecord(BaseModel):
     source_name: str = ""
     imported: bool = False
     import_id: str | None = None
+
+    @field_validator("import_id")
+    @classmethod
+    def validate_import_id(cls, value: str | None) -> str | None:
+        # Joined onto data/courses to find the import's course: never a path.
+        if value is not None:
+            require_uuid4(value, "import_id")
+        return value

@@ -145,3 +145,30 @@ def test_work_item_course_id_only_for_course_scoped_actions(
 ) -> None:
     with pytest.raises(ValidationError, match="course-scoped"):
         WorkItem(job_id="j1", action=action, course_id=course_id)
+
+
+IMPORT_RECORD = {
+    "id": "11111111-1111-4111-8111-111111111111",
+    "status": "done",
+    "stage": "done",
+    "config": {},
+    "created_at": "2026-10-05T00:00:00Z",
+    "updated_at": "2026-10-05T00:00:00Z",
+    "imported": True,
+}
+
+
+def test_job_record_import_id_accepts_a_uuid4() -> None:
+    import_id = "22222222-2222-4222-8222-222222222222"
+    record = JobRecord.model_validate({**IMPORT_RECORD, "import_id": import_id})
+    assert record.import_id == import_id
+
+
+@pytest.mark.parametrize(
+    "import_id",
+    ["../courses/x", "", "22222222-2222-1222-8222-222222222222", "not-a-uuid"],
+)
+def test_job_record_import_id_that_could_be_a_path_raises(import_id: str) -> None:
+    # import_id is joined onto data/courses to find the import's course.
+    with pytest.raises(ValidationError):
+        JobRecord.model_validate({**IMPORT_RECORD, "import_id": import_id})
