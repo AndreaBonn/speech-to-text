@@ -15,7 +15,6 @@
 
   var JOB_ID = readerRoot.dataset.jobId;
   var TRANSCRIPT_URL = "/api/v1/jobs/" + JOB_ID + "/transcript";
-  var MANUAL_SCROLL_QUIET_MS = 1200;
 
   var statusEl = document.getElementById("reader-status");
   var textEl = document.getElementById("reader-text");
@@ -28,9 +27,7 @@
 
   var currentVariant = "original";
   var currentRevision = null; // of the text on screen; edits must quote it
-  var words = []; // flat, chronological: [{start, end, el}]
-  var currentWordEl = null;
-  var lastManualScrollAt = 0;
+  var highlighter = window.SbobinaReaderHighlight.create();
 
   // ---------- helpers ----------
 
@@ -128,7 +125,7 @@
         ? word.text.slice(leadingSpace[0].length)
         : word.text;
       var span = buildWordSpan(word, displayText);
-      words.push({ start: word.start, end: word.end, el: span });
+      highlighter.add({ start: word.start, end: word.end, el: span });
       textWrap.appendChild(span);
     });
     row.appendChild(textWrap);
@@ -136,8 +133,7 @@
   }
 
   function renderTranscript(paragraphs) {
-    words = [];
-    currentWordEl = null;
+    highlighter.reset();
     var fragment = document.createDocumentFragment();
     if (paragraphs.length === 0) {
       var empty = document.createElement("div");
@@ -151,36 +147,6 @@
       });
     }
     textEl.replaceChildren(fragment);
-  }
-
-  function renderPoints(points) {
-    if (points.length === 0) {
-      pointsEl.innerHTML =
-        '<p class="reader__points-empty">Nessun punto incerto da riascoltare.</p>';
-      return;
-    }
-    var fragment = document.createDocumentFragment();
-    var list = document.createElement("ul");
-    list.className = "reader__points-list";
-    points.forEach(function (point, index) {
-      var li = document.createElement("li");
-      var button = document.createElement("button");
-      button.type = "button";
-      button.className = "reader__point";
-      button.dataset.start = String(point.start);
-      button.innerHTML =
-        '<span class="reader__point-time">' + formatTime(point.start) + "</span>" +
-        '<span class="reader__point-text">' +
-        escapeHtml(point.before ? point.before + " " : "") +
-        "<mark>" + escapeHtml(point.text) + "</mark>" +
-        escapeHtml(point.after ? " " + point.after : "") +
-        "</span>";
-      li.appendChild(button);
-      list.appendChild(li);
-      void index;
-    });
-    fragment.appendChild(list);
-    pointsEl.replaceChildren(fragment);
   }
 
   // ---------- transcript loading ----------
@@ -202,7 +168,7 @@
   function applyPayload(body) {
     currentRevision = body.meta.revision;
     renderTranscript(body.data.paragraphs);
-    renderPoints(body.data.review_points);
+    window.SbobinaReaderPoints.render(pointsEl, body.data.review_points, formatTime);
   }
 
   // DOCX and TXT follow the version on screen: what you read is what you get.
@@ -253,62 +219,9 @@
     });
   });
 
-  // ---------- word highlight ----------
-
-  function findCurrentWordIndex(time) {
-    var lo = 0;
-    var hi = words.length - 1;
-    var result = -1;
-    while (lo <= hi) {
-      var mid = (lo + hi) >> 1;
-      if (words[mid].start <= time) {
-        result = mid;
-        lo = mid + 1;
-      } else {
-        hi = mid - 1;
-      }
-    }
-    return result;
-  }
-
-  function highlightCurrentWord(time) {
-    var index = findCurrentWordIndex(time);
-    var match = index >= 0 && time <= words[index].end ? words[index] : null;
-    var nextEl = match ? match.el : null;
-    if (nextEl === currentWordEl) {
-      return;
-    }
-    if (currentWordEl) {
-      currentWordEl.classList.remove("word--current");
-    }
-    if (nextEl) {
-      nextEl.classList.add("word--current");
-      var recentManualScroll =
-        Date.now() - lastManualScrollAt < MANUAL_SCROLL_QUIET_MS;
-      if (!recentManualScroll) {
-        var rect = nextEl.getBoundingClientRect();
-        var outOfView = rect.top < 72 || rect.bottom > window.innerHeight - 96;
-        if (outOfView) {
-          nextEl.scrollIntoView({ block: "center", behavior: "smooth" });
-        }
-      }
-    }
-    currentWordEl = nextEl;
-  }
-
-  ["wheel", "touchmove"].forEach(function (eventName) {
-    window.addEventListener(
-      eventName,
-      function () {
-        lastManualScrollAt = Date.now();
-      },
-      { passive: true }
-    );
-  });
-
   var audio = window.SbobinaReaderAudio.attach({
     formatTime: formatTime,
-    onTime: highlightCurrentWord,
+    onTime: highlighter.highlight,
     showStatus: showStatus,
   });
   var seekTo = audio.seekTo;
