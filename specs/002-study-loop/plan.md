@@ -152,7 +152,7 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
       property derivata dai punti, mai un campo assegnabile; `ProposedJudgement` pydantic solo al
       boundary. Persistenza del tentativo con lo stesso lock per file di `web/path_locks.lock_for`
       (B5).
-- [ ] Formato del giudice (ADR D3): prompt `valutazione-v1.md` (via prompt-master), schema
+- [ ] Formato del giudice (ADR D3): prompt `valutazione-v1.md`, dal 2026-10-05 `valutazione-v2.md` (F41: un punto coperto a metà si divide; misura in `eval-grading.md`), entrambi via prompt-master, schema
       `ProposedJudgement` con `punti_coperti[{punto, prova}]`, `punti_mancanti[]`,
       `errori[{frase, motivo}]`; ogni `punto` deve comparire nella soluzione e ogni `prova`/`frase`
       nella risposta (match contiguo su `normalize_tokens`), le voci che non passano sono scartate
@@ -171,7 +171,7 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
       stato dell'ancora. Da un errore "Crea carta" → carta con ancora `generation`, idempotente.
 - [ ] `gpu_lock.py`: docstring aggiornata da "chat turns" a "interactive LLM calls" (ADR D3).
 - [ ] Misura V5+V6 (T050): 30 risposte preparate a mano su 10 domande reali (5 aperte, 5 orale;
-      per domanda una corretta, una parziale, una errata), verdetto atteso dall'utente, 3
+      per domanda una corretta, una parziale, una errata), verdetto atteso dall'utente (emendato il 2026-10-05: U5 delegata a Claude, etichette di Claude, esito provvisorio), 3
       esecuzioni su GPU; latenza su 20 risposte su GPU e su CPU. In `eval-grading.md`: accordo,
       matrice di confusione, verdetti instabili fra esecuzioni, latenza p50/max per dispositivo.
       Soglia ADR: accordo ≥ 80% per passare da suggerimento a esito; in più (planner, BASIS:
