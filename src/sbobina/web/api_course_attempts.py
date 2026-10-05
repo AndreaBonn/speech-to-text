@@ -21,15 +21,17 @@ router = APIRouter(prefix="/api/v1/courses/{key:path}/attempts")
 
 
 def final_answers(attempt: PracticeAttempt) -> list[Answer]:
-    """Answers with a final outcome: multiple choice or the student's grade.
+    """Answers with a final outcome: multiple choice, the judge or the student.
 
-    A judge verdict without the student's own grade is a suggestion (U2), so
-    that answer counts as pending, not in the score.
+    Since V6 passed (2026-10-05, eval-grading.md) the judge's verdict is a
+    grade (U2); the student's own grade replaces it. Ungraded answers pend.
     """
     return [
         answer
         for answer in attempt.answers
-        if isinstance(answer, MultipleChoiceAnswer) or answer.self_grade is not None
+        if isinstance(answer, MultipleChoiceAnswer)
+        or answer.self_grade is not None
+        or answer.judgement is not None
     ]
 
 

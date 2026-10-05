@@ -1,5 +1,5 @@
 // sbobina · practice page: the result block of one submitted question
-// (outcome, the judge's suggestion, covered and missing points, errors,
+// (outcome, the judge's grade, covered and missing points, errors,
 // solution with its citations). Split out of esercitazione.js to stay under
 // the file size limit. Everything from the LLM reaches the DOM only via
 // textContent (see dom.js).
@@ -46,8 +46,8 @@
     row.appendChild(outcomeBadge(outcome));
   }
 
-  // U2: until the V6 measurement passes, the judge's outcome is a suggestion;
-  // only multiple choice and the student's own grade are final.
+  // U2: since V6 passed (2026-10-05) the judge's outcome is a grade; the
+  // student's own grade, when given, replaces it and is shown first.
   function verdict(answer) {
     var row = el("p", "practice-result__verdict");
     if (answer.kind === "multiple_choice") {
@@ -55,10 +55,10 @@
     } else if (answer.self_grade) {
       labelled(row, "Il tuo voto", answer.self_grade);
       if (answer.judgement) {
-        labelled(row, "Suggerimento del modello", answer.judgement.outcome);
+        labelled(row, "Voto del modello", answer.judgement.outcome);
       }
     } else if (answer.judgement) {
-      labelled(row, "Suggerimento", answer.judgement.outcome);
+      labelled(row, "Voto del modello", answer.judgement.outcome);
     } else {
       row.appendChild(el("span", "badge badge--pending", "Da valutare"));
     }

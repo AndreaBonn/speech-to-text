@@ -59,7 +59,7 @@ def test_judge_observes_persisted_ungraded_answer(
     assert (data["outcome"], data["score"], data["is_suggestion"]) == (
         "corretta",
         1,
-        True,
+        False,
     )
     assert data["judgement"]["covered_points"][0]["evidence"] == TEXT
     assert judge.calls == 1

@@ -54,8 +54,14 @@
       .concat([data]);
   }
 
+  // Same rule as api_course_attempts.final_answers: since V6 the judge's
+  // verdict is a grade, and the student's own grade replaces it.
   function isFinal(answer) {
-    return answer.kind === "multiple_choice" || Boolean(answer.self_grade);
+    return (
+      answer.kind === "multiple_choice" ||
+      Boolean(answer.self_grade) ||
+      Boolean(answer.judgement)
+    );
   }
 
   function renderProgress() {

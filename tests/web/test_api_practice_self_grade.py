@@ -27,7 +27,6 @@ def test_self_grade_overrides_preserving_judgement(
 ) -> None:
     url = f"{attempt_url}/answers/0"
     graded = client.post(url=url, json=submission()).json()["data"]
-    assert graded["is_suggestion"] is True
     response = client.post(url=f"{url}/self-grade", json={"outcome": outcome})
     assert response.status_code == 200
     data = response.json()["data"]
@@ -37,7 +36,6 @@ def test_self_grade_overrides_preserving_judgement(
         "self_graded",
     )
     assert data["judgement"] == graded["judgement"]
-    assert data["is_suggestion"] is False
     assert client.post(url=f"{url}/grade").json()["data"] == data
     saved = client.get(url=attempt_url).json()["data"]["answers"][0]
     assert saved["self_grade"] == outcome

@@ -144,7 +144,7 @@
 
   function verdictLine(mistake) {
     var line = el("p", "practice-result__verdict");
-    var label = mistake.is_suggestion ? "Suggerimento" : "Esito";
+    var label = mistake.self_grade ? "Il tuo voto" : "Voto del modello";
     line.appendChild(el("span", "practice-result__label", label));
     line.appendChild(result.outcomeBadge(mistake.outcome));
     return line;

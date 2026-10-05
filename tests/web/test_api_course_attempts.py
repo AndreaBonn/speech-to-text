@@ -112,11 +112,11 @@ def test_course_attempts_other_course_not_listed(
     assert client.get(url=URL.replace("fisica", "chimica")).json()["data"] == []
 
 
-def test_course_attempts_judge_suggestion_is_pending_self_grade_scores(
+def test_course_attempts_judge_verdict_scores_and_self_grade_overrides(
     client: TestClient, tmp_path: Path
 ) -> None:
-    # U2: a judgement without the student's own grade is a suggestion, so it
-    # is pending and stays out of the score; a self-grade counts.
+    # U2 after V6 (2026-10-05): the judge's verdict is a grade and counts in
+    # the score; the student's own grade replaces it when given.
     course_id = _register_course(tmp_path=tmp_path)
     courses_dir = _store(tmp_path=tmp_path).courses_dir
     generation = make_generation(courses_dir=courses_dir, course_id=course_id)
@@ -158,8 +158,8 @@ def test_course_attempts_judge_suggestion_is_pending_self_grade_scores(
 
     [summary] = client.get(url=URL).json()["data"]
 
-    assert (summary["answered"], summary["pending"]) == (2, 1)
-    assert summary["score"] == 0.5
+    assert (summary["answered"], summary["pending"]) == (2, 0)
+    assert summary["score"] == 1.5
 
 
 EMPTY_PAGE = {

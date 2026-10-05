@@ -37,9 +37,9 @@ def answer_payload(attempt: PracticeAttempt, answer: Answer) -> dict[str, Any]:
         outcome=outcome, score=OUTCOME_SCORES.get(outcome) if outcome else None
     )
     if not isinstance(answer, MultipleChoiceAnswer):
-        payload["is_suggestion"] = (
-            answer.judgement is not None and answer.self_grade is None
-        )
+        # Always false since V6 passed (2026-10-05): the judge's verdict is a
+        # grade. Kept so API v1 clients reading the field keep working.
+        payload["is_suggestion"] = False
         if answer.judgement is not None:
             payload["judgement"].update(
                 outcome=answer.judgement.outcome, score=answer.judgement.score
