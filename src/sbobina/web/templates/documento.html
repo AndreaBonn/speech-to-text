@@ -43,7 +43,9 @@
 
 {% block scripts %}
 {% if not not_found %}
+{% include "_math-assets.html" %}
 <script src="/static/js/dom.js" defer></script>
+<script src="/static/js/document-highlight.js" defer></script>
 <script src="/static/js/documento.js" defer></script>
 {% endif %}
 {% endblock %}

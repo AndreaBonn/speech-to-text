@@ -31,6 +31,9 @@
   var currentChatId = null;
   var onSent = null;
 
+  // Answers may hold \( \) and \[ \] formulas (T065); questions stay literal.
+  var mathEl = window.SbobinaMath ? window.SbobinaMath.element : el;
+
   // ---------- rendering ----------
 
   function renderUserMessage(text) {
@@ -49,7 +52,7 @@
       return li;
     }
     sentences.forEach(function (sentence) {
-      li.appendChild(el("p", "chat__message-text", sentence.text));
+      li.appendChild(mathEl("p", "chat__message-text", sentence.text));
       if (sentence.citations && sentence.citations.length > 0) {
         li.appendChild(citationsList(sentence.citations));
       }

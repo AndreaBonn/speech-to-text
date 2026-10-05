@@ -50,7 +50,7 @@
       el.className = className;
     }
     if (text !== undefined) {
-      el.textContent = text;
+      window.SbobinaMath ? window.SbobinaMath.renderMathText(el, text) : (el.textContent = text);
     }
     return el;
   }
@@ -145,7 +145,7 @@
     if (key === "concepts") {
       var term = element("p", "study__text");
       term.appendChild(element("strong", "study__term", item.term));
-      term.appendChild(document.createTextNode(": " + item.explanation));
+      term.appendChild(element("span", null, ": " + item.explanation));
       li.appendChild(term);
     } else {
       li.appendChild(
