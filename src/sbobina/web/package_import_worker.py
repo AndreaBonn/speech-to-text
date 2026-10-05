@@ -15,6 +15,8 @@ from tempfile import TemporaryDirectory
 
 from sbobina.course_registry import iter_courses
 from sbobina.package_import_stage import PROVENANCE_FILENAME
+from sbobina.settings import MAX_COURSE_DOC_MB
+from sbobina.web.job_store import JobStore
 from sbobina.web.processes import _reap, _spawn
 
 DEFAULT_COMMAND = (sys.executable, "-m", "sbobina.web.package_import_runner")
@@ -53,10 +55,21 @@ class PackageImportOptions:
     command: tuple[str, ...] = DEFAULT_COMMAND
     timeout_s: float = DEFAULT_TIMEOUT_S
     max_memory_mb: int = DEFAULT_MAX_MEMORY_MB
+    max_member_mb: int = MAX_COURSE_DOC_MB
     terminate_timeout_s: float = TERMINATE_TIMEOUT_S
 
 
 DEFAULT_OPTIONS = PackageImportOptions()
+CHILD_LOG_NAME = "import.log"
+CHILD_LOG_TAIL_BYTES = 16 * 1024
+# Outcomes the child did not decide: the cause is only in its log.
+UNEXPECTED_STATUSES = frozenset(
+    {
+        PackageImportStatus.FAILED,
+        PackageImportStatus.TIMEOUT,
+        PackageImportStatus.RESOURCE_EXHAUSTED,
+    }
+)
 # One import per process. Enough today: the web server runs a single uvicorn
 # process and nothing else imports; a second process would need a file lock.
 _IMPORT_LOCK = threading.Lock()
@@ -193,35 +206,76 @@ def run_package_import(
             message="Another course import is running",
         )
     try:
-        return _run_child(source=source, data_dir=data_dir, now=now, options=options)
+        return _run_child(
+            run=ChildRun(source=source, data_dir=data_dir, now=now, options=options)
+        )
     finally:
         _IMPORT_LOCK.release()
 
 
-def _run_child(
-    source: Path, data_dir: Path, now: datetime, options: PackageImportOptions
-) -> PackageImportOutcome:
-    before = _course_ids(data_dir=data_dir)
+def _log_child_output(log_path: Path, outcome: PackageImportOutcome) -> None:
+    """Keep the cause of an unexpected failure: the child log is temporary."""
+    if outcome.status not in UNEXPECTED_STATUSES:
+        return
+    try:
+        with log_path.open(mode="rb") as log_file:
+            log_file.seek(max(0, log_path.stat().st_size - CHILD_LOG_TAIL_BYTES))
+            tail = log_file.read().decode(encoding="utf-8", errors="replace")
+    except OSError as error:
+        logger.error("Import child log unreadable: %s", error)
+        return
+    logger.error("Import child log (%s):\n%s", outcome.status, tail)
+
+
+def _timed_out(data_dir: Path, before: frozenset[str]) -> PackageImportOutcome:
+    """Clean up a killed child; its course may still have landed in time."""
+    remove_import_staging(data_dir=data_dir)
+    published = _late_publication(data_dir=data_dir, before=before)
+    if published is not None:
+        return published
+    # B7: lectures are published before the course; the lock guarantees no
+    # other import is between its two renames right now.
+    removed = JobStore(data_dir=data_dir).remove_orphan_imports()
+    if removed:
+        logger.warning("Removed %d lectures of a timed-out import", len(removed))
+    return PackageImportOutcome(
+        status=PackageImportStatus.TIMEOUT,
+        code="PACKAGE_IMPORT_TIMEOUT",
+        message="Import child exceeded its time budget",
+    )
+
+
+@dataclass(frozen=True)
+class ChildRun:
+    source: Path
+    data_dir: Path
+    now: datetime
+    options: PackageImportOptions
+
+
+def _run_child(run: ChildRun) -> PackageImportOutcome:
     with TemporaryDirectory(prefix="sbobina-import-") as temporary:
-        result_path = Path(temporary) / "result.json"
-        process = _spawn(
-            command=[
-                *options.command,
-                str(source),
-                str(data_dir),
-                now.isoformat(),
-                str(options.max_memory_mb),
-                str(result_path),
-            ],
-            log_path=Path(temporary) / "import.log",
-        )
-        if not _wait_for_import(process=process, options=options):
-            remove_import_staging(data_dir=data_dir)
-            return _late_publication(data_dir=data_dir, before=before) or (
-                PackageImportOutcome(
-                    status=PackageImportStatus.TIMEOUT,
-                    code="PACKAGE_IMPORT_TIMEOUT",
-                    message="Import child exceeded its time budget",
-                )
-            )
-        return _read_outcome(result_path=result_path, returncode=process.returncode)
+        workdir = Path(temporary)
+        outcome = _child_outcome(run=run, workdir=workdir)
+        _log_child_output(log_path=workdir / CHILD_LOG_NAME, outcome=outcome)
+        return outcome
+
+
+def _child_outcome(run: ChildRun, workdir: Path) -> PackageImportOutcome:
+    before = _course_ids(data_dir=run.data_dir)
+    result_path = workdir / "result.json"
+    process = _spawn(
+        command=[
+            *run.options.command,
+            str(run.source),
+            str(run.data_dir),
+            run.now.isoformat(),
+            str(run.options.max_memory_mb),
+            str(run.options.max_member_mb),
+            str(result_path),
+        ],
+        log_path=workdir / CHILD_LOG_NAME,
+    )
+    if not _wait_for_import(process=process, options=run.options):
+        return _timed_out(data_dir=run.data_dir, before=before)
+    return _read_outcome(result_path=result_path, returncode=process.returncode)

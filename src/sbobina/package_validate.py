@@ -14,9 +14,10 @@ from pydantic import ValidationError
 from sbobina.document_sniff import MAX_ARCHIVE_BYTES
 from sbobina.package_models import InventoryEntry, Manifest
 from sbobina.package_zip import iter_member_bytes
+from sbobina.settings import MAX_COURSE_DOC_MB
 
 MAX_PACKAGE_MEMBERS = 5_000
-MAX_MEMBER_BYTES = 200 * 1024 * 1024
+MAX_MEMBER_BYTES = MAX_COURSE_DOC_MB * 1024 * 1024
 MAX_COMPRESSION_RATIO = 100
 MANIFEST_PATH = "manifest.json"
 UNIX_MODE_SHIFT = 16

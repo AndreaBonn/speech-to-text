@@ -30,6 +30,7 @@ class ImportProbe:
     outcome: PackageImportOutcome = SUCCESS
     sources: list[Path] = field(default_factory=list)
     payloads: list[bytes] = field(default_factory=list)
+    options: list[PackageImportOptions] = field(default_factory=list)
 
 
 @pytest.fixture
@@ -59,6 +60,7 @@ def probe(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> ImportProbe:
             asyncio.get_running_loop()
         result.sources.append(source)
         result.payloads.append(source.read_bytes())
+        result.options.append(options)
         return result.outcome
 
     monkeypatch.setattr(package_import_worker, "run_package_import", run_import)

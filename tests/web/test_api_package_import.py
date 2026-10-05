@@ -6,7 +6,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from package_import_api_fixtures import (
+    BASE_URL,
     IMPORT_URL,
+    PORT,
     SUCCESS,
     ImportProbe,
     client,
@@ -16,6 +18,8 @@ from package_import_api_fixtures import (
 from package_import_fixtures import LECTURE_COUNT, make_package
 
 from sbobina.course_registry import get_or_create
+from sbobina.settings import Settings
+from sbobina.web.app import create_app
 from sbobina.web.document_store import iter_documents
 from sbobina.web.package_import_worker import PackageImportOutcome, PackageImportStatus
 
@@ -39,6 +43,18 @@ def test_import_valid_or_reimport_returns_course_and_cleans_upload(
     assert probe.payloads == [b"package"]
     assert len(probe.sources) == 1
     assert not probe.sources[0].exists()
+
+
+def test_import_passes_the_document_limit_to_the_child(
+    probe: ImportProbe, tmp_path: Path
+) -> None:
+    # C5: a package member may be as large as a directly uploaded document.
+    app = create_app(
+        settings=Settings(web_port=PORT, course_doc_max_mb=3), data_dir=tmp_path
+    )
+    with TestClient(app=app, base_url=BASE_URL, headers={"Origin": BASE_URL}) as client:
+        assert upload(client=client).status_code == 201
+    assert [options.max_member_mb for options in probe.options] == [3]
 
 
 ERROR_CASES = [

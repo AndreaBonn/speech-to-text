@@ -1,4 +1,5 @@
 import logging
+from dataclasses import replace
 from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
@@ -10,7 +11,11 @@ from fastapi import APIRouter, File, Request, UploadFile
 from starlette.responses import JSONResponse
 
 from sbobina.web import package_import_worker
-from sbobina.web.package_import_worker import PackageImportOutcome, PackageImportStatus
+from sbobina.web.package_import_worker import (
+    PackageImportOptions,
+    PackageImportOutcome,
+    PackageImportStatus,
+)
 from sbobina.web.responses import error_response
 from sbobina.web.upload_limit import BYTES_PER_MB
 
@@ -77,21 +82,34 @@ def _outcome_response(outcome: PackageImportOutcome) -> JSONResponse:
     )
 
 
-def _import_upload(file: UploadFile, data_dir: Path) -> PackageImportOutcome:
+def _import_upload(
+    file: UploadFile, data_dir: Path, options: PackageImportOptions
+) -> PackageImportOutcome:
+    """Store the upload, then import it; only the first step is a disk error."""
     with TemporaryDirectory(prefix="sbobina-upload-") as temporary:
         source = Path(temporary) / "package.sbobina.zip"
         with source.open(mode="wb") as output:
             copyfileobj(fsrc=file.file, fdst=output, length=BYTES_PER_MB)
-        return package_import_worker.run_package_import(
-            source=source, data_dir=data_dir, now=datetime.now(tz=UTC)
-        )
+        try:
+            return package_import_worker.run_package_import(
+                source=source,
+                data_dir=data_dir,
+                now=datetime.now(tz=UTC),
+                options=options,
+            )
+        except OSError:
+            logger.exception("Could not run the package import")
+            return PackageImportOutcome(
+                status=PackageImportStatus.FAILED, code="PACKAGE_IMPORT_FAILED"
+            )
 
 
 @router.post("/import", status_code=HTTPStatus.CREATED)
 def import_course(
     request: Request, file: Annotated[UploadFile, File()]
 ) -> JSONResponse:
-    limit = request.app.state.settings.web_max_upload_mb * BYTES_PER_MB
+    settings = request.app.state.settings
+    limit = settings.web_max_upload_mb * BYTES_PER_MB
     if file.size is not None and file.size > limit:
         return _outcome_response(
             outcome=PackageImportOutcome(
@@ -100,10 +118,15 @@ def import_course(
         )
     try:
         outcome = _import_upload(
-            file=file, data_dir=request.app.state.job_store.jobs_dir.parent
+            file=file,
+            data_dir=request.app.state.job_store.jobs_dir.parent,
+            options=replace(
+                package_import_worker.DEFAULT_OPTIONS,
+                max_member_mb=settings.course_doc_max_mb,
+            ),
         )
     except OSError:
-        logger.exception("Could not store or import the uploaded package")
+        logger.exception("Could not store the uploaded package")
         outcome = PackageImportOutcome(
             status=PackageImportStatus.STORAGE_ERROR, code="PACKAGE_STORAGE_FAILED"
         )

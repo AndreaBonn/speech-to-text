@@ -14,6 +14,7 @@ from package_import_api_fixtures import (
 from starlette.datastructures import FormData
 from starlette.formparsers import MultiPartParser
 
+from sbobina.web import package_import_worker
 from sbobina.web.upload_limit import BYTES_PER_MB, FORM_OVERHEAD_BYTES
 
 __all__ = ["client", "probe"]
@@ -126,3 +127,16 @@ def test_import_temporary_creation_failure_returns_storage_error(
     assert probe.sources == []
     assert upload(client=client).status_code == 201
     assert probe.payloads == [b"package"]
+
+
+def test_import_child_start_failure_is_not_reported_as_disk_full(
+    client: TestClient, probe: ImportProbe, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The upload is stored; starting the import fails for another reason.
+    def fail_start(**kwargs: object) -> NoReturn:
+        raise OSError("No such file or directory: 'python'")
+
+    monkeypatch.setattr(package_import_worker, "run_package_import", fail_start)
+    response = upload(client=client)
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "PACKAGE_IMPORT_FAILED"

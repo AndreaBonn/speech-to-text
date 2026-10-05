@@ -20,6 +20,8 @@ ComputeType = Literal[
     "int8_bfloat16",
 ]
 
+MAX_COURSE_DOC_MB = 200
+
 
 class Settings(BaseSettings):
     """Runtime configuration; every field can be overridden with ``SBOBINA_<NAME>``."""
@@ -59,7 +61,8 @@ class Settings(BaseSettings):
     web_max_upload_mb: int = 1024
     extraction_timeout_s: float = Field(default=120.0, gt=0.0)
     extraction_max_memory_mb: int = Field(default=2048, gt=0)
-    course_doc_max_mb: int = Field(default=200, gt=0)
+    # C5: a package member is capped at 200 MB, so no document may be larger.
+    course_doc_max_mb: int = Field(default=200, gt=0, le=MAX_COURSE_DOC_MB)
     chat_timeout_s: float = Field(default=120.0, gt=0.0)
     ocr_model: str = "qwen2.5vl:7b"
     # Measured on CPU (eval.md § T050): ~172s/page at scale 1.0, >600s at 2.0.

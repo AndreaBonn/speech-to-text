@@ -9,9 +9,9 @@ from sbobina.course_registry import CourseRecord
 from sbobina.package_import import ImportResult, PackageStorageError
 from sbobina.package_remap_types import IdMaps, ImportedFrom
 from sbobina.package_validate import (
-    DEFAULT_LIMITS,
     PackageInvalidError,
     PackageTooLargeError,
+    ValidationLimits,
 )
 from sbobina.web import package_import_runner
 
@@ -26,6 +26,7 @@ def argv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[str]:
         str(tmp_path / "data"),
         NOW.isoformat(),
         "512",
+        "7",
         str(tmp_path / "result.json"),
     ]
 
@@ -128,7 +129,7 @@ def test_main_success_applies_limit_before_default_import(
         source=Path(argv[0]),
         data_dir=Path(argv[1]),
         now=NOW,
-        limits=DEFAULT_LIMITS,
+        limits=ValidationLimits(member_bytes=7 * 1024 * 1024),
     )
     assert json.loads(Path(argv[-1]).read_text(encoding="utf-8")) == {
         "status": "imported",

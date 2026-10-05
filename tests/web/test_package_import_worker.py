@@ -12,6 +12,8 @@ from fastapi.testclient import TestClient
 
 from sbobina.settings import Settings
 from sbobina.web.app import create_app
+from sbobina.web.job_models import JobConfig
+from sbobina.web.job_store import JobStore
 from sbobina.web.package_import_worker import (
     PackageImportOptions,
     PackageImportOutcome,
@@ -32,7 +34,7 @@ import sys
 import time
 from pathlib import Path
 
-source, data_dir, now, max_memory_mb, result_path = sys.argv[1:]
+source, data_dir, now, max_memory_mb, max_member_mb, result_path = sys.argv[1:]
 root = Path(source).parent
 result = Path(result_path)
 (root / "result-path").write_text(result_path)
@@ -44,6 +46,14 @@ if (root / "publish").exists():
         "label": "Fisica", "created_at": now, "updated_at": now,
     }))
     (course / "imported_from.json").write_text("{}")
+if (root / "publish-lectures").exists():
+    lecture = Path(data_dir) / "jobs" / "44444444-4444-4444-8444-444444444444"
+    lecture.mkdir(parents=True)
+    (lecture / "job.json").write_text(json.dumps({
+        "id": "44444444-4444-4444-8444-444444444444", "status": "done",
+        "stage": "done", "config": {}, "created_at": now, "updated_at": now,
+        "imported": True, "import_id": "33333333-3333-4333-8333-333333333333",
+    }))
 if (root / "stage").exists():
     for name in ("courses", "jobs"):
         staging = Path(data_dir) / name / ".import-00000000-0000-4000-8000-000000000001"
@@ -63,6 +73,7 @@ if (root / "oom").exists():
     except MemoryError:
         sys.exit(3)  # as package_import_runner.MEMORY_EXIT_CODE
 if (root / "crash").exists():
+    print("Traceback: child exploded", file=sys.stderr)
     sys.exit(1)
 if (root / "empty").exists():
     sys.exit(0)
@@ -257,6 +268,23 @@ def test_run_package_import_invalid_result_returns_package_failed(
     assert outcome.code == "PACKAGE_IMPORT_FAILED"
 
 
+def test_run_package_import_crash_copies_child_log_to_server_log(
+    harness: Harness, caplog: pytest.LogCaptureFixture
+) -> None:
+    # The child's log lives in a temporary directory removed on return.
+    (harness.root / "crash").touch()
+    assert harness.run_import().status == PackageImportStatus.FAILED
+    assert "Import child log" in caplog.text
+    assert "Traceback: child exploded" in caplog.text
+
+
+def test_run_package_import_success_keeps_child_log_out(
+    harness: Harness, caplog: pytest.LogCaptureFixture
+) -> None:
+    assert harness.run_import().status == PackageImportStatus.IMPORTED
+    assert "Import child log" not in caplog.text
+
+
 @pytest.mark.parametrize("marker", ["crash", "empty", "result-directory"])
 def test_run_package_import_missing_or_unreadable_result_returns_package_failed(
     harness: Harness,
@@ -332,3 +360,21 @@ def test_run_package_import_timeout_before_publish_stays_a_timeout(
     outcome = timed.run_import()
 
     assert outcome.status == PackageImportStatus.TIMEOUT
+
+
+def test_run_package_import_timeout_between_renames_removes_published_lectures(
+    harness: Harness,
+) -> None:
+    # B7: lectures are renamed in before the course; a kill in between must
+    # not leave them on disk until the next server start.
+    store = JobStore(data_dir=harness.data_dir)
+    kept = store.create(config=JobConfig(), source_name="Lezione")
+    (harness.root / "publish-lectures").touch()
+    (harness.root / "hold").touch()
+    timed = replace(harness, options=replace(harness.options, timeout_s=0.5))
+
+    outcome = timed.run_import()
+
+    assert outcome.status == PackageImportStatus.TIMEOUT
+    jobs = sorted(path.name for path in (harness.data_dir / "jobs").iterdir())
+    assert jobs == [str(kept.id)]
