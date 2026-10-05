@@ -100,5 +100,19 @@
     el.replaceChildren(fragment);
   }
 
-  window.SbobinaMath = { splitMath: splitMath, renderMathText: renderMathText };
+  // Like the views' el(tag, className, text), with formulas rendered.
+  function element(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) {
+      node.className = className;
+    }
+    renderMathText(node, text);
+    return node;
+  }
+
+  window.SbobinaMath = {
+    splitMath: splitMath,
+    renderMathText: renderMathText,
+    element: element,
+  };
 })();

@@ -37,6 +37,10 @@
     return node;
   }
 
+  // Model text may hold \( \) and \[ \] formulas (T064); without math-text.js
+  // it stays plain text.
+  var mathEl = window.SbobinaMath ? window.SbobinaMath.element : el;
+
   function outcomeBadge(outcome) {
     return el("span", "badge badge--outcome-" + outcome, OUTCOME_LABELS[outcome] || outcome);
   }
@@ -72,11 +76,11 @@
   function choiceLines(question, answer) {
     var frag = document.createDocumentFragment();
     frag.appendChild(
-      el("p", "practice-result__solution", "Hai scelto " + optionText(question, answer.chosen_index))
+      mathEl("p", "practice-result__solution", "Hai scelto " + optionText(question, answer.chosen_index))
     );
     if (answer.chosen_index !== question.correct_index) {
       frag.appendChild(
-        el(
+        mathEl(
           "p",
           "practice-result__solution",
           "Risposta corretta: " + optionText(question, question.correct_index)
@@ -101,7 +105,7 @@
   }
 
   function quotedItem(main, quote) {
-    var li = el("li", null, main);
+    var li = mathEl("li", null, main);
     li.appendChild(el("span", "practice-result__quote", quote));
     return li;
   }
@@ -115,12 +119,15 @@
     );
     frag.appendChild(
       listSection("Punti che mancano", judgement.missing_points, function (point) {
-        return el("li", null, point);
+        return mathEl("li", null, point);
       })
     );
     frag.appendChild(
       listSection("In contrasto con la soluzione", judgement.errors, function (item) {
-        return quotedItem("«" + item.phrase + "»", item.reason);
+        // The phrase quotes the student's answer: literal; the reason is the judge's.
+        var li = el("li", null, "«" + item.phrase + "»");
+        li.appendChild(mathEl("span", "practice-result__quote", item.reason));
+        return li;
       })
     );
     return frag;
@@ -203,7 +210,7 @@
   function solutionSection(question) {
     var frag = document.createDocumentFragment();
     frag.appendChild(el("h3", "practice-result__heading", "Soluzione"));
-    frag.appendChild(el("p", "practice-result__solution", question.solution));
+    frag.appendChild(mathEl("p", "practice-result__solution", question.solution));
     if (question.citations && question.citations.length > 0) {
       var list = el("ul", "practice-result__citations");
       list.setAttribute("aria-label", "Fonti della soluzione");

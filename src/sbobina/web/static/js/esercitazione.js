@@ -12,6 +12,8 @@
   var dom = window.SbobinaDom;
   var result = window.SbobinaPracticeResult;
   var el = result.el;
+  // Model text may hold formulas (T064); plain text without math-text.js.
+  var mathEl = window.SbobinaMath ? window.SbobinaMath.element : el;
   var ui = window.SbobinaPracticeUi;
   var SLOW_MS = 15000;
   var FORMAT_LABELS = { multiple_choice: "Crocette", open: "Domande aperte", oral: "Orale" };
@@ -87,7 +89,7 @@
 
   function choiceFieldset(index, question) {
     var fieldset = el("fieldset", "practice-question__options");
-    fieldset.appendChild(el("legend", "practice-question__text", question.question));
+    fieldset.appendChild(mathEl("legend", "practice-question__text", question.question));
     question.options.forEach(function (option, optIndex) {
       var label = el("label", "practice-option");
       var radio = document.createElement("input");
@@ -95,7 +97,7 @@
       radio.name = "scelta-" + index;
       radio.value = String(optIndex);
       label.appendChild(radio);
-      label.appendChild(el("span", null, String.fromCharCode(97 + optIndex) + ") " + option));
+      label.appendChild(mathEl("span", null, String.fromCharCode(97 + optIndex) + ") " + option));
       fieldset.appendChild(label);
     });
     return fieldset;
@@ -103,7 +105,7 @@
 
   function textFields(index, question) {
     var wrap = el("div", "field");
-    var questionText = el("p", "practice-question__text", question.question);
+    var questionText = mathEl("p", "practice-question__text", question.question);
     questionText.id = "domanda-testo-" + index;
     wrap.appendChild(questionText);
     var oral = state.attempt.format === "oral";
@@ -221,7 +223,7 @@
       item.appendChild(answerForm(index, question));
       return;
     }
-    item.appendChild(el("p", "practice-question__text", question.question));
+    item.appendChild(mathEl("p", "practice-question__text", question.question));
     item.appendChild(result.render(question, answer, handlersFor(index), index));
   }
 

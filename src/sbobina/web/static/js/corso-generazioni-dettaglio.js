@@ -29,6 +29,10 @@
     return node;
   }
 
+  // Model text may hold \( \) and \[ \] formulas (T064); without math-text.js
+  // it stays plain text.
+  var mathEl = window.SbobinaMath ? window.SbobinaMath.element : el;
+
   function formatTime(seconds) {
     var total = Math.floor(seconds);
     var h = Math.floor(total / 3600);
@@ -82,13 +86,13 @@
   function renderQuestion(question, index) {
     var li = el("li", "generations__question");
     li.appendChild(
-      el("p", "generations__question-text", index + 1 + ". " + question.question)
+      mathEl("p", "generations__question-text", index + 1 + ". " + question.question)
     );
     if (question.options && question.options.length > 0) {
       var options = el("ul", "generations__options");
       question.options.forEach(function (option, optIndex) {
         var letter = String.fromCharCode(97 + optIndex);
-        options.appendChild(el("li", "generations__option", letter + ") " + option));
+        options.appendChild(mathEl("li", "generations__option", letter + ") " + option));
       });
       li.appendChild(options);
     }
@@ -97,10 +101,10 @@
     details.appendChild(el("summary", null, "Soluzione"));
     var body = el("div", "disclosure__body");
     if (question.options && question.options.length > 0) {
-      body.appendChild(el("p", "generations__solution-answer", correctOption(question)));
+      body.appendChild(mathEl("p", "generations__solution-answer", correctOption(question)));
     }
     if (question.solution) {
-      body.appendChild(el("p", "generations__solution-text", question.solution));
+      body.appendChild(mathEl("p", "generations__solution-text", question.solution));
     }
     body.appendChild(citationsList(question.citations));
     details.appendChild(body);
@@ -110,11 +114,11 @@
 
   function renderSection(section) {
     var wrap = el("div", "generations__section");
-    wrap.appendChild(el("h4", "generations__section-title", section.title));
+    wrap.appendChild(mathEl("h4", "generations__section-title", section.title));
     var sentences = el("ul", "generations__sentences");
     section.sentences.forEach(function (sentence) {
       var li = el("li", "generations__sentence");
-      li.appendChild(el("p", "generations__sentence-text", sentence.text));
+      li.appendChild(mathEl("p", "generations__sentence-text", sentence.text));
       li.appendChild(citationsList(sentence.citations));
       sentences.appendChild(li);
     });

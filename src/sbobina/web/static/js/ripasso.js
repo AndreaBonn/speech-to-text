@@ -31,6 +31,7 @@
   var backEl = document.getElementById("ripasso-card-back");
   var sourceBadgeEl = document.getElementById("ripasso-card-source-badge");
   var sourceLinkEl = document.getElementById("ripasso-card-source-link");
+  var renderText = window.SbobinaMath ? window.SbobinaMath.renderMathText : function (node, text) { node.textContent = text; };
   var ratingButtons = Array.prototype.slice.call(
     document.querySelectorAll(".review-card__rating")
   );
@@ -144,8 +145,8 @@
     backWrapEl.hidden = true;
     revealBtn.hidden = false;
     var card = queue[queueIndex];
-    frontEl.textContent = card.front;
-    backEl.textContent = card.back;
+    renderText(frontEl, card.front);
+    renderText(backEl, card.back);
     var resolution = card.anchor_resolution;
     sourceBadgeEl.className = "badge badge--anchor-" + resolution.status;
     sourceBadgeEl.textContent = ANCHOR_LABELS[resolution.status] || resolution.status;
