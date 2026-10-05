@@ -16,6 +16,7 @@ from typing import Any
 
 from fastapi.encoders import jsonable_encoder
 
+from sbobina.file_cache import read_parsed
 from sbobina.generation_models import (
     GenerationCitation,
     GenerationQuestion,
@@ -25,7 +26,7 @@ from sbobina.generation_models import (
     SummarySentence,
 )
 from sbobina.lecture_windows import WINDOW_WORDS
-from sbobina.models import Transcript, load_transcript
+from sbobina.models import Transcript, transcript_from_json
 from sbobina.study_citations import locate_quote
 from sbobina.study_models import Rejection
 from sbobina.web.api_files import TRANSCRIPT_FILES
@@ -127,7 +128,7 @@ def _lecture_transcript(store: JobStore, job_id: str) -> tuple[Transcript, str] 
         if not path.is_file():
             continue
         try:
-            return load_transcript(path=path), variant
+            return read_parsed(path=path, parse=transcript_from_json), variant
         except (OSError, ValueError, KeyError, TypeError):
             return None
     return None

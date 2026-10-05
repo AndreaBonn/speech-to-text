@@ -15,6 +15,7 @@ from itertools import groupby
 
 from sbobina.course_registry import find_by_key
 from sbobina.courses import course_key, effective_course
+from sbobina.file_cache import read_parsed
 from sbobina.lecture_windows import (
     WINDOW_WORDS,
     expand_lecture_windows,
@@ -83,7 +84,7 @@ def lecture_revision(store: JobStore, job_id: str) -> str | None:
         if not path.is_file():
             continue
         try:
-            return transcript_revision(path.read_text(encoding="utf-8"))
+            return read_parsed(path=path, parse=transcript_revision)
         except OSError:
             return None
     return None

@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -45,7 +47,16 @@ def transcript_to_json(transcript: Transcript) -> str:
 
 
 def save_transcript(transcript: Transcript, path: Path) -> None:
-    path.write_text(transcript_to_json(transcript), encoding="utf-8")
+    # Replace, never rewrite in place: readers never see half a file, and the
+    # new inode invalidates file_cache entries even within one mtime tick.
+    descriptor, name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(transcript_to_json(transcript))
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def load_transcript(path: Path) -> Transcript:

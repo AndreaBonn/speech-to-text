@@ -6,6 +6,7 @@ from urllib.parse import quote
 from pydantic import TypeAdapter
 
 from sbobina.card_models import Anchor, DocumentAnchor, GenerationAnchor, LectureAnchor
+from sbobina.file_cache import read_parsed
 from sbobina.models import Transcript
 from sbobina.study_citations import locate_quote
 from sbobina.study_models import Rejection
@@ -74,6 +75,13 @@ def _relocate(
     return AnchorResolution(href=f"{href}?variant={variant}", status="source_modified")
 
 
+def _transcript_and_revision(content: str) -> tuple[Transcript, str]:
+    # Hash the same bytes we parse so an intervening edit cannot mix revisions.
+    return TRANSCRIPT_ADAPTER.validate_json(content), transcript_revision(
+        content=content
+    )
+
+
 def _lecture_resolution(anchor: LectureAnchor, store: JobStore) -> AnchorResolution:
     href = f"/lettore/{anchor.job_id}"
     try:
@@ -87,13 +95,11 @@ def _lecture_resolution(anchor: LectureAnchor, store: JobStore) -> AnchorResolut
             path = directory / TRANSCRIPT_FILES[variant]
             if not path.exists():
                 continue
-            content = path.read_text(encoding="utf-8")
-            # Hash the same bytes we parse so an intervening edit cannot mix revisions.
+            transcript, revision = read_parsed(
+                path=path, parse=_transcript_and_revision
+            )
             return resolve_lecture(
-                anchor=anchor,
-                transcript=TRANSCRIPT_ADAPTER.validate_json(content),
-                revision=transcript_revision(content=content),
-                variant=variant,
+                anchor=anchor, transcript=transcript, revision=revision, variant=variant
             )
     except (OSError, ValueError) as error:
         logger.warning("Unreadable lecture source %s: %s", anchor.job_id, error)

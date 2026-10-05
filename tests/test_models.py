@@ -60,3 +60,20 @@ def test_transcript_from_json_round_trips_saved_text() -> None:
 def test_transcript_from_json_missing_keys_raises_value_error(content: str) -> None:
     with pytest.raises(ValueError, match="Transcript"):
         transcript_from_json(content=content)
+
+
+def test_save_transcript_replaces_the_file_atomically(tmp_path: Path) -> None:
+    # F12 review: the parse cache keys on the inode, so a save must never
+    # rewrite in place (and a reader must never see half a file).
+    path = tmp_path / "audio.json"
+    transcript = make_transcript(
+        segments=[make_segment(words=[make_word(text="uno", start=0.0)])]
+    )
+    save_transcript(transcript=transcript, path=path)
+    before = path.stat().st_ino
+
+    save_transcript(transcript=transcript, path=path)
+
+    assert path.stat().st_ino != before
+    assert load_transcript(path=path) == transcript
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["audio.json"]
