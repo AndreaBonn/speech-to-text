@@ -586,8 +586,16 @@ stessa finestra.
   **Esito: superata** (`tests/web/test_card_store.py`), estesa alle righe valide ma con dati
   non validi, saltate con warning. BASIS: measured.
 - **V5** Latenza del giudice su 20 risposte reali, GPU e CPU.
+  **Esito (2026-10-05): GPU misurata, CPU no.** 90 giudizi su GPU: p50 8,3 s, max 21,5 s. Su CPU
+  (`num_gpu: 0`) Ollama non carica il modello: servono 8,0 GiB di RAM libera, ne erano
+  disponibili 6,2. Dettaglio in `eval-grading.md`. BASIS: measured su GPU, unknown su CPU.
 - **V6** 30 risposte etichettate a mano dall'utente (corretta, parziale, errata): accordo del
   giudice ≥ 80% per mostrare l'esito come voto e non come suggerimento.
+  **Esito (2026-10-05): superata sulla soglia, provvisoria.** Accordo 25/30 (83%) in tre
+  esecuzioni identiche, zero errate giudicate corrette; tutti i disaccordi sono parziali (3 a metà
+  giudicate corrette, 2 con errore giudicate errate). Domande generate dal corso reale, risposte ed
+  etichette di Claude (U5 delegata): il giudizio resta "Suggerimento" finché l'utente non dà il sì
+  sul passaggio a voto. Dettaglio in `eval-grading.md`. BASIS: measured.
 - **V7** Precisione della regex O3 su 3 lezioni reali, frasi marcate a mano dall'utente.
   **Esito (2026-10-05): superata sulla soglia, provvisoria.** Precisione `strong` 1,00 (5/5)
   contro 0,80, `weak` 0,63 (15/24), recall stimato sulla rete larga 0,91 (20/22), stabilità
