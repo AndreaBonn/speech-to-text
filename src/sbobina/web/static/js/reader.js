@@ -1,4 +1,5 @@
-// sbobina · synchronised reader: word-level transcript + sticky audio bar.
+// sbobina · synchronised reader: word-level transcript, highlight driven by
+// the audio bar in reader-audio.js.
 // Vanilla JS, no build step, no CDN. Builds the DOM once per transcript load
 // (DocumentFragment) and uses event delegation: a 2-hour lecture is ~15-20k
 // words, one listener per word would be the slow path.
@@ -24,25 +25,12 @@
   var downloadReport = document.getElementById("download-report");
   var exportDocx = document.getElementById("export-docx");
   var exportTxt = document.getElementById("export-txt");
-  var audioBar = document.getElementById("audio-bar");
-  var player = document.getElementById("audio-player");
-  var playButton = document.getElementById("audio-playpause");
-  var playIcon = document.getElementById("audio-playpause-icon");
-  var backButton = document.getElementById("audio-back");
-  var forwardButton = document.getElementById("audio-forward");
-  var timeEl = document.getElementById("audio-time");
-  var seekInput = document.getElementById("audio-seek");
-  var speedSelect = document.getElementById("audio-speed");
-
-  var SEEK_STEPS = 1000;
-  var SKIP_SECONDS = 10;
 
   var currentVariant = "original";
   var currentRevision = null; // of the text on screen; edits must quote it
   var words = []; // flat, chronological: [{start, end, el}]
   var currentWordEl = null;
   var lastManualScrollAt = 0;
-  var isSeekDragging = false;
 
   // ---------- helpers ----------
 
@@ -87,7 +75,7 @@
       '<a class="btn btn--secondary" href="/storico">Vai allo storico</a>' +
       "</div>";
     pointsEl.innerHTML = "";
-    audioBar.hidden = true;
+    audio.hide();
   }
 
   function showSkeleton() {
@@ -265,80 +253,7 @@
     });
   });
 
-  // ---------- audio bar ----------
-
-  function clampTime(seconds) {
-    var duration = isFinite(player.duration) ? player.duration : seconds;
-    return Math.max(0, Math.min(seconds, duration));
-  }
-
-  function seekTo(seconds) {
-    player.currentTime = clampTime(seconds);
-  }
-
-  function seekAndPlay(seconds) {
-    player.currentTime = clampTime(seconds);
-    player.play().catch(function () {
-      // Autoplay can still be refused by the browser; the transport stays
-      // paused and the user can press play again.
-    });
-  }
-
-  function updatePlayIcon() {
-    playIcon.innerHTML = player.paused ? "&#9654;" : "&#10073;&#10073;";
-    playButton.setAttribute(
-      "aria-label",
-      player.paused ? "Riproduci" : "Metti in pausa"
-    );
-  }
-
-  playButton.addEventListener("click", function () {
-    if (player.paused) {
-      player.play().catch(function () {
-        showStatus("Impossibile avviare la riproduzione.", "warning");
-      });
-    } else {
-      player.pause();
-    }
-  });
-
-  backButton.addEventListener("click", function () {
-    seekAndPlay(player.currentTime - SKIP_SECONDS);
-  });
-
-  forwardButton.addEventListener("click", function () {
-    seekAndPlay(player.currentTime + SKIP_SECONDS);
-  });
-
-  speedSelect.addEventListener("change", function () {
-    player.playbackRate = parseFloat(speedSelect.value) || 1;
-  });
-
-  seekInput.addEventListener("input", function () {
-    isSeekDragging = true;
-    if (isFinite(player.duration)) {
-      player.currentTime = (seekInput.value / SEEK_STEPS) * player.duration;
-    }
-  });
-
-  seekInput.addEventListener("change", function () {
-    isSeekDragging = false;
-  });
-
-  player.addEventListener("play", updatePlayIcon);
-  player.addEventListener("pause", updatePlayIcon);
-
-  player.addEventListener("loadedmetadata", function () {
-    timeEl.textContent = formatTime(0) + " / " + formatTime(player.duration);
-  });
-
-  player.addEventListener("error", function () {
-    showStatus(
-      "Impossibile decodificare l'audio di questa lezione. Il testo resta leggibile.",
-      "danger"
-    );
-    audioBar.hidden = true;
-  });
+  // ---------- word highlight ----------
 
   function findCurrentWordIndex(time) {
     var lo = 0;
@@ -381,17 +296,6 @@
     currentWordEl = nextEl;
   }
 
-  player.addEventListener("timeupdate", function () {
-    if (!isSeekDragging && isFinite(player.duration) && player.duration > 0) {
-      seekInput.value = String(
-        Math.round((player.currentTime / player.duration) * SEEK_STEPS)
-      );
-    }
-    timeEl.textContent =
-      formatTime(player.currentTime) + " / " + formatTime(player.duration || 0);
-    highlightCurrentWord(player.currentTime);
-  });
-
   ["wheel", "touchmove"].forEach(function (eventName) {
     window.addEventListener(
       eventName,
@@ -401,6 +305,14 @@
       { passive: true }
     );
   });
+
+  var audio = window.SbobinaReaderAudio.attach({
+    formatTime: formatTime,
+    onTime: highlightCurrentWord,
+    showStatus: showStatus,
+  });
+  var seekTo = audio.seekTo;
+  var seekAndPlay = audio.seekAndPlay;
 
   // ---------- word + review-point activation (event delegation) ----------
 
@@ -459,7 +371,7 @@
   clearStatus();
   loadTranscript("original")
     .then(function () {
-      audioBar.hidden = false;
+      audio.show();
       checkCorrectedAvailable();
     })
     .catch(function (error) {

@@ -46,6 +46,9 @@
   </div>
 
   <div id="reader-status" class="reader__status" aria-live="polite"></div>
+  {% if not has_audio %}
+  <p id="reader-no-audio" class="banner banner--info">Lezione importata: l'audio non è incluso. Il testo resta leggibile, e un clic su una parola o su un minuto porta a quel punto del testo.</p>
+  {% endif %}
 
   <div class="reader__layout">
     <article id="reader-text" class="reader__text" aria-label="Trascrizione">
@@ -74,6 +77,7 @@
   <p id="edit-error" class="edit-panel__error" role="alert"></p>
 </form>
 
+{% if has_audio %}
 <div id="audio-bar" class="audio-bar" hidden>
   <audio
     id="audio-player"
@@ -104,6 +108,7 @@
     <option value="1.5">1.5&times;</option>
   </select>
 </div>
+{% endif %}
 
 <p id="reader-card-success" class="banner banner--success" role="status" hidden></p>
 
@@ -135,6 +140,7 @@
 {% block scripts %}
 {% if not not_found %}
 <script src="/static/js/reader-words.js" defer></script>
+<script src="/static/js/reader-audio.js" defer></script>
 <script src="/static/js/reader.js" defer></script>
 <script src="/static/js/reader-edit.js" defer></script>
 <script src="/static/js/card-dialog.js" defer></script>

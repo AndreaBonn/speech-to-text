@@ -37,6 +37,12 @@ def test_reader_page_exposes_audio_availability(
     assert response.status_code == 200
     assert f'data-job-id="{record.id}"' in response.text
     assert f'data-has-audio="{has_audio}"' in response.text
+    # T082: an imported lecture has no audio file, so no player asks for one.
+    assert ('id="audio-player"' in response.text) == (not imported)
+    assert ("l'audio non è incluso" in response.text) == imported
+    assert response.text.index("/static/js/reader-audio.js") < response.text.index(
+        "/static/js/reader.js"
+    )
 
 
 def test_rail_disables_reader_link_without_a_done_job(tmp_path: Path) -> None:

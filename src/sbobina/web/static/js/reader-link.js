@@ -1,6 +1,7 @@
 // sbobina · reader deep link: /lettore/<id>?t=<seconds>&variant=<v> opens the
 // requested text version, moves the audio to t and marks the word spoken
-// there. Search results and study-note citations land here. A bad t or
+// there (only the word when the lecture has no audio). Search results and
+// study-note citations land here. A bad t or
 // variant is ignored: the reader then behaves as if opened without them.
 (function () {
   "use strict";
@@ -10,7 +11,7 @@
 
   var root = document.querySelector(".reader[data-job-id]");
   var player = document.getElementById("audio-player");
-  if (!root || !player || !window.sbobinaReader) {
+  if (!root || !window.sbobinaReader) {
     return;
   }
   var reader = window.sbobinaReader;
@@ -54,6 +55,11 @@
   }
 
   function landWhenReady(seconds) {
+    // An imported lecture has no audio: point at the text, nothing to wait for.
+    if (!player) {
+      markWord(seconds);
+      return;
+    }
     function land() {
       // Past the end means the link no longer matches this audio: ignore it.
       if (seconds <= player.duration) {
