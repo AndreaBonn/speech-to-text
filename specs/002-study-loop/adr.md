@@ -355,8 +355,8 @@ hash di contenuto solo per la deduplicazione.
   `innerHTML` compare 0 volte in `katex.min.js` e in `katex.mjs`.
 - Opzioni: `trust` (boolean o funzione; abilita `\url`, `\href`, `\htmlClass` ecc.), `maxExpand`
   default 1000, `maxSize` default `Infinity`, `throwOnError`, `strict`.
-- Licenza dei font: coperta dalla stessa LICENSE del pacchetto secondo la struttura del repo
-  (UNVERIFIED: verificare se i font hanno una notice separata prima di vendorizzare, V8).
+- Licenza dei font: MIT, notice separata nel repo upstream `KaTeX/katex-fonts` ("Copyright (c)
+  2018 Khan Academy"), vendorizzata come `LICENSE-fonts` accanto alla `LICENSE` del pacchetto (V8).
 
 ### Passata 1: approcci generati
 
@@ -590,6 +590,11 @@ stessa finestra.
   giudice ≥ 80% per mostrare l'esito come voto e non come suggerimento.
 - **V7** Precisione della regex O3 su 3 lezioni reali, frasi marcate a mano dall'utente.
 - **V8** Notice di licenza dei font KaTeX nel repo upstream.
+  **Esito: superata** (2026-10-05). `KaTeX/katex-fonts/LICENSE` è MIT, Copyright (c) 2018 Khan
+  Academy; la `LICENSE` del tarball `katex@0.19.0` è MIT, Copyright (c) 2013-2020 Khan Academy e
+  contributori. Entrambe in `static/vendor/katex-0.19.0/`. Tarball verificato: sha256
+  `d8e49f2fea6eeed7cdae2cf4fd48e2f1d348758aa9e5740715e4533c2c96d1ee`, sha512 uguale al
+  `dist.integrity` del registry npm. BASIS: measured.
 - **V9** Tasso di citazioni scartate su pagine con formule, soglia 20%.
 - **V10** OCR `qwen2.5vl:7b` con prompt `ocr-v2.md` su 10 pagine con formule: formule parsabili da
   KaTeX e corrette a confronto con la pagina.

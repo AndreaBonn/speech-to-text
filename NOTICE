@@ -2,3 +2,10 @@ Transcriber (sbobina)
 Copyright 2026 Andrea Bonacci <andreabonacci95@protonmail.com>
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes KaTeX 0.19.0 (https://katex.org), in
+src/sbobina/web/static/vendor/katex-0.19.0/:
+- katex.min.js and katex.min.css, MIT License, Copyright (c) 2013-2020 Khan
+  Academy and other contributors (see LICENSE in that directory);
+- the KaTeX fonts (woff2), MIT License, Copyright (c) 2018 Khan Academy (see
+  LICENSE-fonts in that directory).
