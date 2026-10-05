@@ -1,0 +1,20 @@
+    <dialog id="examcue-card-dialog" class="card-dialog" aria-labelledby="examcue-card-dialog-title">
+      <form id="examcue-card-form" novalidate>
+        <h3 id="examcue-card-dialog-title" class="card-dialog__title">Crea carta</h3>
+        <div class="field">
+          <label class="field__label" for="examcue-card-front">Fronte</label>
+          <textarea id="examcue-card-front" class="text-input" rows="3" maxlength="2000" required></textarea>
+          <p id="examcue-card-front-error" class="field__error" role="alert" hidden></p>
+        </div>
+        <div class="field">
+          <label class="field__label" for="examcue-card-back">Retro</label>
+          <textarea id="examcue-card-back" class="text-input" rows="4" maxlength="2000"></textarea>
+          <p id="examcue-card-back-error" class="field__error" role="alert" hidden></p>
+        </div>
+        <p id="examcue-card-error" class="card-dialog__error" role="alert"></p>
+        <div class="card-dialog__actions">
+          <button type="button" id="examcue-card-cancel" class="btn btn--ghost">Annulla</button>
+          <button type="submit" id="examcue-card-submit" class="btn btn--primary">Crea carta</button>
+        </div>
+      </form>
+    </dialog>

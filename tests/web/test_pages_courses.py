@@ -166,3 +166,23 @@ def test_corsi_page_has_attempts_and_mistakes_before_detail_script(
     assert body.index("/static/js/corso-esercitazioni.js") < body.index(
         "/static/js/corso-dettaglio.js"
     )
+
+
+def test_corsi_page_has_package_export_and_import(tmp_path: Path) -> None:
+    # T078: export dialog in the course detail, import in the course list.
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/corsi").text
+
+    for element in ('id="export-open"', 'id="export-dialog"', 'id="import-input"'):
+        assert element in body
+    assert "diritto d'autore" in body
+    assert "voci e nomi di altri studenti" in body
+    assert 'id="examcue-card-dialog"' in body  # moved to a partial, still there
+    # Detail script calls SbobinaCourseExport, list reload is used by import.
+    assert (
+        body.index("/static/js/corso-export.js")
+        < body.index("/static/js/corso-dettaglio.js")
+        < body.index("/static/js/corsi.js")
+        < body.index("/static/js/corsi-import.js")
+    )

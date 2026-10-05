@@ -69,16 +69,7 @@
     }
   });
 
-  function formatBytes(bytes) {
-    if (bytes >= 1024 * 1024) {
-      return (
-        (bytes / (1024 * 1024)).toLocaleString("it-IT", {
-          maximumFractionDigits: 1,
-        }) + " MB"
-      );
-    }
-    return Math.ceil(bytes / 1024) + " KB";
-  }
+  var formatBytes = window.SbobinaDom.formatBytes;
 
   function showMessage(message) {
     clearChildren(statusEl);

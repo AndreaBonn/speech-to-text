@@ -117,8 +117,21 @@
     return h > 0 ? h + ":" + String(m).padStart(2, "0") + ":" + s : m + ":" + s;
   }
 
+  // File sizes as the materials list shows them: KB below 1 MB, MB above.
+  function formatBytes(bytes) {
+    if (bytes >= 1024 * 1024) {
+      return (
+        (bytes / (1024 * 1024)).toLocaleString("it-IT", {
+          maximumFractionDigits: 1,
+        }) + " MB"
+      );
+    }
+    return Math.ceil(bytes / 1024) + " KB";
+  }
+
   window.SbobinaDom = {
     jobTitle: jobTitle,
+    formatBytes: formatBytes,
     formatTime: formatTime,
     clearChildren: clearChildren,
     textCell: textCell,

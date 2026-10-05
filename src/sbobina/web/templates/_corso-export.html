@@ -1,0 +1,26 @@
+    <button type="button" id="export-open" class="btn btn--secondary package__open">Esporta il corso</button>
+
+    <dialog id="export-dialog" class="card-dialog" aria-labelledby="export-dialog-title">
+      <form id="export-form" novalidate>
+        <h3 id="export-dialog-title" class="card-dialog__title">Esporta il corso</h3>
+        <p class="field__helper">
+          Un file .sbobina.zip con le lezioni (senza audio), i materiali scelti, le esercitazioni e le
+          carte del Ripasso, da importare su un altro computer.
+        </p>
+        <fieldset class="package__docs">
+          <legend class="field__label">Materiali da includere</legend>
+          <p id="export-docs-status" class="field__helper">Carico i materiali…</p>
+          <ul id="export-docs" class="package__list" hidden></ul>
+        </fieldset>
+        <p id="export-weight" class="field__helper" hidden></p>
+        <p class="banner banner--warning package__notice">
+          Libri e slide sono spesso protetti dal diritto d'autore: condividi il pacchetto solo con chi
+          può usarli. Le trascrizioni possono contenere voci e nomi di altri studenti.
+        </p>
+        <p id="export-error" class="card-dialog__error" role="alert"></p>
+        <div class="card-dialog__actions">
+          <button type="button" id="export-cancel" class="btn btn--ghost">Annulla</button>
+          <button type="submit" id="export-submit" class="btn btn--primary">Esporta</button>
+        </div>
+      </form>
+    </dialog>

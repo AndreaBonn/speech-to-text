@@ -1,0 +1,25 @@
+    <section id="corsi-import" class="package" aria-labelledby="corsi-import-title">
+      <h3 id="corsi-import-title" class="section-title">Importa un corso</h3>
+      <p class="field__helper">
+        Un pacchetto .sbobina.zip esportato da un'altra installazione arriva come corso nuovo, con
+        lezioni, materiali, esercitazioni e carte. L'audio delle lezioni non è incluso.
+      </p>
+      <form id="import-form" class="materials__upload" novalidate>
+        <label id="import-dropzone" class="dropzone" for="import-input">
+          <input id="import-input" class="dropzone__input" type="file" accept=".zip,application/zip" />
+          <span class="dropzone__prompt">
+            Trascina il pacchetto qui o scegli
+            <span class="dropzone__hint">.sbobina.zip</span>
+          </span>
+        </label>
+        <p id="import-error" class="field__error" role="alert" hidden></p>
+      </form>
+      <div id="import-progress" class="materials__progress" hidden>
+        <div class="progress" role="progressbar" aria-label="Avanzamento dell'importazione"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="progress__track"><div id="import-bar" class="progress__fill"></div></div>
+        </div>
+        <p id="import-stage" class="field__helper" aria-live="polite"></p>
+      </div>
+      <div id="import-result" class="banner banner--success" role="status" hidden></div>
+    </section>

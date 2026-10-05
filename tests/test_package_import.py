@@ -101,7 +101,11 @@ def test_import_package_reimport_creates_new_course_with_warning(
     first = import_package(source=source, data_dir=data, now=IMPORT_TIME)
     second = import_package(source=source, data_dir=data, now=IMPORT_TIME)
     assert first.warning is None
-    assert second.warning == f"già importato il {IMPORT_TIME.isoformat()}"
+    # Shown to the student as is (T078): a date, not a timestamp.
+    assert (
+        second.warning
+        == f"già importato il {IMPORT_TIME.astimezone().date().isoformat()}"
+    )
     assert len({first.course.id, second.course.id}) == 2
     assert len({first.course.key, second.course.key}) == 2
     assert len(list(iter_courses(courses_dir=data / "courses"))) == 2

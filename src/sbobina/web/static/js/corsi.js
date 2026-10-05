@@ -137,6 +137,8 @@
   // shared link: it both backs the "Tutti i corsi" return and resolves the
   // course label for the heading once the fetch completes.
   loadList(1);
+  // corsi-import.js shows a freshly imported course without a page reload.
+  window.SbobinaCourses = { reload: function () { loadList(listPage); } };
 
   var initialKey = courseKeyFromUrl();
   if (initialKey === null) {

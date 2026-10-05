@@ -233,7 +233,8 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
 - [ ] Allowlist di `job.json` (S3, P2): ogni campo di `JobRecord` è classificato
       esportato/escluso in una costante; un test di regressione fallisce se `JobRecord` acquista un
       campo non classificato.
-- [ ] Finestra di export: elenco con scelta per documento di testo estratto e originale (U1),
+- [ ] Finestra di export: elenco con scelta per documento di testo estratto e originale (U1;
+      emendato il 2026-10-05 dall'utente: una casella per documento, incluso o escluso del tutto),
       riga sul diritto d'autore, avviso che le trascrizioni possono contenere voci e nomi di altri
       studenti.
 - [ ] Import (ADR D6), file non fidato, nessun `extractall`, in processo figlio con `RLIMIT_AS`:

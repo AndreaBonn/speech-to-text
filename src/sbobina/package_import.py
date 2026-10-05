@@ -56,7 +56,10 @@ def _previous_warning(courses_dir: Path, package_id: str) -> str | None:
             previous = PROVENANCE_ADAPTER.validate_json(path.read_bytes())
             if previous.package_id == package_id:
                 dates.append(previous.imported_at)
-    return f"già importato il {min(dates).isoformat()}" if dates else None
+    if not dates:
+        return None
+    # Shown to the student as is: the local date, as in the renamed label.
+    return f"già importato il {min(dates).astimezone().date().isoformat()}"
 
 
 class PackageStorageError(OSError):

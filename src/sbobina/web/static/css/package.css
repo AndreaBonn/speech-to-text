@@ -1,0 +1,47 @@
+/* Course package: export dialog in the course detail, import in the list (T078). */
+
+.package {
+  margin-top: var(--space-lg);
+}
+
+.package__open {
+  margin-bottom: var(--space-md);
+}
+
+.package__docs {
+  border: 0;
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.package__list {
+  list-style: none;
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.package__doc {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 44px;
+}
+
+.package__doc-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.package__doc-size {
+  flex: none;
+  color: var(--color-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.package__notice {
+  margin-top: var(--space-md);
+}

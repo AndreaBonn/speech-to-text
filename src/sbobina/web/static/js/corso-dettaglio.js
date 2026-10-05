@@ -35,6 +35,7 @@
   var chat = window.SbobinaCourseChat;
   var examCues = window.SbobinaCourseExamCues;
   var practice = window.SbobinaCoursePractice;
+  var packageExport = window.SbobinaCourseExport;
   var clearChildren = dom.clearChildren;
   var textCell = dom.textCell;
   var showSkeleton = dom.showSkeleton;
@@ -171,6 +172,7 @@
     generations.show(key);
     practice.show(key);
     chat.show(key);
+    packageExport.show(key);
   }
 
   function showList() {
@@ -182,6 +184,7 @@
     generations.hide();
     practice.hide();
     chat.hide();
+    packageExport.hide();
   }
 
   function refreshTitle() {
