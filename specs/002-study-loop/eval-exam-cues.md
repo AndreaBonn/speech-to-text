@@ -92,3 +92,29 @@ Limiti da tenere presenti prima di rendere i cue vistosi nel Lettore:
   come oggi.
 
 BASIS: measured su precisione, stabilità e latenza; inferred sul recall (rete larga non esaustiva).
+
+## Iterazione 2: forme enclitiche (F32, 2026-10-05)
+
+`BUDGET: 1 modifica, 1 rimisura | ranking: precisione strong ≥ 0,80 > nessun segnale forte perso in
+più > recall`
+
+`STRONG_PATTERNS_V2` aggiunge `ricordatevelo/-la/-li/-le` e `segnatevela/-li/-le` a v1. Gli altri
+pattern non cambiano.
+
+`eval_exam_cues.py` calcola la precisione sul campo `predicted` scritto all'export del gold set,
+quindi non vede una modifica dei pattern. La v2 è stata rimisurata rieseguendo `find_exam_cues`
+sulle stesse trascrizioni corrette e confrontando ogni frase trovata con le etichette (stessa
+lezione, stesso segmento, stessa frase):
+
+| | v1 | v2 |
+|---|---|---|
+| Precisione `strong` | 5/5 | 6/6 |
+| Precisione `weak` | 15/24 | 15/24 |
+| Recall stimato sulla rete larga | 20/22 | 21/22 |
+| Stabilità sul duplicato | 100% | 100% |
+
+Il segnale recuperato è "ricordatevelo sempre" (8319d0b3, 42:03). Resta perso "la classica domanda
+è" (F33). Due frasi `weak` "ma attenzione" non hanno riga nel gold set: sono segnali deboli, che v2
+non tocca, quindi erano già fuori dall'export con v1 (dedotto, non rieseguito con v1).
+
+`SPEDITO: iter 2/2 - pattern v2.` BASIS: measured sulle metriche, inferred sulle due frasi non etichettate.
