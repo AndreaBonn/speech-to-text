@@ -29,7 +29,7 @@ from sbobina.generation_validation import (
 from sbobina.ollama_chat import ChatRequest, strip_markdown_fence
 from sbobina.retrieval import RetrievedPassage
 
-PROMPT_FILE = "chat-v2.md"
+PROMPT_FILE = "chat-v3.md"
 MAX_ATTEMPTS = 2
 # Keeps the prompt bounded regardless of how many passages retrieval hands in.
 MAX_PASSAGES = 12

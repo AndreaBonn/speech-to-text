@@ -22,7 +22,7 @@ from sbobina.study_models import (
 )
 from sbobina.study_validation import convert_chapter, validate_chapter
 
-PROMPT_FILE = "studio-v1.md"
+PROMPT_FILE = "studio-v2.md"
 MAX_ATTEMPTS = 2
 REVISION_CHARS = 16
 type StudyChat = Callable[[ChatRequest], str]

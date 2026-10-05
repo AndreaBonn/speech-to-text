@@ -267,3 +267,14 @@ def test_validate_chapter_rejects_quote_missing_from_the_original_segments() -> 
     items = len(chapter.summary) + len(chapter.concepts) + len(chapter.questions)
     assert kept == chapter
     assert (dropped, dict(counts)) == (None, {RejectionReason.QUOTE_NOT_FOUND: items})
+
+
+def test_generate_study_records_the_prompt_that_asks_for_delimited_formulas() -> None:
+    chat = FakeChat(responses=[response_fixture()])
+
+    result = generate_study(
+        transcript=transcript_fixture(), chat=chat, options=StudyOptions(model="test")
+    )
+
+    assert result.prompt_version == "studio-v2"
+    assert "fra \\( e \\)" in chat.requests[0].system_prompt

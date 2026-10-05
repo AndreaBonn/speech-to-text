@@ -46,10 +46,10 @@ INVALID_RESPONSE_ERROR = "INVALID_RESPONSE"
 type GenerationChat = Callable[[ChatRequest], str]
 
 PROMPT_FILES: dict[GenerationFormat, str] = {
-    GenerationFormat.MULTIPLE_CHOICE: "compito-v2.md",
-    GenerationFormat.OPEN: "compito-v2.md",
-    GenerationFormat.ORAL: "compito-v2.md",
-    GenerationFormat.SUMMARY: "riassunto-v1.md",
+    GenerationFormat.MULTIPLE_CHOICE: "compito-v3.md",
+    GenerationFormat.OPEN: "compito-v3.md",
+    GenerationFormat.ORAL: "compito-v3.md",
+    GenerationFormat.SUMMARY: "riassunto-v2.md",
 }
 _FORMAT_LABELS: dict[GenerationFormat, str] = {
     GenerationFormat.MULTIPLE_CHOICE: "crocette",
