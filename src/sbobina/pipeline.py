@@ -128,9 +128,7 @@ def _correct(
     on_progress: Callable[[int, int], None] | None,
 ) -> tuple[CorrectionResult, dict[str, int]]:
     recorder = ServedByRecorder()
-    chat = llm_factory.build_chat_client(
-        settings=config, keys=llm_factory.keys_from_settings(config), recorder=recorder
-    )
+    chat = llm_factory.build_from_settings(settings=config, recorder=recorder)
     corrector = llm_corrector.make_ollama_corrector(
         chat=chat, model=config.ollama_model, subject=subject
     )

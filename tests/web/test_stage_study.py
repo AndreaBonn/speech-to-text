@@ -1,6 +1,6 @@
 from dataclasses import replace
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 from pydantic import JsonValue
@@ -53,7 +53,9 @@ def test_study_stage_writes_pair_revision_and_every_block_progress(
     ]
     assert store.read_progress(job_id=study_directory.name)["stage"] == "study"
     assert store.get(job_id=study_directory.name) == record_before
-    prepare.assert_called_once_with(model="custom-study", host=settings.ollama_host)
+    prepare.assert_called_once_with(
+        model="custom-study", host=settings.ollama_host, config=ANY, recorder=ANY
+    )
 
 
 @pytest.mark.parametrize("when", ["prepare", "chat"])
@@ -87,7 +89,7 @@ def test_study_writes_intermediate_progress_without_throttle(
     store = JobStore(data_dir=study_directory.parent.parent)
     seen: list[JsonValue] = []
 
-    def prepare(model: str, host: str) -> StudyChat:
+    def prepare(model: str, host: str, **_: object) -> StudyChat:
         def answer(request: object) -> str:
             seen.append(store.read_progress(job_id=study_directory.name)["progress"])
             return response_fixture()

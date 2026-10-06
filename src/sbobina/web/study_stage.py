@@ -1,6 +1,8 @@
+from dataclasses import replace
 from pathlib import Path
 
-from sbobina import study_command
+from sbobina import llm_factory, study_command
+from sbobina.llm_chain import ServedByRecorder
 from sbobina.render import RenderOptions
 from sbobina.settings import Settings
 from sbobina.study_pipeline import (
@@ -19,13 +21,17 @@ def generate_study_files(
     content = paths.source.read_bytes().decode("utf-8")
     transcript = study_command.TRANSCRIPT_ADAPTER.validate_json(content)
     on_progress(0, 1)
+    recorder = ServedByRecorder()
     result = generate_study(
         transcript=transcript,
         chat=study_command._prepare_chat(
-            model=config.ollama_model, host=config.ollama_host
+            model=config.ollama_model,
+            host=config.ollama_host,
+            config=config,
+            recorder=recorder,
         ),
         options=StudyOptions(
-            model=config.ollama_model,
+            model=llm_factory.effective_model_label(settings=config),
             block_words=config.study_block_words,
             num_predict=config.study_num_predict,
             source_variant=paths.variant,
@@ -33,6 +39,7 @@ def generate_study_files(
         ),
         on_progress=on_progress,
     )
+    result = replace(result, served_by=recorder.snapshot() or None)
     save_study(
         result=result,
         json_path=paths.output,

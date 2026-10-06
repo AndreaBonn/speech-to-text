@@ -181,6 +181,8 @@ class GenerationRecord:
     # Appended last, defaulted: a record saved before T034 has no such key
     # in its JSON and must still load (see test_generation_models.py).
     requested_sources: GenerationSources = field(default_factory=GenerationSources)
+    # Which provider/model served how many requests (T024); absent before it.
+    served_by: dict[str, int] | None = None
 
     def __post_init__(self) -> None:
         self._validate_status()

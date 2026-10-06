@@ -1,17 +1,17 @@
 import argparse
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
 
-from ollama import Client
 from pydantic import TypeAdapter
 
-from sbobina import llm_corrector, ollama_chat
+from sbobina import llm_corrector, llm_factory
 from sbobina.correction import CorrectorUnavailableError
+from sbobina.llm_chain import ServedByRecorder
 from sbobina.models import Transcript
 from sbobina.render import RenderOptions
-from sbobina.settings import settings
+from sbobina.settings import Settings, settings
 from sbobina.study_pipeline import (
     StudyChat,
     StudyOptions,
@@ -42,14 +42,15 @@ def select_study_paths(path: Path) -> StudyPaths:
     )
 
 
-def _prepare_chat(model: str, host: str) -> StudyChat:
-    llm_corrector.ensure_model(model=model, host=host)
-    client = Client(host=host)
-
-    def chat(request: ollama_chat.ChatRequest) -> str:
-        return ollama_chat.chat_json(client=client, request=request)
-
-    return chat
+def _prepare_chat(
+    model: str,
+    host: str,
+    config: Settings | None = None,
+    recorder: ServedByRecorder | None = None,
+) -> StudyChat:
+    base = config if config is not None else settings
+    effective = base.model_copy(update={"ollama_model": model, "ollama_host": host})
+    return llm_factory.build_from_settings(settings=effective, recorder=recorder)
 
 
 def _log_study_progress(done: int, total: int) -> None:
@@ -69,14 +70,19 @@ def _study_options(model: str, paths: StudyPaths, content: str) -> StudyOptions:
 def _generate_files(paths: StudyPaths, model: str, chat: StudyChat | None) -> None:
     content = paths.source.read_text(encoding="utf-8")
     transcript = TRANSCRIPT_ADAPTER.validate_json(content)
+    recorder = ServedByRecorder()
+    label = llm_factory.effective_model_label(
+        settings=settings.model_copy(update={"ollama_model": model})
+    )
     result = generate_study(
         transcript=transcript,
         chat=chat
         if chat is not None
-        else _prepare_chat(model=model, host=settings.ollama_host),
-        options=_study_options(model=model, paths=paths, content=content),
+        else _prepare_chat(model=model, host=settings.ollama_host, recorder=recorder),
+        options=_study_options(model=label, paths=paths, content=content),
         on_progress=_log_study_progress,
     )
+    result = replace(result, served_by=recorder.snapshot() or None)
     render_options = RenderOptions(
         uncertain_threshold=settings.uncertain_threshold,
         paragraph_gap_s=settings.paragraph_gap_s,

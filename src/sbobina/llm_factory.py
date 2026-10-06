@@ -102,6 +102,28 @@ def build_chat_client(
     )
 
 
+def has_cloud_key(settings: Settings) -> bool:
+    """True when the api engine has a key for at least one chain link."""
+    if settings.llm_engine != "api":
+        return False
+    keys = keys_from_settings(settings=settings)
+    return any(entry.provider in keys for entry in settings.llm_chain)
+
+
+def build_from_settings(
+    settings: Settings,
+    recorder: ServedByRecorder | None = None,
+    guard: Guard | None = None,
+) -> ChatClient:
+    """Build the client with the keys every caller resolves the same way."""
+    return build_chat_client(
+        settings=settings,
+        keys=keys_from_settings(settings=settings),
+        guard=guard,
+        recorder=recorder,
+    )
+
+
 def _build_local_client(
     settings: Settings, recorder: ServedByRecorder | None
 ) -> ChatClient:

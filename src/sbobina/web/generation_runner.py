@@ -15,9 +15,7 @@ from dataclasses import dataclass, replace
 from importlib import resources
 from pathlib import Path
 
-from ollama import Client
-
-from sbobina import llm_corrector, ollama_chat
+from sbobina import llm_factory
 from sbobina.generation_models import (
     GenerationFormat,
     GenerationRecord,
@@ -36,6 +34,7 @@ from sbobina.generation_pipeline import (
     estimate_tokens,
     generate,
 )
+from sbobina.llm_chain import ServedByRecorder
 from sbobina.ollama_chat import CONTEXT_WINDOW_TOKENS
 from sbobina.retrieval import (
     DocumentSource,
@@ -119,6 +118,7 @@ class GenerationJob:
     course_id: str
     course_key: str
     record: GenerationRecord
+    recorder: ServedByRecorder | None = None
 
 
 def _status_for_outcome(outcome: GenerationOutcome) -> GenerationStatus:
@@ -257,19 +257,16 @@ def execute_generation(job: GenerationJob, chat: GenerationChat, model: str) -> 
     save_generation(
         courses_dir=job.store.courses_dir,
         course_id=job.course_id,
-        record=_to_record(record=job.record, result=result, sources=sources),
+        record=replace(
+            _to_record(record=job.record, result=result, sources=sources),
+            served_by=(job.recorder.snapshot() or None) if job.recorder else None,
+        ),
     )
 
 
 def _course_key(courses_dir: Path, course_id: str) -> str:
     content = (courses_dir / course_id / COURSE_FILENAME).read_text(encoding="utf-8")
     return str(json.loads(content)["key"])
-
-
-def _build_chat(model: str, host: str) -> GenerationChat:
-    llm_corrector.ensure_model(model=model, host=host)
-    client = Client(host=host)
-    return lambda request: ollama_chat.chat_json(client=client, request=request)
 
 
 def run_generation_stage(course_dir: Path) -> None:
@@ -285,9 +282,11 @@ def run_generation_stage(course_dir: Path) -> None:
         course_id=course_id,
         course_key=_course_key(courses_dir=courses_dir, course_id=course_id),
         record=record,
+        recorder=ServedByRecorder(),
     )
-    chat = _build_chat(model=settings.ollama_model, host=settings.ollama_host)
-    execute_generation(job=job, chat=chat, model=settings.ollama_model)
+    chat = llm_factory.build_from_settings(settings=settings, recorder=job.recorder)
+    label = llm_factory.effective_model_label(settings=settings)
+    execute_generation(job=job, chat=chat, model=label)
 
 
 __all__ = [
