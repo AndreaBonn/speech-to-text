@@ -633,6 +633,10 @@ stessa finestra.
   giudicate corrette, 2 con errore giudicate errate). Domande generate dal corso reale, risposte ed
   etichette di Claude (U5 delegata): il giudizio resta "Suggerimento" finché l'utente non dà il sì
   sul passaggio a voto. Dettaglio in `eval-grading.md`. BASIS: measured.
+  **Aggiornamento (2026-10-06, F41): soluzioni a più punti (`compito-v4`).** Su un set nuovo di
+  10 domande e 30 risposte di Claude: accordo 28/30 in tre esecuzioni, risposte a metà giudicate
+  parziali 10/10 (obiettivo 6 su 7 raggiunto), nessuna errata giudicata corretta; 2 complete su 10
+  giudicate parziali. Provvisorio come V6. Dettaglio in `eval-grading.md`.
   **Aggiornamento (2026-10-05, F41): `valutazione-v2`.** Stesse 30 risposte: accordo 26/30 (87%),
   zero errate giudicate corrette, risposte a metà giudicate parziali 5/7 (erano 4/7). BASIS: measured.
   **Decisione dell'utente (2026-10-05): il giudizio diventa voto** ("passo a voto ora"), con il

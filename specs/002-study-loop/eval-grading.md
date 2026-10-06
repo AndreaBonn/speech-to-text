@@ -143,7 +143,31 @@ doppio dei 856 token di uscita, il taglio cade nella terza e il secondo tentativ
 pipeline tiene le domande scritte per intero (F40), e una citazione esatta più lunga di 40 parole
 viene accorciata alle prime 40 invece di far scartare la domanda (F81).
 
-`SPEDITO: iter 1/1 - compito-v4.` BASIS: measured sul numero di punti; **unknown** sull'effetto nel
-giudice: le 30 risposte di V6 sono scritte per le soluzioni a un punto e non sono state rifatte,
-quindi l'obiettivo di 6 su 7 risposte a metà giudicate parziali resta da misurare con un dataset
-nuovo.
+`SPEDITO: iter 1/1 - compito-v4.` BASIS: measured sul numero di punti.
+
+### Effetto sul giudice (2026-10-06)
+
+Nuovo set di valutazione (U5 delegata, dati di Claude, quindi provvisorio come V6): 10 domande
+generate con `compito-v4` dal corso di Diritto, su TFR e azioni possessorie (5 aperte, 5 orali;
+ogni soluzione con 2 o 3 punti), e per ciascuna tre risposte di Claude: completa (attesa
+"corretta"), con il solo primo punto (attesa "parziale"), errata. Scartate due domande generate
+che invertivano i termini dell'azione di reintegrazione. Giudice `valutazione-v2` invariato, 3
+esecuzioni con `scripts/eval_grading.py`; dati in `data/eval/grading/` (fuori dal repo).
+
+Soglie scritte prima dei numeri: accordo ≥ 80% per esecuzione, al massimo 1 errata giudicata
+corretta, risposte a metà giudicate parziali ≥ 86% (6 su 7).
+
+| | Esecuzione 1 | Esecuzione 2 | Esecuzione 3 |
+|---|---|---|---|
+| Accordo | 28/30 (93%) | 28/30 (93%) | 28/30 (93%) |
+| Risposte a metà giudicate parziali | 10/10 | 10/10 | 10/10 |
+| Errate giudicate corrette | 0 | 0 | 0 |
+| Complete giudicate corrette | 8/10 | 8/10 | 8/10 |
+
+Verdetti identici nelle tre esecuzioni. Latenza p50 8,5 s, massimo 16,8 s. I due disaccordi sono
+risposte complete giudicate parziali (domanda orale sulla misura minima del TFR e domanda orale
+sulle caratteristiche dello spoglio): con più punti il giudice è più severo sulle risposte
+complete scritte con parole diverse dalla soluzione, mentre con v1 nessuna corretta era scesa.
+
+`SPEDITO: iter 1/1 - compito-v4 con valutazione-v2: obiettivo di F41 raggiunto (10/10 contro 5/7),
+al costo di 2 risposte complete su 10 giudicate parziali.` BASIS: measured su etichette di Claude.
