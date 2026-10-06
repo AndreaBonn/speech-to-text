@@ -12,6 +12,8 @@ transcription is done.
 
 from typing import TYPE_CHECKING
 
+from sbobina.runtime_config import runtime_settings
+from sbobina.settings import settings
 from sbobina.web.gpu_lock import LeaseCancelledError
 from sbobina.web.job_models import JobStage, WorkItem
 
@@ -24,6 +26,14 @@ TRANSCRIBING_STAGE_LABEL = "transcribing"
 def execute_pipeline_action(supervisor: "Supervisor", item: WorkItem) -> bool:
     """True once TRANSCRIBING (and, if configured, CORRECTING) succeeded."""
     record = supervisor._store.get(job_id=item.job_id)
+    if runtime_settings(settings=settings).transcription_engine == "assemblyai":
+        # Remote transcription: no GPU to lease and no Ollama model to unload,
+        # so chat keeps the GPU while the audio is processed elsewhere.
+        if not supervisor._run_stage(item=item, stage=JobStage.TRANSCRIBING):
+            return False
+        return _run_correction(
+            supervisor=supervisor, record_correct=record.config.correct, item=item
+        )
     try:
         with supervisor._gpu_arbiter.transcription_lease(
             stage=TRANSCRIBING_STAGE_LABEL
@@ -34,6 +44,14 @@ def execute_pipeline_action(supervisor: "Supervisor", item: WorkItem) -> bool:
                 return False
     except LeaseCancelledError:
         return False
-    if not record.config.correct:
+    return _run_correction(
+        supervisor=supervisor, record_correct=record.config.correct, item=item
+    )
+
+
+def _run_correction(
+    supervisor: "Supervisor", record_correct: bool, item: WorkItem
+) -> bool:
+    if not record_correct:
         return True
     return supervisor._run_stage(item=item, stage=JobStage.CORRECTING)

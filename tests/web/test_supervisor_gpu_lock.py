@@ -1,10 +1,17 @@
+import os
 import threading
 import time
+from pathlib import Path
 from threading import Event
 
 import pytest
 from test_supervisor import Harness, harness, wait_for
 
+from sbobina.user_preferences import (
+    UserPreferences,
+    preferences_path,
+    save_preferences,
+)
 from sbobina.web.errors import JobNotCancellableError
 from sbobina.web.gpu_lock import GpuArbiter, GpuBusyError
 from sbobina.web.job_models import JobStatus
@@ -137,3 +144,23 @@ def test_cancel_during_lease_wait_does_not_deadlock(harness: Harness) -> None:
     release_chat.set()
     chat_thread.join(timeout=5)
     harness.supervisor.stop()
+
+
+def test_assemblyai_transcription_leaves_the_gpu_to_chat(harness: Harness) -> None:
+    config_dir = Path(os.environ["XDG_CONFIG_HOME"]) / "sbobina"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    save_preferences(
+        path=preferences_path(config_dir),
+        preferences=UserPreferences(transcription_engine="assemblyai"),
+    )
+    job_id = harness.create(hold=True)
+    arbiter = harness.supervisor._gpu_arbiter
+    harness.supervisor.start()
+    harness.supervisor.submit(job_id=job_id)
+    wait_for(predicate=harness.marker(job_id=job_id, name="transcribe.started").exists)
+
+    with arbiter.chat_turn():
+        pass  # no lease: chat runs while the audio is transcribed remotely
+
+    harness.marker(job_id=job_id, name="hold").unlink()
+    wait_for(predicate=lambda: harness.finished(job_id=job_id))
