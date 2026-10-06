@@ -12,7 +12,9 @@ import logging
 import threading
 import time
 from collections import Counter
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, replace
 
 from sbobina.chain_policy import LinkState
@@ -51,6 +53,23 @@ class ServedByRecorder:
 
 def _label(link: ChainLink) -> str:
     return f"{link.provider}/{link.model}"
+
+
+# A chain is shared by every chat turn; this scope counts one turn's calls.
+_scoped_recorder: ContextVar["ServedByRecorder | None"] = ContextVar(
+    "scoped_served_by", default=None
+)
+
+
+@contextmanager
+def record_served_by() -> Iterator["ServedByRecorder"]:
+    """Count, for the calls made inside this block only, who served them."""
+    recorder = ServedByRecorder()
+    token = _scoped_recorder.set(recorder)
+    try:
+        yield recorder
+    finally:
+        _scoped_recorder.reset(token)
 
 
 class FallbackChain:
@@ -134,6 +153,9 @@ class FallbackChain:
         with self._lock:
             self._states[index] = self._states[index].record_success()
         self.recorder.add(_label(link))
+        scoped = _scoped_recorder.get()
+        if scoped is not None:
+            scoped.add(_label(link))
         return result
 
     def _record_failure(

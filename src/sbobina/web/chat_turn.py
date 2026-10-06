@@ -24,6 +24,7 @@ from sbobina.chat_pipeline import (
 )
 from sbobina.correction import CorrectorUnavailableError
 from sbobina.generation_pipeline import ITALIAN_TOKENS_PER_WORD, estimate_tokens
+from sbobina.llm_chain import record_served_by
 from sbobina.llm_errors import ChainExhaustedError, FailureKind
 from sbobina.ollama_chat import CONTEXT_WINDOW_TOKENS, ChatRequest
 from sbobina.retrieval import RetrievedPassage
@@ -174,6 +175,20 @@ def _answer(
         raise _ollama_error(error=error, arbiter=services.arbiter) from error
 
 
+def _reply_to(
+    services: ChatServices,
+    question_id: str,
+    query: ChatQuery,
+    passages: list[RetrievedPassage],
+) -> AnswerTo:
+    """Answer and record which chain link served this turn only."""
+    with record_served_by() as served:
+        result = _answer(services=services, query=query, passages=passages)
+    return AnswerTo(
+        question_id=question_id, answer=result, served_by=served.snapshot() or None
+    )
+
+
 def ask(
     services: ChatServices,
     where: ChatLocation,
@@ -194,8 +209,9 @@ def ask(
         key=where.key,
         question=build_retrieval_question(question=question, history=history),
     )
-    result = _answer(
+    reply = _reply_to(
         services=services,
+        question_id=asked.id,
         query=ChatQuery(question=question, history=history),
         passages=passages,
     )
@@ -203,5 +219,5 @@ def ask(
         courses_dir=courses_dir,
         course_id=where.course_id,
         chat_id=where.chat_id,
-        reply=AnswerTo(question_id=asked.id, answer=result),
+        reply=reply,
     )

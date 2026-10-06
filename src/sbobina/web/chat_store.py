@@ -94,6 +94,7 @@ def append_answer(
         discarded=reply.answer.discarded,
         error=reply.answer.error,
         created_at=_now(),
+        served_by=reply.served_by,
     )
     _append(path=path, record=record)
     return record

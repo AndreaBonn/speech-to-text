@@ -41,6 +41,8 @@ class ChatAnswerRecord:
     discarded: int
     error: str | None
     created_at: str
+    # Which provider/model answered (api engine); absent in older records.
+    served_by: dict[str, int] | None = None
 
     def __post_init__(self) -> None:
         if self.discarded < 0:
@@ -57,6 +59,7 @@ class AnswerTo:
 
     question_id: str
     answer: ChatAnswer
+    served_by: dict[str, int] | None = None
 
 
 def _citation_to_dict(citation: GenerationCitation) -> dict[str, object]:
@@ -105,6 +108,8 @@ def record_to_line(record: ChatRecord) -> str:
             "error": record.error,
             "created_at": record.created_at,
         }
+        if record.served_by is not None:
+            payload["served_by"] = record.served_by
     return json.dumps(payload, ensure_ascii=False)
 
 
@@ -129,4 +134,5 @@ def line_to_record(raw: dict[str, Any]) -> ChatRecord:
         discarded=int(raw["discarded"]),
         error=None if raw["error"] is None else str(raw["error"]),
         created_at=str(raw["created_at"]),
+        served_by=raw.get("served_by"),
     )

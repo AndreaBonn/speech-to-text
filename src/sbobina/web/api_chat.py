@@ -165,6 +165,7 @@ def _answer_payload(
         "discarded": record.discarded,
         "error": record.error,
         "created_at": record.created_at,
+        "served_by": record.served_by,
         "sentences": [
             {
                 "text": sentence.text,
