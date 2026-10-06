@@ -427,6 +427,11 @@ Premesse che il piano non prevedeva, scoperte con generazioni reali e corrette n
 - **Un passaggio per riga** (c8a59e3). Una pagina fino a 400 parole è un passaggio unico con i
   suoi a capo; mandato così rompeva il formato `[P<n>] (fonte) testo` e 2 compiti su 10
   fallivano due volte. `render_passages` unisce gli spazi; le citazioni si confrontano per token.
+- **Risposte troncate** (6e45600, 132852a). Su materiale denso qwen scrive più del budget di uscita
+  e si ferma dentro una domanda, identico a ogni tentativo: la pipeline tiene le domande scritte per
+  intero, anche meno di quelle chieste. Senza nessuna domanda completa il compito fallisce.
+- **Citazioni lunghe** (4e61247). Sulle lezioni il modello copia 50-70 parole: una citazione esatta
+  oltre 40 parole viene accorciata alle prime 40, che restano un match contiguo esatto.
 - **Titoli dell'OCR** (c09973e). `ocr-v2` apre 5 pagine su 10 con `\section*{...}`: il passo OCR
   salva il testo del titolo.
 

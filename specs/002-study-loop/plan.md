@@ -152,6 +152,8 @@ Ogni fase lascia il sistema usabile se la successiva non arriva.
       property derivata dai punti, mai un campo assegnabile; `ProposedJudgement` pydantic solo al
       boundary. Persistenza del tentativo con lo stesso lock per file di `web/path_locks.lock_for`
       (B5).
+- [ ] Soluzioni di aperte e orali come lista `"punti"` (`compito-v4`, F41, 2026-10-06): il
+      testo sulla forma non bastava; misura in `eval-grading.md`.
 - [ ] Formato del giudice (ADR D3): prompt `valutazione-v1.md`, dal 2026-10-05 `valutazione-v2.md` (F41: un punto coperto a metà si divide; misura in `eval-grading.md`), entrambi via prompt-master, schema
       `ProposedJudgement` con `punti_coperti[{punto, prova}]`, `punti_mancanti[]`,
       `errori[{frase, motivo}]`; ogni `punto` deve comparire nella soluzione e ogni `prova`/`frase`

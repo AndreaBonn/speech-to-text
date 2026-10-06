@@ -121,3 +121,29 @@ Restano corrette due risposte a metà: D1 (manca la condizione sugli accordi col
 
 `SPEDITO: iter 1/1 - valutazione-v2, migliore di v1 sulle risposte a metà e invariata sul resto.`
 BASIS: measured.
+
+## F41: soluzioni a più punti con `compito-v4` (2026-10-06)
+
+Il punto debole residuo del giudice (risposte a metà giudicate parziali 5 su 7, obiettivo 6) nasce
+dalle soluzioni a un punto solo. Due riscritture del testo del prompt non le avevano cambiate;
+`compito-v4` cambia il contratto: aperte e orali restituiscono `"punti": [...]` (da due a cinque,
+uno per idea) e il codice li unisce nella soluzione salvata, frasi per le aperte e " | " per gli
+orali, che `solution_points.py` divide di nuovo per il giudice. `"soluzione"` libera resta letta.
+
+`BUDGET: 1 versione del prompt | ranking: soluzioni con più di un punto > scarti non aumentati >
+lunghezza del prompt; se restano a un punto, revert`
+
+| Misura | `compito-v3` | `compito-v4` |
+|---|---|---|
+| Sonda, 12 domande (diritto e analisi, aperte e orali) | soluzioni di una frase | 12/12 con 2 punti |
+| Percorso dell'app sul corso di Diritto (presunzioni, possesso) | - | 9 domande, 2-4 punti ciascuna |
+
+Sul possesso le generazioni fallivano anche con `compito-v3`: tre domande aperte chiedono circa il
+doppio dei 856 token di uscita, il taglio cade nella terza e il secondo tentativo è identico. Ora la
+pipeline tiene le domande scritte per intero (F40), e una citazione esatta più lunga di 40 parole
+viene accorciata alle prime 40 invece di far scartare la domanda (F81).
+
+`SPEDITO: iter 1/1 - compito-v4.` BASIS: measured sul numero di punti; **unknown** sull'effetto nel
+giudice: le 30 risposte di V6 sono scritte per le soluzioni a un punto e non sono state rifatte,
+quindi l'obiettivo di 6 su 7 risposte a metà giudicate parziali resta da misurare con un dataset
+nuovo.
