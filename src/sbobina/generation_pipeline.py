@@ -166,9 +166,12 @@ def _salvage(
     retry never helps. The complete questions are kept, even fewer than asked:
     the page shows "2 su 3 richieste". A reply with none still fails.
     """
-    items = complete_questions(content=content) if wanted else []
+    if not wanted:
+        # A summary has no questions to keep: let the caller retry it.
+        return None
+    items = complete_questions(content=content)
     valid = keep_valid(items=items, response_model=schema_model, field="questions")
-    if not wanted or not valid:
+    if not valid:
         return None
     return schema_model.model_validate({"domande": valid[:wanted]})
 

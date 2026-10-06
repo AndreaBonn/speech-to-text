@@ -139,3 +139,29 @@ def test_generate_does_not_log_a_readable_reply(
     )
 
     assert caplog.text == ""
+
+
+def _summary_reply() -> str:
+    sentence = {
+        "testo": "Parte da un fatto noto.",
+        "citazioni": [{"passaggio": "P1", "testo": QUOTE}],
+    }
+    return json.dumps({"sezioni": [{"titolo": "Presunzione", "frasi": [sentence]}]})
+
+
+def test_generate_retries_a_summary_whose_reply_is_unreadable() -> None:
+    # Measured on a real slide: a summary cut by num_predict crashed the
+    # generation (KeyError in the question salvage) instead of retrying.
+    request = GenerationRequest.model_validate({"format": "summary", "count": 1})
+    chat = FakeChat(responses=[_summary_reply()[:-5], _summary_reply()])
+
+    result = generate(
+        request=request,
+        passages=[_passage()],
+        chat=chat,
+        options=GenerationOptions(model="test"),
+    )
+
+    assert result.outcome is GenerationOutcome.DONE
+    assert len(result.sections) == 1
+    assert len(chat.requests) == 2
