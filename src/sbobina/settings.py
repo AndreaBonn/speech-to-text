@@ -8,6 +8,19 @@ Device = Literal["auto", "cuda", "cpu"]
 LOOPBACK_HOSTS = ("127.0.0.1", "::1", "localhost")
 LlmProvider = Literal["groq", "gemini", "openai", "anthropic"]
 LLM_CHAIN_MAX_LINKS = 8
+TranscriptionEngine = Literal["whisper", "assemblyai"]
+
+
+def validate_llm_chain_entries(value: list["LlmChainEntry"]) -> list["LlmChainEntry"]:
+    """Shared by `Settings.llm_chain` and `user_preferences.UserPreferences`."""
+    if len(value) > LLM_CHAIN_MAX_LINKS:
+        raise ValueError(f"La catena può avere al massimo {LLM_CHAIN_MAX_LINKS} anelli")
+    pairs = [(entry.provider, entry.model) for entry in value]
+    if len(pairs) != len(set(pairs)):
+        raise ValueError(
+            "La catena non può contenere coppie provider+modello duplicate"
+        )
+    return value
 
 
 class LlmChainEntry(BaseModel):
@@ -98,11 +111,16 @@ class Settings(BaseSettings):
     llm_chain: list[LlmChainEntry] = Field(default_factory=list)
     llm_ollama_fallback: bool = True
     cloud_timeout_s: float = Field(default=60.0, gt=0)
+    transcription_engine: TranscriptionEngine = "whisper"
     groq_api_key: SecretStr | None = None
     gemini_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
     anthropic_api_key: SecretStr | None = None
     assemblyai_api_key: SecretStr | None = None
+    # D1/D4: per-user config dir for credentials.json/preferences.json, never
+    # under data_dir (copied with a course) or the repository. None means
+    # "use the platform default" (resolved by config_dir.resolve_config_dir).
+    config_dir: Path | None = None
 
     @field_validator("web_host")
     @classmethod
@@ -114,16 +132,7 @@ class Settings(BaseSettings):
     @field_validator("llm_chain")
     @classmethod
     def validate_llm_chain(cls, value: list[LlmChainEntry]) -> list[LlmChainEntry]:
-        if len(value) > LLM_CHAIN_MAX_LINKS:
-            raise ValueError(
-                f"La catena può avere al massimo {LLM_CHAIN_MAX_LINKS} anelli"
-            )
-        pairs = [(entry.provider, entry.model) for entry in value]
-        if len(pairs) != len(set(pairs)):
-            raise ValueError(
-                "La catena non può contenere coppie provider+modello duplicate"
-            )
-        return value
+        return validate_llm_chain_entries(value)
 
 
 settings = Settings()
