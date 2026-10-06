@@ -1,4 +1,5 @@
 import json
+import os
 from hashlib import sha256
 from pathlib import Path, PurePosixPath
 
@@ -13,6 +14,7 @@ from package_fixtures import (
 )
 
 from sbobina.course_registry import get_or_create
+from sbobina.credential_store import CredentialStore
 from sbobina.package_export import (
     ExportRequest,
     iter_package_members,
@@ -281,3 +283,19 @@ def test_write_package_manifest_matches_zip_and_applied_options(
     }
     assert manifest.created_at == NOW
     assert manifest.course.label == "Fisica"
+
+
+def test_inventory_never_contains_a_saved_api_key(
+    course_data: PackageFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sentinel = "sk-SENTINEL-0123456789abcdef"
+    config_dir = Path(os.environ["XDG_CONFIG_HOME"]) / "sbobina"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    CredentialStore(config_dir=config_dir).set_key(provider="groq", key=sentinel)
+    monkeypatch.setenv("SBOBINA_OPENAI_API_KEY", sentinel)
+
+    members = list(iter_package_members(request=make_request(data=course_data)))
+
+    assert any(member.entry.path == "lectures/0/transcript.json" for member in members)
+    assert all(sentinel.encode() not in member.data for member in members)
+    assert all("credentials" not in member.entry.path for member in members)
