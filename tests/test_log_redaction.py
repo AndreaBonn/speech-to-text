@@ -1,10 +1,12 @@
 import io
 import logging
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from pydantic import SecretStr
 
+from sbobina.credential_store import CredentialStore
 from sbobina.log_redaction import SecretRedactionFilter, install_redaction
 from sbobina.settings import Settings
 
@@ -117,3 +119,49 @@ def test_install_redaction_redacts_records_propagated_from_a_child_logger(
     output = stream.getvalue()
     assert SENTINEL not in output
     assert "***" in output
+
+
+# No recognizable prefix on purpose: unlike SENTINEL (sk-...), this must be
+# caught only by the dynamic source, never by the static `_KEY_PATTERNS`
+# regexes, so the two tests below cannot pass by accident.
+UNPREFIXED_SENTINEL = "assemblyai-0123456789abcdef-no-known-prefix"
+
+
+def test_install_redaction_redacts_a_key_saved_after_install(
+    captured_root: tuple[logging.Logger, io.StringIO, logging.Handler],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AssemblyAI has no recognizable prefix, so a key saved via the UI into
+    `credentials.json` after startup is only caught by the dynamic source,
+    never by the static settings snapshot taken at `install_redaction` time.
+    """
+    root, stream, _handler = captured_root
+    monkeypatch.setenv("SBOBINA_CONFIG_DIR", str(tmp_path))
+    install_redaction(settings=Settings())
+    store = CredentialStore(config_dir=tmp_path)
+    store.set_key(provider="assemblyai", key=UNPREFIXED_SENTINEL)
+
+    root.info("upload assemblyai con chiave %s", UNPREFIXED_SENTINEL)
+
+    output = stream.getvalue()
+    assert UNPREFIXED_SENTINEL not in output
+    assert "***" in output
+
+
+def test_install_redaction_dynamic_source_leaves_unrelated_text_unchanged(
+    captured_root: tuple[logging.Logger, io.StringIO, logging.Handler],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Positive case paired with the test above: redaction only touches the
+    secret, not every log line, once a dynamic source is wired in."""
+    root, stream, _handler = captured_root
+    monkeypatch.setenv("SBOBINA_CONFIG_DIR", str(tmp_path))
+    install_redaction(settings=Settings())
+    store = CredentialStore(config_dir=tmp_path)
+    store.set_key(provider="assemblyai", key=UNPREFIXED_SENTINEL)
+
+    root.info("nessuna chiave qui, solo testo")
+
+    assert stream.getvalue().strip() == "nessuna chiave qui, solo testo"

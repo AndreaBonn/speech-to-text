@@ -11,11 +11,17 @@ with ``propagate=False`` (S3, review di sicurezza del piano 003).
 
 import logging
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from pathlib import Path
 
+from sbobina.config_dir import resolve_config_dir
+from sbobina.credential_store import CredentialStore, resolve_keys
 from sbobina.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 _REDACTED = "***"
+_UNSET: object = object()
 
 # Handlers to patch: root (reaches every "sbobina.*" logger via propagation)
 # plus the loggers uvicorn configures with their own handlers and
@@ -34,6 +40,35 @@ _KEY_PATTERNS = (
 )
 
 
+class _CachedKeyStoreSource:
+    """Re-reads `credentials.json` only when its mtime changes.
+
+    `SecretRedactionFilter.filter` runs on every log record, so re-opening
+    and re-parsing the file on each call (as `CredentialStore.get_keys` does)
+    would cost a stat *and* a read per log line. A stat alone is cheap and
+    the cache only needs invalidating when the file actually changed, which
+    is exactly what the mtime says (D4: a key added via the UI after
+    `install_redaction` ran must still be redacted on the next log line).
+    """
+
+    def __init__(self, settings: Settings, store: CredentialStore) -> None:
+        self._settings = settings
+        self._store = store
+        self._cached_mtime: object = _UNSET
+        self._cached_secrets: list[str] = []
+
+    def __call__(self) -> list[str]:
+        try:
+            mtime: object = self._store.path.stat().st_mtime
+        except OSError:
+            mtime = None
+        if mtime != self._cached_mtime:
+            resolved = resolve_keys(settings=self._settings, store=self._store)
+            self._cached_secrets = list(resolved.values())
+            self._cached_mtime = mtime
+        return self._cached_secrets
+
+
 class SecretRedactionFilter(logging.Filter):
     """Replaces known secret values and key-shaped substrings with ``***``.
 
@@ -42,14 +77,29 @@ class SecretRedactionFilter(logging.Filter):
     known_secrets : Iterable[str]
         Secret values to redact verbatim. Empty and falsy entries are
         ignored, so callers can pass a list with unset keys as ``None``.
+    dynamic_secrets : Callable[[], Iterable[str]] | None
+        Queried on every record for secret values not known at
+        installation time (e.g. a key saved to `credentials.json` through
+        the UI after the filter was attached).
     """
 
-    def __init__(self, known_secrets: Iterable[str | None]) -> None:
+    def __init__(
+        self,
+        known_secrets: Iterable[str | None],
+        dynamic_secrets: Callable[[], Iterable[str]] | None = None,
+    ) -> None:
         super().__init__()
         self._known_secrets = [secret for secret in known_secrets if secret]
+        self._dynamic_secrets = dynamic_secrets
+
+    def _all_secrets(self) -> list[str]:
+        if self._dynamic_secrets is None:
+            return self._known_secrets
+        extra = [secret for secret in self._dynamic_secrets() if secret]
+        return [*self._known_secrets, *extra]
 
     def _redact(self, text: str) -> str:
-        for secret in self._known_secrets:
+        for secret in self._all_secrets():
             text = text.replace(secret, _REDACTED)
         for pattern in _KEY_PATTERNS:
             text = pattern.sub(_REDACTED, text)
@@ -81,15 +131,38 @@ def _has_redaction_filter(handler: logging.Handler) -> bool:
     return any(isinstance(f, SecretRedactionFilter) for f in handler.filters)
 
 
+def _build_dynamic_secret_source(
+    settings: Settings,
+) -> Callable[[], Iterable[str]] | None:
+    try:
+        config_dir: Path = resolve_config_dir(settings=settings, create=False)
+    except Exception:
+        logger.debug(
+            "redazione dinamica disattivata: cartella di configurazione non risolvibile",
+            exc_info=True,
+        )
+        return None
+    store = CredentialStore(config_dir=config_dir)
+    return _CachedKeyStoreSource(settings=settings, store=store)
+
+
 def install_redaction(settings: Settings) -> None:
     """Attach a `SecretRedactionFilter` to every handler that could log a secret.
 
     Idempotent: a handler that already carries the filter is left alone, so
     calling this twice (e.g. once from `cli.py`, once from a test app) never
-    duplicates redaction work.
+    duplicates redaction work. Also wires in a dynamic source over
+    `credentials.json` so a key saved later through the UI (AssemblyAI has
+    no recognizable prefix, so it would otherwise be invisible to
+    `_KEY_PATTERNS`) is redacted from the next log line onward.
     """
     secrets = _secret_values(settings=settings)
+    dynamic_secrets = _build_dynamic_secret_source(settings=settings)
     for name in _TARGET_LOGGER_NAMES:
         for handler in logging.getLogger(name).handlers:
             if not _has_redaction_filter(handler):
-                handler.addFilter(SecretRedactionFilter(known_secrets=secrets))
+                handler.addFilter(
+                    SecretRedactionFilter(
+                        known_secrets=secrets, dynamic_secrets=dynamic_secrets
+                    )
+                )
