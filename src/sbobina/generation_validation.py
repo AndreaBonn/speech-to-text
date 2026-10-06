@@ -19,10 +19,13 @@ from sbobina.generation_models import (
     ProposedMultipleChoiceQuestion,
     ProposedSummarySection,
     ProposedSummarySentence,
-    ProposedTextQuestion,
     SummaryResponse,
     SummarySection,
     SummarySentence,
+)
+from sbobina.generation_text_questions import (
+    OralQuestionResponse,
+    ProposedTextQuestion,
     TextQuestionResponse,
 )
 from sbobina.retrieval import RetrievedPassage
@@ -145,7 +148,7 @@ def _validate_text_question(
 
 
 def validate_exam_response(
-    response: MultipleChoiceResponse | TextQuestionResponse,
+    response: MultipleChoiceResponse | TextQuestionResponse | OralQuestionResponse,
     passages: Sequence[RetrievedPassage],
 ) -> tuple[tuple[GenerationQuestion, ...], Counter[str]]:
     counts: Counter[str] = Counter()

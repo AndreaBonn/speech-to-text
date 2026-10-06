@@ -30,9 +30,9 @@ from sbobina.generation_models import (
     MultipleChoiceResponse,
     SummaryResponse,
     SummarySection,
-    TextQuestionResponse,
 )
 from sbobina.generation_render import format_passage_source
+from sbobina.generation_text_questions import OralQuestionResponse, TextQuestionResponse
 from sbobina.generation_validation import (
     discard_counts,
     validate_exam_response,
@@ -49,9 +49,9 @@ INVALID_RESPONSE_ERROR = "INVALID_RESPONSE"
 type GenerationChat = Callable[[ChatRequest], str]
 
 PROMPT_FILES: dict[GenerationFormat, str] = {
-    GenerationFormat.MULTIPLE_CHOICE: "compito-v3.md",
-    GenerationFormat.OPEN: "compito-v3.md",
-    GenerationFormat.ORAL: "compito-v3.md",
+    GenerationFormat.MULTIPLE_CHOICE: "compito-v4.md",
+    GenerationFormat.OPEN: "compito-v4.md",
+    GenerationFormat.ORAL: "compito-v4.md",
     GenerationFormat.SUMMARY: "riassunto-v2.md",
 }
 _FORMAT_LABELS: dict[GenerationFormat, str] = {
@@ -62,7 +62,7 @@ _FORMAT_LABELS: dict[GenerationFormat, str] = {
 _RESPONSE_SCHEMAS: dict[GenerationFormat, type[BaseModel]] = {
     GenerationFormat.MULTIPLE_CHOICE: MultipleChoiceResponse,
     GenerationFormat.OPEN: TextQuestionResponse,
-    GenerationFormat.ORAL: TextQuestionResponse,
+    GenerationFormat.ORAL: OralQuestionResponse,
     GenerationFormat.SUMMARY: SummaryResponse,
 }
 
@@ -231,7 +231,9 @@ def _apply_validation(
             response=response, passages=passages
         )
         return replace(done, sections=sections, discarded=discard_counts(counts))
-    if isinstance(response, (MultipleChoiceResponse, TextQuestionResponse)):
+    if isinstance(
+        response, (MultipleChoiceResponse, TextQuestionResponse, OralQuestionResponse)
+    ):
         questions, counts = validate_exam_response(response=response, passages=passages)
         return replace(done, questions=questions, discarded=discard_counts(counts))
     raise AssertionError(f"unexpected response schema: {type(response)}")

@@ -5,8 +5,8 @@ from sbobina.generation_models import (
     GenerationRequest,
     MultipleChoiceResponse,
     SummaryResponse,
-    TextQuestionResponse,
 )
+from sbobina.generation_text_questions import TextQuestionResponse
 
 
 def _mc_payload(options: list[str], correct_index: int) -> dict[str, object]:

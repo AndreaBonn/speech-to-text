@@ -35,13 +35,13 @@ from sbobina.generation_models import (
     GenerationRequest,
     ProposedCitation,
     SummaryResponse,
-    TextQuestionResponse,
 )
 from sbobina.generation_pipeline import (
     GenerationOptions,
     GenerationResult,
     generate,
 )
+from sbobina.generation_text_questions import TextQuestionResponse
 from sbobina.ollama_chat import ChatRequest, chat_json, strip_markdown_fence
 from sbobina.retrieval import DocumentSource, RetrievedPassage, cut_to_budget
 from sbobina.settings import Settings

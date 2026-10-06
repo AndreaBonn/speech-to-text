@@ -20,6 +20,10 @@ EXPECTED_OPTION_COUNT = 4
 _PASSAGE_PATTERN = r"^P[0-9]+$"
 
 
+# An oral outline lists its points separated by this (solution_points.py).
+ORAL_POINT_SEPARATOR = " | "
+
+
 class GenerationFormat(StrEnum):
     MULTIPLE_CHOICE = "multiple_choice"
     OPEN = "open"
@@ -229,18 +233,6 @@ class ProposedMultipleChoiceQuestion(BaseModel):
 
 class MultipleChoiceResponse(BaseModel):
     questions: list[ProposedMultipleChoiceQuestion] = Field(alias="domande")
-
-
-class ProposedTextQuestion(BaseModel):
-    """Shared shape for "aperte" and "orale": no options, free-text solution."""
-
-    question: str = Field(alias="domanda")
-    solution: str = Field(alias="soluzione")
-    citations: list[ProposedCitation] = Field(alias="citazioni")
-
-
-class TextQuestionResponse(BaseModel):
-    questions: list[ProposedTextQuestion] = Field(alias="domande")
 
 
 class ProposedSummarySentence(BaseModel):

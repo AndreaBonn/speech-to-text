@@ -1,8 +1,7 @@
 import re
 
-from sbobina.generation_models import GenerationFormat
+from sbobina.generation_models import ORAL_POINT_SEPARATOR, GenerationFormat
 
-ORAL_POINT_SEPARATOR = " | "
 # Unlike exam_cues.SENTENCE_SEPARATOR, a period followed by a digit or a
 # lowercase word is an abbreviation ("art. 1418", "pag. iniziale"), not a
 # sentence end: splitting there would make the judge cite half a point.

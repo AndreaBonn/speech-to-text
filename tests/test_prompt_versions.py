@@ -23,9 +23,9 @@ def _passage() -> RetrievedPassage:
 @pytest.mark.parametrize(
     ("format_", "version"),
     [
-        ("multiple_choice", "compito-v3"),
-        ("open", "compito-v3"),
-        ("oral", "compito-v3"),
+        ("multiple_choice", "compito-v4"),
+        ("open", "compito-v4"),
+        ("oral", "compito-v4"),
         ("summary", "riassunto-v2"),
     ],
 )
