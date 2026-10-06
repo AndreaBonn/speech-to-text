@@ -81,11 +81,19 @@
     return actions.join("");
   }
 
+  // Static markup only: the engine name never comes from user input.
+  function engineNote(job) {
+    var engine = job.config && job.config.transcription_engine;
+    return engine === "assemblyai"
+      ? ' <span class="cell-engine">Trascritta con AssemblyAI</span>'
+      : "";
+  }
+
   function renderRow(job) {
     var created = new Date(job.created_at).toLocaleString("it-IT");
     return (
       '<tr data-job-id="' + job.id + '">' +
-      '<td class="cell-name" data-label="Lezione">' + escapeHtml(jobTitle(job)) + "</td>" +
+      '<td class="cell-name" data-label="Lezione">' + escapeHtml(jobTitle(job)) + engineNote(job) + "</td>" +
       '<td data-label="Data">' + created + "</td>" +
       '<td data-label="Stato"><span class="badge badge--' +
       job.status +

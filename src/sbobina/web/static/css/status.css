@@ -155,3 +155,10 @@
   }
 }
 
+
+/* Which engine transcribed a lecture, when it was not the local Whisper. */
+.cell-engine {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
