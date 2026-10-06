@@ -1,3 +1,4 @@
+import logging
 import threading
 from collections.abc import Callable
 
@@ -230,3 +231,54 @@ def test_served_by_recorder_counts_by_provider_and_model_label() -> None:
     recorder.add("ollama/qwen3.5:9b")
 
     assert recorder.snapshot() == {"groq/llama": 2, "ollama/qwen3.5:9b": 1}
+
+
+def test_fallback_chain_without_links_says_no_model_is_configured() -> None:
+    chain = FallbackChain(links=[])
+
+    with pytest.raises(ChainExhaustedError) as excinfo:
+        chain(make_request())
+
+    assert "Nessun modello configurato" in str(excinfo.value)
+
+
+def test_fallback_chain_warns_once_when_a_link_is_disabled_for_good(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    chain = FallbackChain(
+        links=[
+            ChainLink(
+                provider="groq", model="m", client=failing_client(FailureKind.AUTH)
+            ),
+            ChainLink(provider="gemini", model="g", client=succeeding_client("{}")),
+        ]
+    )
+
+    with caplog.at_level(logging.INFO):
+        chain(make_request())
+        chain(make_request())
+
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "groq/m" in warnings[0].getMessage()
+
+
+def test_fallback_chain_transient_failure_is_logged_at_info_only(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    chain = FallbackChain(
+        links=[
+            ChainLink(
+                provider="groq",
+                model="m",
+                client=failing_client(FailureKind.RATE_LIMIT),
+            ),
+            ChainLink(provider="gemini", model="g", client=succeeding_client("{}")),
+        ]
+    )
+
+    with caplog.at_level(logging.INFO):
+        chain(make_request())
+
+    assert [r for r in caplog.records if r.levelno == logging.WARNING] == []
+    assert any(r.levelno == logging.INFO for r in caplog.records)

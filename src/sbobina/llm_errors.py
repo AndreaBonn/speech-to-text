@@ -83,6 +83,13 @@ class ChainExhaustedError(CorrectorUnavailableError):
 
     def __init__(self, causes: tuple[ProviderUnavailableError, ...]) -> None:
         self.causes = causes
+        if not causes:
+            # api engine with an empty chain and Ollama switched off.
+            super().__init__(
+                "Nessun modello configurato: aggiungi un modello nelle "
+                "Impostazioni o attiva Ollama come riserva"
+            )
+            return
         reasons = ", ".join(
             f"{cause.provider} ({_KIND_LABELS_IT[cause.kind]})" for cause in causes
         )

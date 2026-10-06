@@ -120,7 +120,13 @@ class FallbackChain:
             result = link.client(replace(request, model=link.model))
         except InvalidResponseError:
             with self._lock:
+                was_disabled = self._states[index].disabled
                 self._states[index] = self._states[index].record_invalid()
+                excluded = self._states[index].disabled and not was_disabled
+            if excluded:
+                logger.warning(
+                    "%s escluso: troppe risposte non valide di fila", _label(link)
+                )
             raise
         except ProviderUnavailableError as err:
             self._record_failure(index=index, link=link, err=err, now=now)
@@ -134,10 +140,18 @@ class FallbackChain:
         self, index: int, link: ChainLink, err: ProviderUnavailableError, now: float
     ) -> None:
         with self._lock:
+            was_disabled = self._states[index].disabled
             self._states[index] = self._states[index].record_failure(
                 kind=err.kind, retry_after_s=err.retry_after_s, now=now
             )
             self._last_failures[index] = err
+            disabled_now = self._states[index].disabled and not was_disabled
+        if disabled_now:
+            # Lasting degradation, unlike a cooldown: say so once, louder.
+            logger.warning(
+                "%s escluso per il resto del lavoro (%s)", _label(link), err.kind
+            )
+            return
         logger.info(
             "anello %d/%d non disponibile (%s), passo al successivo",
             index + 1,
