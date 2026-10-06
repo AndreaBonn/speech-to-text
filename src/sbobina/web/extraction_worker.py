@@ -201,6 +201,7 @@ class ExtractionWorker:
                 str(self._options.max_memory_mb),
             ],
             log_path=doc_dir / CHILD_LOG_NAME,
+            untrusted=True,
         )
         # Visible to stop(), which terminates it instead of waiting the timeout.
         with self._condition:

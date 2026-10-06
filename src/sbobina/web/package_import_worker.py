@@ -275,6 +275,7 @@ def _child_outcome(run: ChildRun, workdir: Path) -> PackageImportOutcome:
             str(result_path),
         ],
         log_path=workdir / CHILD_LOG_NAME,
+        untrusted=True,
     )
     if not _wait_for_import(process=process, options=run.options):
         return _timed_out(data_dir=run.data_dir, before=before)

@@ -1,23 +1,30 @@
 import logging
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 logger = logging.getLogger("sbobina")
+_API_KEY_ENV = re.compile(r"SBOBINA_[A-Z0-9_]+_API_KEY", re.IGNORECASE)
 
 
-def _child_env() -> dict[str, str]:
+def _child_env(untrusted: bool = False) -> dict[str, str]:
     # Force UTF-8 I/O in the child: a Windows pipe/file otherwise uses the
     # system codepage and raises UnicodeEncodeError on accented log text
     # (BASIS: inferred).
     env = dict(os.environ)
+    if untrusted:
+        # S1: children parsing untrusted files never need a cloud API key.
+        env = {k: v for k, v in env.items() if not _API_KEY_ENV.fullmatch(k)}
     if sys.platform == "win32":
         env["PYTHONUTF8"] = "1"
     return env
 
 
-def _spawn(command: list[str], log_path: Path) -> subprocess.Popen[bytes]:
+def _spawn(
+    command: list[str], log_path: Path, untrusted: bool = False
+) -> subprocess.Popen[bytes]:
     # Redirected to a file, never piped: a pipe nobody drains blocks the
     # child once its OS buffer fills.
     with log_path.open("a", encoding="utf-8") as log_file:
@@ -27,7 +34,7 @@ def _spawn(command: list[str], log_path: Path) -> subprocess.Popen[bytes]:
                 stdin=subprocess.PIPE,
                 stdout=log_file,
                 stderr=log_file,
-                env=_child_env(),
+                env=_child_env(untrusted=untrusted),
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
             )
         return subprocess.Popen(
@@ -35,7 +42,7 @@ def _spawn(command: list[str], log_path: Path) -> subprocess.Popen[bytes]:
             stdin=subprocess.PIPE,
             stdout=log_file,
             stderr=log_file,
-            env=_child_env(),
+            env=_child_env(untrusted=untrusted),
             start_new_session=True,
         )
 

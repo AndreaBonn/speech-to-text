@@ -115,6 +115,7 @@ def launch_ocr_process(
     process = _spawn(
         command=[*supervisor._options.command, OCR_COMMAND, str(directory)],
         log_path=directory / CHILD_LOG_NAME,
+        untrusted=True,
     )
     supervisor._process = process
     return process

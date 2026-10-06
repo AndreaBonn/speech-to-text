@@ -46,8 +46,10 @@ def test_pipeline_then_study_never_overlap_children(
     children: list[subprocess.Popen[bytes]] = []
     active_counts: list[int] = []
 
-    def tracked_spawn(command: list[str], log_path: Path) -> subprocess.Popen[bytes]:
-        child = _spawn(command=command, log_path=log_path)
+    def tracked_spawn(
+        command: list[str], log_path: Path, untrusted: bool = False
+    ) -> subprocess.Popen[bytes]:
+        child = _spawn(command=command, log_path=log_path, untrusted=untrusted)
         children.append(child)
         active_counts.append(sum(p.poll() is None for p in children))
         return child
