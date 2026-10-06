@@ -172,3 +172,33 @@ def test_ocr_page_keeps_the_heading_text_without_latex_section_commands(
     )
 
     assert result.pages[0].text == stored
+
+
+@pytest.mark.parametrize(
+    ("read", "stored"),
+    [
+        (
+            (
+                "Titolo\n\\begin{itemize}\n    \\item Primo \\(y = f(k)\\)\n"
+                "    \\item Secondo\n\\end{itemize}"
+            ),
+            "Titolo\n- Primo \\(y = f(k)\\)\n- Secondo",
+        ),
+        ("\\begin{enumerate}\n\\item Uno\n\\end{enumerate}", "- Uno"),
+        (
+            "\\[\\begin{array}{c} a \\\\ b \\end{array}\\]",
+            "\\[\\begin{array}{c} a \\\\ b \\end{array}\\]",
+        ),
+    ],
+)
+def test_ocr_page_turns_latex_lists_into_dash_items(read: str, stored: str) -> None:
+    # Measured on a real course PDF: ocr-v2 wrote \begin{itemize}/\item on 2 of
+    # 9 slides; the viewer showed them as source and "item" broke citations.
+    result = ocr_missing_pages(
+        extracted=_extracted((Page(text="", no_text=True),)),
+        read_page=lambda index: read,
+        on_progress=lambda done, total: None,
+        prompt_version="ocr-v2",
+    )
+
+    assert result.pages[0].text == stored

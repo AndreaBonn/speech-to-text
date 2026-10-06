@@ -16,16 +16,25 @@ logger = logging.getLogger(__name__)
 # 10 pages (T069). The viewer renders formulas only, so keep the heading text.
 # A heading with nested braces is left as is (not seen in the measured pages).
 _LATEX_HEADING = re.compile(r"\\(?:sub)*section\*?\{([^{}]*)\}")
+# Same for lists: \begin{itemize} and \item on 2 of 9 real slides; the word
+# "item" also broke the contiguity a citation needs.
+_LATEX_LIST_ENV = re.compile(
+    r"^[ \t]*\\(?:begin|end)\{(?:itemize|enumerate)\}[ \t]*\n?", re.MULTILINE
+)
+_LATEX_ITEM = re.compile(r"^[ \t]*\\item\b[ \t]*", re.MULTILINE)
 
 
-def _strip_latex_headings(text: str) -> str:
-    return _LATEX_HEADING.sub(r"\1", text)
+def _strip_latex_structure(text: str) -> str:
+    text = _LATEX_HEADING.sub(r"\1", text)
+    text = _LATEX_LIST_ENV.sub("", text)
+    # A closing \end{itemize} leaves the newline before it at the end.
+    return _LATEX_ITEM.sub("- ", text).rstrip("\n")
 
 
 def _ocr_page(
     page: Page, index: int, read_page: ReadPage, prompt_version: str | None
 ) -> Page:
-    text = normalize_pages(texts=(_strip_latex_headings(text=read_page(index)),))[0]
+    text = normalize_pages(texts=(_strip_latex_structure(text=read_page(index)),))[0]
     if not text.strip():
         logger.warning("OCR returned no text for page %d", index + 1)
         return page
