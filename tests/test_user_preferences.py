@@ -9,6 +9,7 @@ from sbobina.settings import LlmChainEntry, Settings
 from sbobina.user_preferences import (
     UserPreferences,
     effective_settings,
+    preferences_path,
     resolve_preferences,
     save_preferences,
 )
@@ -117,3 +118,30 @@ def test_effective_settings_without_a_file_matches_defaults(tmp_path: Path) -> N
 
     assert resolved.llm_engine == "local"
     assert resolved.transcription_engine == "whisper"
+
+
+def test_effective_settings_child_rebuilt_settings_still_read_the_file(
+    tmp_path: Path,
+) -> None:
+    save_preferences(
+        path=preferences_path(tmp_path),
+        preferences=UserPreferences(
+            llm_engine="api",
+            llm_chain=[LlmChainEntry(provider="groq", model="llama-x")],
+        ),
+    )
+    # stage_runner rebuilds Settings from a full dump: every field is "set".
+    rebuilt = Settings.model_validate(Settings().model_dump())
+
+    effective = effective_settings(settings=rebuilt, config_dir=tmp_path)
+
+    assert effective.llm_engine == "api"
+    assert [entry.model for entry in effective.llm_chain] == ["llama-x"]
+
+
+def test_effective_settings_without_a_file_keeps_passed_settings(
+    tmp_path: Path,
+) -> None:
+    passed = Settings(llm_engine="api")
+
+    assert effective_settings(settings=passed, config_dir=tmp_path) is passed
