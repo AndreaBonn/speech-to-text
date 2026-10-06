@@ -705,3 +705,85 @@ remediation `/analyze` applicata, più quattro punti aperti da sessioni
 precedenti (F40, F41, F51, F81) risolti. Suite a 2327 test verdi, ruff e
 mypy puliti. Piano a fine percorso; restano aperte solo la misura del
 giudice su `compito-v4` e il push.
+
+## 2026-10-06 | Sessione #7 [FEATURE]
+
+### Richiesta
+
+Workflow RPI sul branch `feature/003-cloud-providers`, piano in
+`specs/003-cloud-providers/`: affiancare al motore locale dei provider cloud
+opzionali per il testo e la trascrizione, con consenso esplicito e chiavi
+gestite in sicurezza.
+
+### Azioni Eseguite
+
+- Il lavoro di testo (correzione, studio, generazioni, chat, correzione delle
+  esercitazioni) può ora girare su una catena ordinata di modelli Groq,
+  Gemini, OpenAI e Anthropic: se una richiesta fallisce per errore, limite di
+  frequenza o quota esaurita, passa al modello successivo senza ripetere i
+  blocchi già completati. Ollama locale resta un ultimo anello opzionale. Ogni
+  risultato registra quale provider e modello lo ha prodotto (`served_by`).
+- La trascrizione può usare AssemblyAI al posto di Whisper locale: a fine
+  lavoro il trascritto remoto e l'audio caricato vengono eliminati dal
+  servizio cloud, e non serve più riservare la GPU.
+- Nuova pagina Impostazioni (`/impostazioni`): motore e ordine dei modelli,
+  chiavi API (salvate in `credentials.json` con permessi 0600 nella cartella
+  di configurazione dell'utente, mai sotto `data/` o nel repository, mostrate
+  sempre oscurate), motore di trascrizione; consenso esplicito prima che testo
+  o audio lascino il computer; avviso di chiavi mancanti su ogni pagina.
+- Sicurezza: le chiavi vengono oscurate nei log e nelle tracce di errore,
+  rimosse dall'ambiente dei processi figli che leggono file non fidati; la
+  scrittura delle impostazioni richiede l'Origin dell'applicazione.
+
+### Verifiche
+
+| Controllo | Risultato |
+|---|---|
+| `uv run pytest` | 2705 passed |
+| `uv run ruff check .` | pulito |
+| `uv run mypy src tests` | pulito |
+| `code-reviewer` / `security-reviewer` | eseguiti su ogni fase |
+| Click-through browser su impostazioni e home | 25/25 |
+| Render osservato | 375 px e 1280 px |
+| Contrasto (chiaro/scuro, riposo/hover) | 0 sotto soglia |
+
+Difetti trovati e corretti durante la verifica: stati HTTP non mappati che
+interrompevano la catena dei provider invece di passare al successivo;
+richieste GET alle impostazioni rifiutate senza Origin; errori nel log di
+accesso di uvicorn causati dal filtro di oscuramento delle chiavi; la cache
+della chat non si ricostruiva al cambio di chiave; riquadri di errore nascosti
+ma ancora visibili; il tasto Escape lasciava selezionato un motore non
+salvato.
+
+### Aperto a fine sessione
+
+- Le prove con i provider reali e la misura del WER su AssemblyAI restano da
+  fare con le chiavi dell'utente.
+- README, SECURITY e guida utente non aggiornati: si toccano solo su
+  richiesta esplicita.
+- I punti A3-A5, A7-A9, A11, A12 del gate `/analyze` attendono una decisione
+  dell'utente.
+
+### Note per il Cliente
+
+Oltre al motore che gira sul computer, ora si può scegliere di usare servizi
+cloud (Groq, Gemini, OpenAI, Anthropic, AssemblyAI) per il lavoro sul testo e
+per la trascrizione: una nuova pagina Impostazioni permette di inserire le
+chiavi di questi servizi, scegliere quale motore usare e in quale ordine, e
+chiede sempre una conferma esplicita prima che testo o audio lascino il
+computer. Le chiavi inserite restano protette: non finiscono nei file del
+progetto, non compaiono nei log né negli errori mostrati a schermo, e sono
+sempre visibili solo in forma oscurata. Durante le verifiche sono stati
+trovati e corretti alcuni problemi (pagine che si bloccavano su un errore
+imprevisto, impostazioni non salvate in certi casi) prima che il lavoro fosse
+dichiarato concluso. Restano da fare: una prova con le chiavi reali
+dell'utente e l'aggiornamento della documentazione.
+
+### Riepilogo (Complessità / Stato)
+
+Complessità alta: nuovo sottosistema di provider cloud per testo e
+trascrizione, affiancato al motore locale senza sostituirlo. Suite a 2705
+test verdi, ruff e mypy puliti, gate di sicurezza e accessibilità eseguiti su
+ogni fase. Restano aperte le prove con chiavi reali, la misura del WER su
+AssemblyAI, l'aggiornamento della documentazione e alcuni punti del gate
+`/analyze` in attesa di decisione.
