@@ -44,6 +44,7 @@ MAX_CITATIONS = 3
 class DiscardReason(StrEnum):
     CITATION_COUNT = "CITATION_COUNT"
     INVALID_OPTIONS = "INVALID_OPTIONS"
+    EMPTY_SOLUTION = "EMPTY_SOLUTION"
 
 
 def to_generation_citation(resolved: SourceCitation) -> GenerationCitation:
@@ -133,6 +134,10 @@ def _validate_text_question(
     passages: Sequence[RetrievedPassage],
     counts: Counter[str],
 ) -> GenerationQuestion | None:
+    # Without a solution the judge has no point to grade against (A28).
+    if not proposed.solution.strip():
+        counts[DiscardReason.EMPTY_SOLUTION] += 1
+        return None
     citations = resolve_citations(
         proposed=proposed.citations, passages=passages, counts=counts
     )

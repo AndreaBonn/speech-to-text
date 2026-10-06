@@ -51,7 +51,11 @@ class ProposedOralQuestion(ProposedTextQuestion):
 
     @classmethod
     def join_points(cls, points: list[str]) -> str:
-        return ORAL_POINT_SEPARATOR.join(points)
+        # A separator inside a point would split it in two for the judge (A29);
+        # a lone "|" stays, it is an absolute value in \\(|q| < 1\\).
+        return ORAL_POINT_SEPARATOR.join(
+            point.replace(ORAL_POINT_SEPARATOR, ", ") for point in points
+        )
 
 
 class TextQuestionResponse(BaseModel):

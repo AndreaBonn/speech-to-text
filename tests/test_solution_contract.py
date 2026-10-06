@@ -7,6 +7,8 @@ from sbobina.generation_models import (
     GenerationFormat,
 )
 from sbobina.generation_text_questions import OralQuestionResponse, TextQuestionResponse
+from sbobina.generation_validation import validate_exam_response
+from sbobina.retrieval import DocumentSource, RetrievedPassage
 from sbobina.solution_points import extract_solution_points
 
 CITATION = {"passaggio": "P1", "testo": "tre parole almeno"}
@@ -90,3 +92,49 @@ def test_points_that_are_not_text_are_left_out() -> None:
     )
 
     assert solution == "Il punto vero."
+
+
+def test_an_empty_solution_drops_only_its_question() -> None:
+    # A28: an empty "soluzione" left the judge without any point. Like invalid
+    # options, it drops that question, not the whole reply.
+    passage = RetrievedPassage(
+        text="tre parole almeno qui",
+        source=DocumentSource(doc_id="manuale", page=1, chunk=0),
+        passage_id="manuale:p1:c0",
+    )
+    empty = {"domanda": "Vuota?", "soluzione": "  ", "citazioni": [CITATION]}
+    full = {"domanda": "Piena?", "punti": ["Un punto."], "citazioni": [CITATION]}
+    response = TextQuestionResponse.model_validate({"domande": [empty, full]})
+
+    questions, counts = validate_exam_response(response=response, passages=[passage])
+
+    assert [q.question for q in questions] == ["Piena?"]
+    assert counts == {"EMPTY_SOLUTION": 1}
+
+
+def test_an_oral_point_holding_the_separator_stays_one_point() -> None:
+    # A29: " | " inside a point would split it into two for the judge.
+    solution = _oral(
+        {
+            "domanda": "Le azioni?",
+            "punti": ["reintegrazione | entro un anno", "manutenzione"],
+            "citazioni": [CITATION],
+        }
+    )
+
+    assert extract_solution_points(solution=solution, format=GenerationFormat.ORAL) == (
+        "reintegrazione, entro un anno",
+        "manutenzione",
+    )
+
+
+def test_an_absolute_value_in_an_oral_point_is_kept() -> None:
+    solution = _oral(
+        {
+            "domanda": "Converge?",
+            "punti": ["Se \\(|q| < 1\\)", "Altrimenti no"],
+            "citazioni": [CITATION],
+        }
+    )
+
+    assert solution == "Se \\(|q| < 1\\) | Altrimenti no"

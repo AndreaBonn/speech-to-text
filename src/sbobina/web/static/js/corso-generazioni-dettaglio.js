@@ -16,6 +16,7 @@
     QUOTE_LENGTH: "la citazione era troppo corta o troppo lunga",
     CITATION_COUNT: "le citazioni erano assenti o troppe",
     INVALID_OPTIONS: "le opzioni di risposta non erano valide",
+    EMPTY_SOLUTION: "la soluzione era vuota",
   };
 
   function el(tag, className, text) {

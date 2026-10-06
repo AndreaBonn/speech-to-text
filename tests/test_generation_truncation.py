@@ -124,7 +124,9 @@ def test_generate_logs_an_unreadable_reply_it_could_not_salvage(
     assert "testo che non è JSON" in caplog.text
 
 
-def test_generate_does_not_log_a_readable_reply(caplog: pytest.LogCaptureFixture) -> None:
+def test_generate_does_not_log_a_readable_reply(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     caplog.set_level("WARNING", logger="sbobina")
     request = GenerationRequest.model_validate({"format": "oral", "count": 1})
     chat = FakeChat(responses=[json.dumps({"domande": [_question(0)]})])
