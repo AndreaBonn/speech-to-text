@@ -114,21 +114,12 @@
 
   function renderBanner() {
     clearChildren(el.banner);
-    var warnings = settingsState.warnings;
-    var missing = warnings.missing_keys;
-    if (missing.length > 0) {
-      var labels = missing.map(function (provider) {
-        return PROVIDER_LABELS[provider] || provider;
-      });
-      el.banner.appendChild(
-        Dom.makeBanner("Aggiungi le chiavi per: " + labels.join(", "))
-      );
-    }
-    if (warnings.empty_chain) {
-      el.banner.appendChild(
-        Dom.makeBanner("Nessun modello configurato nella catena API.")
-      );
-    }
+    // Same sentences as the banner on every other page (engine-warning.js).
+    window.SbobinaEngineWarnings.messages(settingsState.warnings).forEach(
+      function (message) {
+        el.banner.appendChild(Dom.makeBanner(message));
+      }
+    );
   }
 
   // ---------- section 1: engine ----------
