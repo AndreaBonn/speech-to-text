@@ -25,6 +25,10 @@
 
   function fetchJson(url, options) {
     return fetch(url, options).then(function (response) {
+      // 204 (DELETE) has no body: parsing it would reject the whole chain.
+      if (response.status === 204) {
+        return { status: response.status, body: null };
+      }
       return response.json().then(function (body) {
         return { status: response.status, body: body };
       });

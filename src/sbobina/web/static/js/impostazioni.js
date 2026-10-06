@@ -275,6 +275,9 @@
   el.transcriptionAssemblyai.addEventListener("change", handleTranscriptionChange);
   el.audioAckConfirm.addEventListener("click", onAudioAckConfirm);
   el.audioAckCancel.addEventListener("click", onAudioAckCancel);
+  // Escape closes a native dialog without a click: revert the radio too.
+  el.cloudAckDialog.addEventListener("cancel", onCloudAckCancel);
+  el.audioAckDialog.addEventListener("cancel", onAudioAckCancel);
 
   loadSettings();
 })();
