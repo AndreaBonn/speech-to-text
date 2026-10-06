@@ -209,8 +209,7 @@ mostra "0 su 3 tenute" con il motivo di ogni scarto: comportamento previsto, non
 **Decisione T069a: resta no**, perché l'11% è sotto la soglia. Il candidato, se il tasso salisse
 su altro materiale, è già visibile: in `normalize_tokens`, rendere equivalenti i comandi LaTeX
 delle lettere greche e i loro caratteri Unicode (`\delta` e `δ`), separando la lettera dalla
-parola che segue (`δk` oggi è un token solo). Coprirebbe 2 delle 5 riscritture (BASIS: inferred,
-non provato).
+parola che segue (`δk` oggi è un token solo). Provato e scartato, vedi sotto.
 
 ## Seconda esecuzione: testo senza `\item` (2026-10-06)
 
@@ -251,3 +250,9 @@ formula (`c^*` senza `\mathbf`): è la causa già nota di V9, non il JSON.
   BASIS: unknown.
 - Variabilità fra esecuzioni: una esecuzione per pagina e formato.
 - Formati a crocette e orale.
+
+## Tentativi scartati
+
+| Idea | Baseline → Risultato | Verdetto | Perché |
+|---|---|---|---|
+| In `normalize_tokens` una lettera greca isolata diventa il suo nome LaTeX e si stacca dalle lettere vicine (`δk` → `delta k`, come già `\delta k`); le parole greche restano intere | Citazioni scartate ritrovate nel testo: 0/21 → 2/21 sulle slide reali, 0/1 → 0/1 sulle sintetiche; tenute ritrovate 181/186 e 88/88, invariate | scartata (2026-10-06) | Guadagno marginale (2 citazioni su circa 214 delle due esecuzioni reali) contro circa 15 righe nel tokenizer di tutte le citazioni, lezioni comprese. La misura è offline: ogni citazione salvata cercata in tutte le pagine, non solo nel passaggio citato (BASIS: inferred sul risolutore vero). Diff in scratchpad di sessione, non nel repo |

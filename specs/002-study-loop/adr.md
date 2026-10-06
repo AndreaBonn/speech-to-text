@@ -672,8 +672,9 @@ stessa finestra.
   `compito-v4`: 18/18 `DONE`, 11 citazioni scartate su 103 (11%). Cause, classificate a mano: 5
   formule riscritte dal modello (`δk` per `\delta k`), 2 formule sotto le 3 parole, 3 citazioni
   che saltano testo o uniscono pagine, 1 per il markup `\item` dell'OCR (corretto in `8c0bc09`).
-  T069a resta chiuso; il candidato, se servisse, è l'equivalenza fra comandi LaTeX delle lettere
-  greche e caratteri Unicode in `normalize_tokens`. Seconda esecuzione sul testo senza `\item`
+  T069a resta chiuso. L'equivalenza fra comandi LaTeX delle lettere greche e caratteri Unicode in
+  `normalize_tokens` è stata provata e scartata: 2 scarti recuperati su 21, guadagno marginale
+  (registro in `eval-math.md`, "Tentativi scartati"). Seconda esecuzione sul testo senza `\item`
   e con il raffreddamento della GPU fra le generazioni: 17/18 `DONE`, 17/111 scartate (15%), tutte
   nei riassunti e 8 da una sola generazione che ha scritto le formule in testo semplice; nessuna
   per `\item`. La differenza fra 11% e 15% è variabilità fra esecuzioni. BASIS: measured su due
