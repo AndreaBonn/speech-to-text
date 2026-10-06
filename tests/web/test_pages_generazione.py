@@ -1,6 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from generation_api_fixtures import _register_course, _store
 from page_fixtures import BASE_URL
@@ -8,6 +9,7 @@ from test_practice_store import make_generation
 
 from sbobina.settings import Settings
 from sbobina.web.app import create_app
+from sbobina.web.generation_store import generation_path
 
 
 def make_generation_on_disk(tmp_path: Path, key: str = "fisica") -> str:
@@ -67,3 +69,39 @@ def test_generation_page_non_uuid_id_is_404(tmp_path: Path) -> None:
 
     assert response.status_code == 404
     assert "Generazione non trovata" in response.text
+
+
+def test_generation_page_corrupted_record_is_404_and_logged(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # A24: a corrupted record must not look like a wrong id with no trace.
+    generation_id = make_generation_on_disk(tmp_path=tmp_path)
+    course_id = _register_course(tmp_path=tmp_path, key="fisica")
+    courses_dir = _store(tmp_path=tmp_path).courses_dir
+    generation_path(
+        courses_dir=courses_dir, course_id=course_id, gen_id=generation_id
+    ).write_text("{non json", encoding="utf-8")
+    caplog.set_level("WARNING", logger="sbobina")
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        response = client.get(f"/corsi/fisica/generazioni/{generation_id}")
+
+    assert response.status_code == 404
+    # The startup scan logs the same file too: only the page's own record counts.
+    page_logs = [
+        r.getMessage() for r in caplog.records if r.module == "pages_generazione"
+    ]
+    assert any(generation_id in message for message in page_logs)
+
+
+def test_generation_page_non_uuid_id_is_not_logged(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    make_generation_on_disk(tmp_path=tmp_path)
+    caplog.set_level("WARNING", logger="sbobina")
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        client.get("/corsi/fisica/generazioni/non-un-uuid")
+
+    page_logs = [r for r in caplog.records if r.module == "pages_generazione"]
+    assert page_logs == []

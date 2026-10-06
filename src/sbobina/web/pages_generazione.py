@@ -1,5 +1,6 @@
 """Page route for one generation, the target of a card made from it (F51)."""
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Request
@@ -14,6 +15,7 @@ from sbobina.web.job_store import JobStore
 from sbobina.web.pages import JobStoreDep, render_page
 
 router = APIRouter()
+logger = logging.getLogger("sbobina")
 
 
 def _find_generation(
@@ -21,10 +23,17 @@ def _find_generation(
 ) -> GenerationRecord | None:
     try:
         UUID(gen_id)
+    except ValueError:
+        return None
+    try:
         return load_generation(
             courses_dir=store.courses_dir, course_id=course_id, gen_id=gen_id
         )
-    except (ValueError, NotFoundError):
+    except NotFoundError:
+        return None
+    except ValueError as error:
+        # A corrupted record answers 404 like a missing one, but leaves a trace.
+        logger.warning("Generazione %s non leggibile: %s", gen_id, error)
         return None
 
 
