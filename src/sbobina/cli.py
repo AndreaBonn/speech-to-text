@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from sbobina import pipeline
+from sbobina.log_redaction import install_redaction
 from sbobina.models import load_transcript
 from sbobina.render import format_timestamp
 from sbobina.settings import Settings, settings
@@ -216,6 +217,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     # httpx logs every Ollama request at INFO, burying the progress lines.
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    install_redaction(settings=settings)
     args = build_parser().parse_args(argv)
     inputs = [getattr(args, name) for name in INPUT_FILE_ARGS if hasattr(args, name)]
     missing = [path for path in inputs if not path.is_file()]

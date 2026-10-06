@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from sbobina.log_redaction import install_redaction
 from sbobina.settings import LOOPBACK_HOSTS, Settings
 from sbobina.web import search_service
 from sbobina.web.api_cards import router as cards_router
@@ -100,6 +101,9 @@ def _clean_interrupted_imports(app: FastAPI) -> None:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     supervisor: Supervisor = app.state.supervisor
     extraction_worker: ExtractionWorker = app.state.extraction_worker
+    # uvicorn configures its own logging (and that of "httpx") before this
+    # runs, so the filter can only be attached here, not in launcher.py.
+    install_redaction(settings=app.state.settings)
     try:
         # start() first marks jobs left running by a previous server as
         # interrupted; both calls block on disk and child processes, so they run

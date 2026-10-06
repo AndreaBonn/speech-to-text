@@ -9,6 +9,7 @@ from pathlib import Path
 from threading import Thread
 
 from sbobina.correction import CorrectorUnavailableError
+from sbobina.log_redaction import install_redaction
 from sbobina.notices import USER_NOTICE
 from sbobina.pipeline import (
     CorrectionOutcome,
@@ -262,6 +263,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
+    install_redaction(settings=settings)
     parser = argparse.ArgumentParser(description="Esegue uno stage di un job locale")
     parser.add_argument("stage", choices=(*STAGES, GENERATION_STAGE, OCR_STAGE))
     parser.add_argument("job_dir", type=Path)
