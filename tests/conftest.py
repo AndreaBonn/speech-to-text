@@ -89,3 +89,20 @@ def _block_real_network(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         httpx.AsyncHTTPTransport, "handle_async_request", _guarded_handle_async_request
     )
+
+
+@pytest.fixture(autouse=True)
+def _isolated_user_config_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Never read the developer's real credentials.json or preferences.json."""
+    config_home = tmp_path_factory.mktemp("config-home")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(config_home))
+    monkeypatch.setenv("APPDATA", str(config_home))
+    for name in (
+        "SBOBINA_CONFIG_DIR",
+        "SBOBINA_LLM_ENGINE",
+        "SBOBINA_LLM_CHAIN",
+        "SBOBINA_TRANSCRIPTION_ENGINE",
+    ):
+        monkeypatch.delenv(name, raising=False)

@@ -10,6 +10,7 @@ from sbobina import pipeline
 from sbobina.log_redaction import install_redaction
 from sbobina.models import load_transcript
 from sbobina.render import format_timestamp
+from sbobina.runtime_config import runtime_settings
 from sbobina.settings import Settings, settings
 from sbobina.study_command import cmd_studio
 from sbobina.wer import compute_wer
@@ -53,8 +54,10 @@ def _config_for(args: argparse.Namespace) -> Settings:
         "uncertain_threshold": options.get("soglia"),
         "ollama_model": options.get("modello"),
     }
-    return settings.model_copy(
-        update={key: value for key, value in overrides.items() if value is not None}
+    return runtime_settings(
+        settings=settings.model_copy(
+            update={key: value for key, value in overrides.items() if value is not None}
+        )
     )
 
 

@@ -119,9 +119,9 @@ def _settings_key(settings: Settings, provider: str) -> str | None:
     return secret.get_secret_value() if secret is not None else None
 
 
-def resolve_keys(settings: Settings, store: CredentialStore) -> dict[str, str]:
-    """Provider -> key, env wins over the file (D4)."""
-    file_keys = store.get_keys()
+def resolve_keys(settings: Settings, store: CredentialStore | None) -> dict[str, str]:
+    """Provider -> key, env wins over the file (D4); no store means env only."""
+    file_keys = store.get_keys() if store is not None else {}
     resolved: dict[str, str] = {}
     for provider in SECRET_PROVIDERS:
         env_value = _settings_key(settings=settings, provider=provider)

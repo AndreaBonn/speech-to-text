@@ -13,6 +13,7 @@ from sbobina.generation_models import (
     GenerationStatus,
 )
 from sbobina.practice_models import AnswerStatus, PracticeAttempt, require_uuid4
+from sbobina.runtime_config import runtime_settings
 from sbobina.web.api_chat import _chat_client
 from sbobina.web.course_dependencies import Course, Services
 from sbobina.web.errors import ConflictError, NotFoundError, ValidationError
@@ -36,7 +37,7 @@ router = APIRouter(prefix="/api/v1/courses/{key:path}/generations/{gen_id}/attem
 
 
 def _grading_services(request: Request) -> PracticeServices:
-    settings = request.app.state.settings
+    settings = runtime_settings(settings=request.app.state.settings)
     return PracticeServices(
         store=request.app.state.job_store,
         settings=settings,

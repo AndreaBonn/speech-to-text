@@ -18,6 +18,7 @@ from sbobina.pipeline import (
     label_transcript,
     transcribe_to_dir,
 )
+from sbobina.runtime_config import runtime_settings
 from sbobina.settings import Settings, settings
 from sbobina.web.generation_runner import run_generation_stage
 from sbobina.web.job_models import JobRecord, JobStage
@@ -115,13 +116,16 @@ def _find_audio(job_dir: Path) -> Path:
     return candidates[0]
 
 
+def _job_settings(record: JobRecord) -> Settings:
+    merged = {**settings.model_dump(), **record.config.model_dump()}
+    return runtime_settings(settings=Settings.model_validate(merged))
+
+
 def _prepare_stage(
     job_dir: Path, progress: _Progress
 ) -> tuple[Path, Settings, JobRecord]:
     record = progress.store.get(job_id=progress.job_id)
-    config = Settings.model_validate(
-        {**settings.model_dump(), **record.config.model_dump()}
-    )
+    config = _job_settings(record=record)
     audio_path = _find_audio(job_dir=job_dir)
     logger.info("Avvio stage %s per il job %s", progress.stage, progress.job_id)
     return audio_path, config, record
@@ -165,9 +169,7 @@ def _execute_stage(
         _execute_pipeline_stage(job_dir=job_dir, pipeline=pipeline, progress=progress)
         return
     record = progress.store.get(job_id=progress.job_id)
-    config = Settings.model_validate(
-        {**settings.model_dump(), **record.config.model_dump()}
-    )
+    config = _job_settings(record=record)
     study = pipeline if pipeline is not None else generate_study_files
     study(job_dir=job_dir, config=config, on_progress=progress)
 

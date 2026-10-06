@@ -42,6 +42,7 @@ from sbobina.retrieval import (
     RetrievalScope,
     RetrievedPassage,
 )
+from sbobina.runtime_config import runtime_settings
 from sbobina.settings import settings
 from sbobina.web.course_retrieval import (
     WindowedQuery,
@@ -271,21 +272,19 @@ def _course_key(courses_dir: Path, course_id: str) -> str:
 
 def run_generation_stage(course_dir: Path) -> None:
     """Production entry point: course_dir is courses/<course_id>."""
-    courses_dir = course_dir.parent
+    courses_dir, course_id = course_dir.parent, course_dir.name
     data_dir = courses_dir.parent
-    course_id = course_dir.name
-    store = JobStore(data_dir=data_dir)
-    record = find_running(courses_dir=courses_dir, course_id=course_id)
     job = GenerationJob(
-        store=store,
+        store=JobStore(data_dir=data_dir),
         index_path=data_dir / SEARCH_INDEX_FILENAME,
         course_id=course_id,
         course_key=_course_key(courses_dir=courses_dir, course_id=course_id),
-        record=record,
+        record=find_running(courses_dir=courses_dir, course_id=course_id),
         recorder=ServedByRecorder(),
     )
-    chat = llm_factory.build_from_settings(settings=settings, recorder=job.recorder)
-    label = llm_factory.effective_model_label(settings=settings)
+    config = runtime_settings(settings=settings)
+    chat = llm_factory.build_from_settings(settings=config, recorder=job.recorder)
+    label = llm_factory.effective_model_label(settings=config)
     execute_generation(job=job, chat=chat, model=label)
 
 

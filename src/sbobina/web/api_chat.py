@@ -18,6 +18,7 @@ from sbobina.chat_pipeline import ChatClient
 from sbobina.course_registry import find_by_key
 from sbobina.courses import course_key
 from sbobina.ollama_chat import ChatRequest, chat_json
+from sbobina.runtime_config import runtime_keys, runtime_settings
 from sbobina.settings import Settings
 from sbobina.web.chat_records import (
     ChatAnswerRecord,
@@ -48,7 +49,7 @@ class ChatMessageBody(BaseModel):
 def _settings_fingerprint(settings: Settings) -> tuple[object, ...]:
     """What `_chat_client` must rebuild on: a settings change otherwise keeps
     serving a cached chain whose breaker state (and provider keys) are stale."""
-    keys = llm_factory.keys_from_settings(settings=settings)
+    keys = runtime_keys(settings=settings)
     return (
         settings.llm_engine,
         tuple((entry.provider, entry.model) for entry in settings.llm_chain),
@@ -78,7 +79,7 @@ def _chat_client(request: Request) -> ChatClient:
     existing = getattr(request.app.state, "chat_client", None)
     if existing is not None:
         return cast(ChatClient, existing)
-    settings: Settings = request.app.state.settings
+    settings = runtime_settings(settings=request.app.state.settings)
     fingerprint = _settings_fingerprint(settings=settings)
     if getattr(request.app.state, "_chat_client_fingerprint", None) == fingerprint:
         return cast(ChatClient, request.app.state._built_chat_client)
@@ -95,7 +96,7 @@ def _chat_client(request: Request) -> ChatClient:
 
 
 def _services(request: Request) -> ChatServices:
-    settings: Settings = request.app.state.settings
+    settings = runtime_settings(settings=request.app.state.settings)
     return ChatServices(
         store=request.app.state.job_store,
         index_path=request.app.state.search_index_path,

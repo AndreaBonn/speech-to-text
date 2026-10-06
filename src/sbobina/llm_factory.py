@@ -33,6 +33,7 @@ from sbobina.ollama_chat import ChatRequest
 from sbobina.providers.anthropic import make_anthropic_client
 from sbobina.providers.ollama_link import Guard, make_ollama_link_client
 from sbobina.providers.openai_compat import PROFILES, make_openai_compat_client
+from sbobina.runtime_config import runtime_keys
 from sbobina.settings import LlmChainEntry, LlmProvider, Settings
 
 _KEY_FIELDS: dict[LlmProvider, str] = {
@@ -106,7 +107,7 @@ def has_cloud_key(settings: Settings) -> bool:
     """True when the api engine has a key for at least one chain link."""
     if settings.llm_engine != "api":
         return False
-    keys = keys_from_settings(settings=settings)
+    keys = runtime_keys(settings=settings)
     return any(entry.provider in keys for entry in settings.llm_chain)
 
 
@@ -118,7 +119,7 @@ def build_from_settings(
     """Build the client with the keys every caller resolves the same way."""
     return build_chat_client(
         settings=settings,
-        keys=keys_from_settings(settings=settings),
+        keys=runtime_keys(settings=settings),
         guard=guard,
         recorder=recorder,
     )
