@@ -134,8 +134,31 @@ def invalid_problems(page: Page) -> list[str]:
     return problems
 
 
+BROKEN_RENDER = """([text]) => {
+  const real = katex.render;
+  katex.render = () => { throw new TypeError('render broke'); };
+  const el = document.createElement('div');
+  try { window.SbobinaMath.renderMathText(el, text); }
+  finally { katex.render = real; }
+  return el.textContent;
+}"""
+
+
+def warning_problems(page: Page, warnings: list[str]) -> list[str]:
+    """A KaTeX failure that is not a parse error must leave a warning (A27)."""
+    before = len(warnings)
+    page.evaluate(RENDER, ["\\(\\frac{a}\\)"])
+    if len(warnings) != before:
+        return [f"formula invalida: avviso inatteso {warnings[before:]}"]
+    text = page.evaluate(BROKEN_RENDER, ["\\(x^2\\)"])
+    if text != "\\(x^2\\)" or len(warnings) == before:
+        return [f"errore di KaTeX: testo {text!r}, avvisi {warnings[before:]}"]
+    return []
+
+
 def main() -> int:
     errors: list[str] = []
+    warnings: list[str] = []
     failures = 0
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(channel="chrome")
@@ -146,6 +169,10 @@ def main() -> int:
             "console", lambda m: errors.append(m.text) if m.type == "error" else None
         )
         page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on(
+            "console",
+            lambda m: warnings.append(m.text) if m.type == "warning" else None,
+        )
         page.add_style_tag(path=str(KATEX_DIR / "katex.min.css"))
         page.add_script_tag(path=str(KATEX_DIR / "katex.min.js"))
         page.evaluate(
@@ -155,6 +182,9 @@ def main() -> int:
         checks = [(case.name, run_case(page=page, case=case)) for case in CASES]
         checks.append(("limite 2000/2001", length_problems(page=page)))
         checks.append(("formula invalida", invalid_problems(page=page)))
+        checks.append(
+            ("avviso errore KaTeX", warning_problems(page=page, warnings=warnings))
+        )
         checks.append(("console", errors))
         for name, problems in checks:
             print(f"{'OK  ' if not problems else 'FAIL'} {name}: {'; '.join(problems)}")

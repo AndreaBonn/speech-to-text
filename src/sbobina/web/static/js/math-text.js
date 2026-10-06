@@ -104,6 +104,11 @@
     try {
       katex.render(part.value, span, Object.assign({ displayMode: part.display }, KATEX_OPTIONS));
     } catch (error) {
+      // Invalid LaTeX from the model is expected and stays quiet; anything
+      // else is a KaTeX or options bug and must leave a trace (A27).
+      if (!(katex.ParseError && error instanceof katex.ParseError)) {
+        console.warn("KaTeX render failed", error);
+      }
       return sourceNode(part.source);
     }
     return span;
