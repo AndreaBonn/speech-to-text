@@ -53,6 +53,7 @@
     </nav>
     <div class="app-shell__main">
       <div id="system-banner" class="banner-region" aria-live="polite"></div>
+      <div id="engine-warning-banner" class="banner-region" aria-live="polite"></div>
       <main id="main-content">
         <h1 class="page-title">{{ page_title }}</h1>
         {% block content %}{% endblock %}
@@ -60,6 +61,7 @@
     </div>
   </div>
   <script src="/static/js/system-banner.js"></script>
+  <script src="/static/js/engine-warning.js"></script>
   <script src="/static/js/toggletip.js"></script>
   {% block scripts %}{% endblock %}
 </body>

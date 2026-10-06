@@ -51,6 +51,19 @@ def test_index_tells_why_ollama_models_are_missing(tmp_path: Path) -> None:
     assert '<option value="qwen3.5:9b" selected>qwen3.5:9b</option>' in body
 
 
+def test_index_includes_engine_warning_slot_and_scripts(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/").text
+
+    assert (
+        '<div id="engine-warning-banner" class="banner-region" aria-live="polite"></div>'
+        in body
+    )
+    assert '<script src="/static/js/engine-warning.js"></script>' in body
+    assert '<script src="/static/js/engine-form.js" defer></script>' in body
+
+
 def test_index_returns_form_with_expected_fields(tmp_path: Path) -> None:
     app = create_app(settings=Settings(), data_dir=tmp_path)
     with TestClient(app=app, base_url=BASE_URL) as client:
