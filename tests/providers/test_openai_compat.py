@@ -122,7 +122,7 @@ def test_make_openai_compat_client_maps_429_with_retry_after() -> None:
     assert excinfo.value.retry_after_s == 30.0
 
 
-@pytest.mark.parametrize("status", [503, 529])
+@pytest.mark.parametrize("status", [503, 529, 413])
 def test_make_openai_compat_client_maps_5xx_to_server(status: int) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(status, json={})

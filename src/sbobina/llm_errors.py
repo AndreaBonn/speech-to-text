@@ -17,7 +17,7 @@ _MODEL_MISSING_STATUS = 404
 _RATE_LIMIT_STATUS = 429
 _QUOTA_STATUS = 402
 _BAD_REQUEST_STATUSES = frozenset({400, 422})
-_SERVER_STATUS_MIN = 500
+_REQUEST_TIMEOUT_STATUS = 408
 
 
 class FailureKind(StrEnum):
@@ -117,9 +117,11 @@ def classify_http_failure(
         return FailureKind.QUOTA, None
     if status in _BAD_REQUEST_STATUSES:
         return FailureKind.BAD_REQUEST, None
-    if status >= _SERVER_STATUS_MIN:
-        return FailureKind.SERVER, None
-    raise ValueError(f"Unmapped HTTP status for a provider failure: {status}")
+    if status == _REQUEST_TIMEOUT_STATUS:
+        return FailureKind.TIMEOUT, None
+    # Anything else (413, 409, 3xx, >= 500) must still move the chain on:
+    # a raise here would escape FallbackChain and stop the whole job.
+    return FailureKind.SERVER, None
 
 
 def classify_transport_error(exc: Exception) -> FailureKind:

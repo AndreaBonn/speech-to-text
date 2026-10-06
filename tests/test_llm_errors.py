@@ -74,9 +74,18 @@ def test_classify_http_failure_maps_server_statuses(status: int) -> None:
     assert retry_after_s is None
 
 
-def test_classify_http_failure_raises_on_an_unmapped_status() -> None:
-    with pytest.raises(ValueError, match="204"):
-        classify_http_failure(status=204, headers={})
+@pytest.mark.parametrize("status", [413, 409, 307])
+def test_classify_http_failure_unmapped_status_is_a_server_failure(
+    status: int,
+) -> None:
+    assert classify_http_failure(status=status, headers={}) == (
+        FailureKind.SERVER,
+        None,
+    )
+
+
+def test_classify_http_failure_maps_408_to_timeout() -> None:
+    assert classify_http_failure(status=408, headers={}) == (FailureKind.TIMEOUT, None)
 
 
 def test_classify_transport_error_maps_timeout() -> None:
