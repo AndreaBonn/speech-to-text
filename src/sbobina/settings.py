@@ -1,11 +1,31 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Device = Literal["auto", "cuda", "cpu"]
 LOOPBACK_HOSTS = ("127.0.0.1", "::1", "localhost")
+LlmProvider = Literal["groq", "gemini", "openai", "anthropic"]
+LLM_CHAIN_MAX_LINKS = 8
+
+
+class LlmChainEntry(BaseModel):
+    """One provider/model pair in the configured LLM fallback chain."""
+
+    model_config = ConfigDict(frozen=True)
+
+    provider: LlmProvider
+    model: str
+
+    @field_validator("model")
+    @classmethod
+    def validate_model(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Il modello della catena non può essere vuoto")
+        return stripped
+
 
 # CTranslate2 quantization types: https://opennmt.net/CTranslate2/quantization.html
 ComputeType = Literal[
@@ -73,12 +93,36 @@ class Settings(BaseSettings):
     # A4 (security): the supervisor's only worker thread must not block
     # forever behind a hung or looping OCR child.
     ocr_process_timeout_s: float = Field(default=3600.0, gt=0.0)
+    # C1: motore locale invariato finché non si passa esplicitamente ad "api".
+    llm_engine: Literal["local", "api"] = "local"
+    llm_chain: list[LlmChainEntry] = Field(default_factory=list)
+    llm_ollama_fallback: bool = True
+    cloud_timeout_s: float = Field(default=60.0, gt=0)
+    groq_api_key: SecretStr | None = None
+    gemini_api_key: SecretStr | None = None
+    openai_api_key: SecretStr | None = None
+    anthropic_api_key: SecretStr | None = None
+    assemblyai_api_key: SecretStr | None = None
 
     @field_validator("web_host")
     @classmethod
     def validate_web_host(cls, value: str) -> str:
         if value not in LOOPBACK_HOSTS:
             raise ValueError("L'host web deve essere 127.0.0.1, ::1 o localhost")
+        return value
+
+    @field_validator("llm_chain")
+    @classmethod
+    def validate_llm_chain(cls, value: list[LlmChainEntry]) -> list[LlmChainEntry]:
+        if len(value) > LLM_CHAIN_MAX_LINKS:
+            raise ValueError(
+                f"La catena può avere al massimo {LLM_CHAIN_MAX_LINKS} anelli"
+            )
+        pairs = [(entry.provider, entry.model) for entry in value]
+        if len(pairs) != len(set(pairs)):
+            raise ValueError(
+                "La catena non può contenere coppie provider+modello duplicate"
+            )
         return value
 
 
