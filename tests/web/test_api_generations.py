@@ -257,3 +257,24 @@ def test_list_records_file_deleted_between_glob_and_read_is_not_reported(
 
     assert [record.id for record in records] == [kept.id]
     assert unavailable == []
+
+
+def test_corrupted_generation_returns_503_envelope_on_detail_and_new_attempt(
+    client: TestClient, tmp_path: Path
+) -> None:
+    course_id = _register_course(tmp_path=tmp_path)
+    record = _make_record(tmp_path=tmp_path, course_id=course_id)
+    url = f"{COURSES_URL}/fisica/generations/{record.id}"
+    assert client.get(url).status_code == 200
+    path = generation_path(
+        courses_dir=_store(tmp_path).courses_dir, course_id=course_id, gen_id=record.id
+    )
+    path.write_text("{", encoding="utf-8")
+
+    detail = client.get(url)
+    attempt = client.post(f"{url}/attempts")
+
+    for response in (detail, attempt):
+        assert response.status_code == 503
+        assert response.json()["error"]["code"] == "GENERATION_UNREADABLE"
+    assert path.read_text(encoding="utf-8") == "{"

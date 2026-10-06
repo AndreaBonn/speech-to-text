@@ -53,6 +53,19 @@ class AttemptUnreadableError(ServiceUnavailableError):
         )
 
 
+class GenerationUnreadableError(ServiceUnavailableError):
+    """A generation file exists but cannot be parsed (HTTP 503).
+
+    Not a 404: the file is kept, and the generation list reports it as damaged.
+    """
+
+    def __init__(self, gen_id: str) -> None:
+        super().__init__(
+            message=f"Generazione {gen_id} non leggibile: il file è danneggiato",
+            code="GENERATION_UNREADABLE",
+        )
+
+
 class GatewayTimeoutError(AppError):
     """An external call exceeded its time budget (HTTP 504)."""
 

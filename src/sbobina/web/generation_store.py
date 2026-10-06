@@ -19,7 +19,7 @@ from sbobina.generation_models import (
 )
 from sbobina.generation_models import load_generation as parse_generation
 from sbobina.study_files import atomic_write_pair
-from sbobina.web.errors import NotFoundError
+from sbobina.web.errors import GenerationUnreadableError, NotFoundError
 
 logger = logging.getLogger("sbobina")
 
@@ -52,6 +52,8 @@ def load_generation(courses_dir: Path, course_id: str, gen_id: str) -> Generatio
         return parse_generation(path.read_text(encoding="utf-8"))
     except FileNotFoundError as error:
         raise NotFoundError(entity="Generazione", id=gen_id) from error
+    except ValueError as error:
+        raise GenerationUnreadableError(gen_id=gen_id) from error
 
 
 def create_generation(

@@ -28,7 +28,7 @@ from sbobina.generation_render import (
     render_solutions_markdown,
     render_summary_markdown,
 )
-from sbobina.web.errors import ConflictError, NotFoundError
+from sbobina.web.errors import ConflictError, GenerationUnreadableError, NotFoundError
 from sbobina.web.generation_citations_api import (
     CitationContext,
     doc_filenames,
@@ -111,7 +111,7 @@ def _list_records(
             )
         except NotFoundError:
             continue  # deleted between glob and read: nothing to report
-        except (OSError, ValueError) as error:
+        except (OSError, GenerationUnreadableError) as error:
             logger.error("Unreadable generation %s: %s", path, error)
             unavailable.append(path.stem)
     return records, unavailable

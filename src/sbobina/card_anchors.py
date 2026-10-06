@@ -12,7 +12,7 @@ from sbobina.study_citations import locate_quote
 from sbobina.study_models import Rejection
 from sbobina.web.api_files import TRANSCRIPT_FILES, transcript_revision
 from sbobina.web.document_store import read_document
-from sbobina.web.errors import NotFoundError
+from sbobina.web.errors import GenerationUnreadableError, NotFoundError
 from sbobina.web.generation_store import load_generation
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_service import PREFERRED_VARIANTS
@@ -141,7 +141,7 @@ def _generation_resolution(
         )
     except NotFoundError:
         return AnchorResolution(href=href, status="source_removed")
-    except (OSError, ValueError) as error:
+    except (OSError, GenerationUnreadableError) as error:
         logger.warning(
             "Unreadable generation source %s: %s", anchor.generation_id, error
         )

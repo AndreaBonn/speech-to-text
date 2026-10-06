@@ -71,7 +71,7 @@ def test_generation_page_non_uuid_id_is_404(tmp_path: Path) -> None:
     assert "Generazione non trovata" in response.text
 
 
-def test_generation_page_corrupted_record_is_404_and_logged(
+def test_generation_page_corrupted_record_says_damaged_and_is_logged(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     # A24: a corrupted record must not look like a wrong id with no trace.
@@ -86,7 +86,8 @@ def test_generation_page_corrupted_record_is_404_and_logged(
     with TestClient(app=app, base_url=BASE_URL) as client:
         response = client.get(f"/corsi/fisica/generazioni/{generation_id}")
 
-    assert response.status_code == 404
+    assert response.status_code == 503
+    assert "il file è danneggiato" in response.text
     # The startup scan logs the same file too: only the page's own record counts.
     page_logs = [
         r.getMessage() for r in caplog.records if r.module == "pages_generazione"
