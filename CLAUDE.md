@@ -1,6 +1,6 @@
 # sbobina
 
-Local-only lecture transcription (Italian). Audio must never leave the machine; text correction (phase 4) uses a local LLM via Ollama, not a cloud API.
+Lecture transcription (Italian), local by default: with the default engines (Whisper, Ollama) nothing leaves the machine. Cloud engines are opt-in and need an explicit confirmation in Settings: text to Groq/Gemini/OpenAI/Anthropic (`cloud_ack`), audio to AssemblyAI (`cloud_ack_audio`). API keys live in `credentials.json` (0600) in the user config dir, never under `data/` or the repo, never in `os.environ`, logs or `job.json`. OCR stays local only. Design: `specs/003-cloud-providers/`.
 
 ## Stack
 - faster-whisper large-v3, float16, CUDA (RTX 4060 8 GB)
@@ -13,7 +13,7 @@ Local-only lecture transcription (Italian). Audio must never leave the machine; 
 
 ## Layout
 - `models.py` domain dataclasses + JSON I/O; `render.py` and `wer.py` pure logic; `transcriber.py` the only faster-whisper boundary; `cli.py` entry point
-- `edits.py` applies LLM edits behind guards (substitutions only, ≤3 words, difflib ≥0.6); `correction.py` chunks and orchestrates; `ollama_chat.py` is the shared Ollama chat boundary (request, errors, markdown fences); `llm_corrector.py` validates corrections and ensures model availability; `cleanup.py` drops isolated "Grazie." hallucinations; `report.py` the corrections report
+- `edits.py` applies LLM edits behind guards (substitutions only, ≤3 words, difflib ≥0.6); `correction.py` chunks and orchestrates; `ollama_chat.py` is the Ollama chat boundary; `llm_corrector.py` validates corrections and ensures model availability; `cleanup.py` drops isolated "Grazie." hallucinations; `report.py` the corrections report
 - `study_models.py` separates persisted study dataclasses from the LLM response schema and runtime citation matches; `study_citations.py` validates exact normalized quotes within a passage and its allowed successor, resolving current word indices and timestamps without I/O
 - `book.py` (pure) and `docx_export.py` (the only python-docx boundary) export the reading copy as TXT/DOCX: book layout, no timestamps or review marks
 - `manual_edit.py` replaces a word span typed by the user in the reader; `web/api_corrected.py` serves exports and edits. Edits quote the file `revision` (hash of the saved JSON): word indices shift after an edit, and repeated words make a text-only check unsafe
@@ -23,6 +23,8 @@ Local-only lecture transcription (Italian). Audio must never leave the machine; 
 - Retrieval: `retrieval.py` (BM25 per table, reciprocal rank fusion), `lecture_windows.py` (~250-word lecture windows), `source_sampling.py` (spread sampling for an empty topic), `web/course_retrieval.py` the I/O edge. Citations of course material: `source_citations.py`
 - Generations (exams, summaries): `generation_pipeline.py` + `generation_validation.py` + `generation_render.py`/`docx_export.py`, run as a queue action (`web/generation_runner.py` in the child, `web/generation_queue.py`/`generation_supervisor.py` in the supervisor), served by `web/api_generations.py`
 - Chat: `chat_pipeline.py` answers with cited sentences only; `web/chat_turn.py` runs one turn; `web/chat_store.py` keeps append-only JSONL per conversation; `web/api_chat.py` the routes
+- LLM engines (specs/003-cloud-providers): `llm_factory.py` is the only place that builds a `ChatClient` (`build_from_settings`); engine `local` keeps the Ollama path, engine `api` builds `llm_chain.FallbackChain` over `providers/openai_compat.py` (OpenAI, Groq, Gemini) and `providers/anthropic.py`, with `providers/ollama_link.py` (never pulls) as optional last link. A provider outage moves one request to the next link (`chain_policy.py`, `llm_errors.py`); invalid JSON is re-raised, not passed on. Results carry `served_by`. JSON repairs are provider-neutral in `llm_repair.py`; `providers/schema_compat.py` makes schemas portable
+- Config: `config_dir.py` (per-user dir), `credential_store.py` (keys, atomic 0600 writes), `user_preferences.py` (engine, chain; env wins), `log_redaction.py` (key redaction on every handler, tracebacks included). Never name modules `secret*`: a permission deny blocks reading them
 - GPU: `web/gpu_lock.py` is a readers-writer lock (writer priority) between chat turns in the web process and the supervisor's TRANSCRIBING stage (`web/transcription_gate.py`); queue children are already serial
 
 ## Roadmap
