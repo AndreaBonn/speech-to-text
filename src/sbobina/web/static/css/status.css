@@ -127,6 +127,11 @@
   gap: var(--space-sm);
 }
 
+/* display:flex above would otherwise beat the UA [hidden] rule. */
+.queue__error[hidden] {
+  display: none;
+}
+
 .skeleton-row {
   height: 4.5rem;
   border-radius: var(--radius-card);

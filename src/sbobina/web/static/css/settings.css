@@ -193,3 +193,11 @@
   flex: 1 0 100%;
   margin: 0;
 }
+
+/* The display rules above would otherwise beat the UA [hidden] rule while
+   the sections are loading. */
+.radio-group[hidden],
+.chain-list[hidden],
+.keys-list[hidden] {
+  display: none;
+}
