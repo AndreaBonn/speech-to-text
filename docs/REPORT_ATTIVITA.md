@@ -577,12 +577,29 @@ su `main`.
   domande con 2-4 punti sul corso reale; l'effetto sul giudice non è
   misurato, perché il dataset V6 era costruito per soluzioni a un punto.
   Documentazione in e79481a.
+- Secondo `/analyze` di chiusura di T069 (`type-design-analyzer` e
+  `silent-failure-hunter`): remediation A24-A31 applicata. A24 record di
+  generazione corrotto ora loggato dietro il 404 (88af373); A25 risposta
+  del modello illeggibile loggata con i primi 500 caratteri (45e86b8); A26
+  la pagina della generazione distingue caricamento e rendering falliti
+  (a9252e2); A27 avviso in console per errori di KaTeX che non sono LaTeX
+  non valido (0c86ad7); A28 domanda con soluzione vuota scartata da sola,
+  A29 il separatore " | " dentro un punto orale non lo divide più
+  (7d198f8).
+- A30: studio su una lezione reale, 0 citazioni oltre 40 parole (scarti:
+  13 non trovate, 5 senza termine, 4 troppo corte), quindi i materiali di
+  studio restano invariati (a6c2541).
+- A31: nuovo set di valutazione del giudice (10 domande con `compito-v4`,
+  30 risposte di Claude, provvisorio): accordo 28/30 in tre esecuzioni
+  identiche, risposte a metà giudicate parziali 10/10 contro 5/7 prima,
+  nessuna errata giudicata corretta, 2 complete su 10 giudicate parziali
+  (6ec0178, script `scripts/eval_grading.py`).
 
 ### Verifiche
 
 | Controllo | Risultato |
 |---|---|
-| `uv run pytest` | 2327 passed |
+| `uv run pytest` | 2334 passed |
 | `uv run ruff check .` | All checks passed |
 | `uv run ruff format --check .` | pulito |
 | `uv run mypy src tests` | pulito |
@@ -590,14 +607,12 @@ su `main`.
 | `verify_math_text` | 11/11 |
 | `a11y-gate` (axe) | 0 violazioni |
 | Misura V9, citazioni scartate | 1/89 |
+| Giudice (A31) | accordo 28/30, metà giudicate parziali 10/10 |
 
 ### Aperto a fine sessione
 
-- Effetto di `compito-v4` (soluzioni a più punti) sul giudice automatico:
-  da misurare con un nuovo dataset, perché V6 era costruito su soluzioni a
-  un punto.
-- L'accorciamento delle citazioni oltre 40 parole (F81) non è applicato ai
-  materiali di studio (`study_citations`).
+- 3 blocchi falliti nello studio della lezione misurata per A30, da
+  indagare.
 - Le pagine V10 e V9 sono sintetiche: le pagine reali del corso non sono
   state misurate.
 - Nessun push: i commit restano locali su `main`.
