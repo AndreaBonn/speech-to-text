@@ -9,6 +9,10 @@ from dataclasses import dataclass, replace
 from sbobina.llm_errors import FailureKind
 
 _DEFAULT_COOLDOWN_S = 60.0
+# The Ollama link only turns busy while the supervisor holds the GPU for
+# transcription (gpu_lock.py): a much shorter, dedicated default than the
+# provider-quota cooldown, since the lease is typically seconds, not minutes.
+_BUSY_COOLDOWN_S = 30.0
 _CONNECTIVITY_FAILURE_THRESHOLD = 3
 _CONNECTIVITY_COOLDOWN_S = 120.0
 _INVALID_RESPONSE_THRESHOLD = 3
@@ -25,7 +29,14 @@ _PERMANENT_KINDS = frozenset(
     }
 )
 # rate_limit/quota: the provider names a cooldown (or none, default 60s).
-_COOLDOWN_KINDS = frozenset({FailureKind.RATE_LIMIT, FailureKind.QUOTA})
+# busy: the GPU guard never names one, so it always falls back to its own
+# default below.
+_COOLDOWN_DEFAULTS_S: dict[FailureKind, float] = {
+    FailureKind.RATE_LIMIT: _DEFAULT_COOLDOWN_S,
+    FailureKind.QUOTA: _DEFAULT_COOLDOWN_S,
+    FailureKind.BUSY: _BUSY_COOLDOWN_S,
+}
+_COOLDOWN_KINDS = frozenset(_COOLDOWN_DEFAULTS_S)
 # timeout/server/network: transient connectivity issues, tolerated twice.
 _CONNECTIVITY_KINDS = frozenset(
     {FailureKind.TIMEOUT, FailureKind.SERVER, FailureKind.NETWORK}
@@ -53,7 +64,9 @@ class LinkState:
             return replace(self, disabled=True)
         if kind in _COOLDOWN_KINDS:
             cooldown = (
-                retry_after_s if retry_after_s is not None else _DEFAULT_COOLDOWN_S
+                retry_after_s
+                if retry_after_s is not None
+                else _COOLDOWN_DEFAULTS_S[kind]
             )
             return replace(self, cooldown_until=now + cooldown)
         if kind in _CONNECTIVITY_KINDS:

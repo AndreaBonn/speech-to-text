@@ -108,6 +108,14 @@ def test_provider_unavailable_error_is_a_corrector_unavailable_error() -> None:
     assert error.retry_after_s == 30.0
 
 
+def test_provider_unavailable_error_busy_uses_the_italian_gpu_label() -> None:
+    error = ProviderUnavailableError(
+        kind=FailureKind.BUSY, provider="ollama", retry_after_s=None
+    )
+
+    assert "GPU occupata dalla trascrizione" in str(error)
+
+
 def test_provider_unavailable_error_message_has_no_response_body() -> None:
     error = ProviderUnavailableError(
         kind=FailureKind.AUTH, provider="gemini/flash", retry_after_s=None

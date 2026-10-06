@@ -57,6 +57,26 @@ def test_record_failure_quota_uses_the_same_cooldown_rule_as_rate_limit() -> Non
     assert state.eligible(now=70.0) is True
 
 
+def test_record_failure_busy_uses_its_own_default_30s() -> None:
+    state = LinkState().record_failure(
+        kind=FailureKind.BUSY, retry_after_s=None, now=0.0
+    )
+
+    assert state.eligible(now=29.0) is False
+    assert state.eligible(now=30.0) is True
+
+
+def test_record_failure_busy_ignores_the_60s_rate_limit_default() -> None:
+    # A regression guard for the per-kind cooldown map (T021): busy must not
+    # fall back to _DEFAULT_COOLDOWN_S just because it shares the cooldown
+    # branch with rate_limit/quota.
+    state = LinkState().record_failure(
+        kind=FailureKind.BUSY, retry_after_s=None, now=0.0
+    )
+
+    assert state.eligible(now=30.0) is True
+
+
 @pytest.mark.parametrize(
     "kind", [FailureKind.TIMEOUT, FailureKind.SERVER, FailureKind.NETWORK]
 )

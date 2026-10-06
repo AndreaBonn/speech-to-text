@@ -32,6 +32,7 @@ class FailureKind(StrEnum):
     BAD_REQUEST = "bad_request"
     MISSING_KEY = "missing_key"
     MODEL_MISSING = "model_missing"
+    BUSY = "busy"
 
 
 _KIND_LABELS_IT: dict[FailureKind, str] = {
@@ -44,6 +45,7 @@ _KIND_LABELS_IT: dict[FailureKind, str] = {
     FailureKind.BAD_REQUEST: "richiesta rifiutata",
     FailureKind.MISSING_KEY: "chiave assente",
     FailureKind.MODEL_MISSING: "modello non installato",
+    FailureKind.BUSY: "GPU occupata dalla trascrizione",
 }
 
 
