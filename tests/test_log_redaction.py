@@ -170,7 +170,7 @@ def test_install_redaction_dynamic_source_leaves_unrelated_text_unchanged(
 class _UnpackingFormatter(logging.Formatter):
     """Mirrors uvicorn's AccessFormatter, which unpacks record.args."""
 
-    def formatMessage(self, record: logging.LogRecord) -> str:  # noqa: N802
+    def formatMessage(self, record: logging.LogRecord) -> str:
         assert isinstance(record.args, tuple)
         client, path = record.args
         return f"{client} {path}"
