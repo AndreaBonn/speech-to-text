@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/settings.css" />
+{% endblock %}
+
+{% block content %}
+<div id="impostazioni-root" class="settings">
+  <div id="settings-banner" class="banner-region" aria-live="polite"></div>
+
+  <section aria-labelledby="settings-engine-heading" class="settings-section">
+    <h2 id="settings-engine-heading" class="section-title">Motore per testi e studio</h2>
+    <p class="field__helper">
+      Scegli come vengono corretti i testi e generati i materiali di studio.
+    </p>
+    <div id="engine-skeleton" class="skeleton-row"></div>
+    <fieldset id="engine-fieldset" class="radio-group" hidden>
+      <legend class="sr-only">Motore per testi e studio</legend>
+      <label class="radio-field">
+        <input type="radio" name="llm-engine" id="engine-local" value="local" />
+        <span class="radio-field__text">
+          <span class="radio-field__title">Locale</span>
+          <span class="radio-field__helper">Tutto resta sul computer</span>
+        </span>
+      </label>
+      <label class="radio-field">
+        <input type="radio" name="llm-engine" id="engine-api" value="api" />
+        <span class="radio-field__text">
+          <span class="radio-field__title">API</span>
+          <span class="radio-field__helper">Usa i provider cloud configurati qui sotto</span>
+        </span>
+      </label>
+    </fieldset>
+    <p id="engine-locked-note" class="field__helper" hidden>
+      Impostato da variabile d'ambiente.
+    </p>
+    <div id="engine-error" class="queue__error" role="alert" hidden></div>
+  </section>
+
+  <section aria-labelledby="settings-chain-heading" class="settings-section">
+    <h2 id="settings-chain-heading" class="section-title">Ordine dei modelli</h2>
+    <p class="field__helper">
+      In caso di errore o limite raggiunto si passa al modello successivo.
+    </p>
+    <div id="chain-skeleton" class="skeleton-row"></div>
+    <form id="chain-form" novalidate hidden>
+      <ol id="chain-list" class="chain-list"></ol>
+      <button type="button" id="chain-add" class="btn btn--secondary">
+        Aggiungi modello
+      </button>
+      <div class="chain-row chain-row--ollama">
+        <span class="chain-row__provider">Ollama locale (riserva)</span>
+        <label class="checkbox-field chain-row__fallback">
+          <input type="checkbox" id="chain-ollama-fallback" />
+          <span>Usa Ollama se la catena si interrompe</span>
+        </label>
+      </div>
+      <p id="chain-error" class="field__error" role="alert" hidden></p>
+      <button type="submit" id="chain-save" class="btn btn--primary">Salva</button>
+    </form>
+  </section>
+
+  <section aria-labelledby="settings-keys-heading" class="settings-section">
+    <h2 id="settings-keys-heading" class="section-title">Chiavi API</h2>
+    <p id="keys-windows-note" class="field__helper" hidden>
+      Su Windows i permessi del file non proteggono la chiave da altri programmi dell'utente.
+    </p>
+    <div id="keys-skeleton" class="skeleton-row"></div>
+    <div id="keys-list" class="keys-list"></div>
+  </section>
+
+  <section aria-labelledby="settings-transcription-heading" class="settings-section">
+    <h2 id="settings-transcription-heading" class="section-title">Trascrizione</h2>
+    <div id="transcription-skeleton" class="skeleton-row"></div>
+    <fieldset id="transcription-fieldset" class="radio-group" hidden>
+      <legend class="sr-only">Motore di trascrizione</legend>
+      <label class="radio-field">
+        <input
+          type="radio"
+          name="transcription-engine"
+          id="transcription-whisper"
+          value="whisper"
+        />
+        <span class="radio-field__text">
+          <span class="radio-field__title">Whisper locale</span>
+          <span class="radio-field__helper">La lezione resta sul computer</span>
+        </span>
+      </label>
+      <label class="radio-field">
+        <input
+          type="radio"
+          name="transcription-engine"
+          id="transcription-assemblyai"
+          value="assemblyai"
+        />
+        <span class="radio-field__text">
+          <span class="radio-field__title">AssemblyAI</span>
+          <span class="radio-field__helper">Audio caricato nel servizio cloud</span>
+        </span>
+      </label>
+    </fieldset>
+    <p id="transcription-key-warning" class="field__error" hidden></p>
+    <p id="transcription-locked-note" class="field__helper" hidden>
+      Impostato da variabile d'ambiente.
+    </p>
+    <div id="transcription-error" class="queue__error" role="alert" hidden></div>
+  </section>
+
+  <dialog id="cloud-ack-dialog" class="card-dialog" aria-labelledby="cloud-ack-title">
+    <h3 id="cloud-ack-title" class="card-dialog__title">Invio dei testi al cloud</h3>
+    <p class="field__helper">
+      Il testo delle lezioni e dei documenti verrà inviato ai servizi scelti. Le chiavi restano
+      su questo computer.
+    </p>
+    <div class="card-dialog__actions">
+      <button type="button" id="cloud-ack-cancel" class="btn btn--ghost">Annulla</button>
+      <button type="button" id="cloud-ack-confirm" class="btn btn--primary">Conferma</button>
+    </div>
+  </dialog>
+
+  <dialog id="audio-ack-dialog" class="card-dialog" aria-labelledby="audio-ack-title">
+    <h3 id="audio-ack-title" class="card-dialog__title">Invio dell'audio al cloud</h3>
+    <p class="field__helper">
+      L'audio della lezione verrà caricato su AssemblyAI per la trascrizione e cancellato al
+      termine.
+    </p>
+    <div class="card-dialog__actions">
+      <button type="button" id="audio-ack-cancel" class="btn btn--ghost">Annulla</button>
+      <button type="button" id="audio-ack-confirm" class="btn btn--primary">Conferma</button>
+    </div>
+  </dialog>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/impostazioni.js" defer></script>
+{% endblock %}

@@ -143,6 +143,18 @@ def modelli(request: Request, store: JobStoreDep) -> HTMLResponse:
     )
 
 
+@router.get("/impostazioni", response_class=HTMLResponse)
+def impostazioni(request: Request, store: JobStoreDep) -> HTMLResponse:
+    """Settings page: engine, model chain, API keys, transcription engine."""
+    return _render(
+        request=request,
+        template_name="impostazioni.html",
+        active="impostazioni",
+        store=store,
+        page_title="Impostazioni",
+    )
+
+
 @router.get("/confronto", response_class=HTMLResponse)
 def confronto(request: Request, store: JobStoreDep) -> HTMLResponse:
     """WER comparison form; the computation happens client-side via the API."""

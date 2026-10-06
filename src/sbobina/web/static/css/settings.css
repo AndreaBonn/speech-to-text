@@ -1,0 +1,195 @@
+/* Settings page (/impostazioni): engine, model chain, API keys, transcription. */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+  max-width: var(--content-max);
+}
+
+.settings-section {
+  padding-bottom: var(--space-md);
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+
+.settings-section:last-of-type {
+  border-bottom: none;
+}
+
+/* ---------- Radio group (engine pickers) ---------- */
+
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+  border: none;
+  padding: 0;
+}
+
+.radio-field {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--rule-hair) solid var(--color-control-border);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.radio-field input {
+  margin-top: 0.2rem;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.radio-field__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+}
+
+.radio-field__title {
+  font-weight: var(--weight-medium);
+}
+
+.radio-field__helper {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+/* ---------- Chain list (section 2) ---------- */
+
+.chain-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chain-list__empty {
+  padding: var(--space-md);
+  text-align: center;
+  color: var(--color-ink-2);
+  border: 1px dashed var(--color-rule);
+  border-radius: var(--radius-card);
+}
+
+.chain-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.chain-row__provider-select {
+  max-width: none;
+}
+
+.chain-row__model-input {
+  max-width: none;
+}
+
+.chain-row__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.chain-row__btn {
+  min-height: 40px;
+}
+
+.chain-row--ollama {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-sm);
+}
+
+.chain-row__provider {
+  font-weight: var(--weight-medium);
+}
+
+.chain-row__fallback {
+  margin-bottom: 0;
+}
+
+@media (min-width: 768px) {
+  .chain-row {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .chain-row__provider-select {
+    flex: 0 0 11rem;
+  }
+
+  .chain-row__model-input {
+    flex: 1 1 auto;
+  }
+}
+
+/* ---------- Keys list (section 3) ---------- */
+
+.keys-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.key-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.key-row__title {
+  flex: 0 0 7rem;
+  font-weight: var(--weight-medium);
+}
+
+.key-row__status {
+  flex: 1 1 14rem;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+.key-row__input {
+  flex: 1 1 14rem;
+  max-width: 20rem;
+  min-height: 44px;
+}
+
+.key-row__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.key-row__result {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+.key-row .field__error {
+  flex: 1 0 100%;
+  margin: 0;
+}

@@ -26,6 +26,7 @@ NAV_SPECS = (
     NavSpec(id="storico", label="Storico", href="/storico"),
     NavSpec(id="modelli", label="Modelli", href="/modelli"),
     NavSpec(id="confronto", label="Confronto (WER)", href="/confronto"),
+    NavSpec(id="impostazioni", label="Impostazioni", href="/impostazioni"),
 )
 
 
