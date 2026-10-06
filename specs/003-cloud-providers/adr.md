@@ -696,3 +696,18 @@ Restano aperte: vincoli di schema di OpenAI
 Le domande aperte sopra sono state chiuse dall'utente il 2026-10-06 (`plan.md` § Riconciliazione,
 K5): Ollama ultimo anello attivo di default e rimovibile; consenso audio una volta; motore API
 anche per chat e giudizio.
+
+## Esiti dell'implementazione (2026-10-06)
+
+| Voce | Esito | Fonte |
+|---|---|---|
+| V8 cancellazione | `DELETE /v2/transcript/{id}` cancella trascrizione e file caricato con `/v2/upload` | https://www.assemblyai.com/docs/api-reference/transcripts/delete |
+| A1 adapter | httpx diretto: `providers/openai_compat.py` (OpenAI, Groq, Gemini via endpoint compatibile) e `providers/anthropic.py`; nessun SDK aggiunto | codice |
+| A2 schema | `providers/schema_compat.py` rende lo schema portabile; un 400 sullo schema ripiega una volta su JSON semplice e lo ricorda per modello | codice |
+| A3 codici | status non mappati (413, 409, 3xx) diventano `server`, 408 `timeout`: un'eccezione non classificata fermava la catena (review F1, CR1) | codice |
+
+Scelte prese in implementazione, oltre al piano:
+
+- Le preferenze si leggono a ogni ingresso (`runtime_config.py`: CLI, richieste web, figli). Supervisor e figlio leggono il motore di trascrizione separatamente: se l'utente cambia motore nell'istante fra le due letture, il figlio può usare Whisper senza lease GPU. Finestra di millisecondi, accettata.
+- L'id remoto AssemblyAI non viene salvato nel job: la cancellazione avviene nel `finally` del figlio. Un crash del processo fra submit e cancellazione lascia la trascrizione sul servizio (parcheggiato).
+- Parcheggiati dalla security review di F1: S5 (TOCTOU fra controllo symlink e chmod di `credentials.json`, richiede lo stesso utente) e S6 (anello Ollama senza timeout, come il percorso locale preesistente).
