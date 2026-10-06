@@ -12,7 +12,7 @@ Registri la lezione col telefono, trascini il file in una pagina del browser e o
 
 Sotto c'è [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper large-v3 su scheda NVIDIA, large-v3-turbo sul processore). Un secondo passaggio facoltativo manda il testo a un LLM locale tramite [Ollama](https://ollama.com) per correggere le parole sentite male; l'LLM può solo sostituire brevi gruppi di parole, e ogni modifica finisce in un report delle correzioni. Interfaccia web e riga di comando usano la stessa pipeline.
 
-Le lezioni sono raggruppate per corso. Ogni corso ha una pagina in cui aggiungi il materiale (libro, slide, appunti in PDF, DOCX, PPTX, TXT o Markdown), cerchi insieme nelle lezioni e nel materiale, generi esercitazioni e riassunti e fai domande sul corso. Tutto ciò che scrive l'LLM locale riporta la frase della lezione o la pagina del documento da cui è preso, e le voci con una citazione che non si trova nel materiale vengono scartate.
+Le lezioni sono raggruppate per corso. Ogni corso ha una pagina in cui aggiungi il materiale (libro, slide, appunti in PDF, DOCX, PPTX, TXT o Markdown), cerchi insieme nelle lezioni e nel materiale, generi esercitazioni e riassunti, svolgi le esercitazioni con la valutazione delle risposte e fai domande sul corso. Le frasi in cui il docente parla dell'esame vengono trovate da sole, e ciò che vuoi ricordare diventa una flashcard da ripassare con la ripetizione dilazionata. Tutto ciò che scrive l'LLM locale riporta la frase della lezione o la pagina del documento da cui è preso, e le voci con una citazione che non si trova nel materiale vengono scartate. Un corso si esporta in un pacchetto `.sbobina.zip` e si importa su un altro computer.
 
 **Non sei un utente tecnico?** Leggi la [guida utente](./docs/guida-utente.md): spiega passo per passo installazione e uso su Windows, macOS e Linux.
 
@@ -29,7 +29,7 @@ INFO Interfaccia su http://127.0.0.1:8765
 
 Poi il browser si apre sulla pagina di caricamento.
 
-Tempi misurati sull'hardware del progetto (trascrizione e correzione da `src/sbobina/model_catalog.py`, funzioni dei corsi da `specs/001-course-workspace/eval*.md`):
+Tempi misurati sull'hardware del progetto (trascrizione e correzione da `src/sbobina/model_catalog.py`, funzioni dei corsi da `specs/001-course-workspace/eval*.md`, valutazione delle risposte da `specs/002-study-loop/eval-grading.md`):
 
 | Passaggio | Hardware | Tempo |
 | --- | --- | --- |
@@ -38,12 +38,13 @@ Tempi misurati sull'hardware del progetto (trascrizione e correzione da `src/sbo
 | Correzione LLM, lezione di 85 min, qwen3.5:9b | NVIDIA RTX 4060 8 GB | circa 18 min |
 | Esercitazione (10 domande) o riassunto, qwen3.5:9b | NVIDIA RTX 4060 8 GB | da 33 a 84 s |
 | Domanda sul corso, qwen3.5:9b, modello già caricato | NVIDIA RTX 4060 8 GB | mediana 10 s, massimo 17 s |
+| Valutazione di una risposta aperta, qwen3.5:9b | NVIDIA RTX 4060 8 GB | mediana 8,3 s, massimo 21,5 s |
 | OCR di una pagina scansionata, qwen2.5vl:7b | stessa macchina; il modello non sta in 8 GB e gira sul processore | da 4 a 5 min |
 
 ## Funzionalità
 
 - Interfaccia web su `127.0.0.1`: caricamento, coda dei lavori con avanzamento in tempo reale, storico, download dei modelli, tema chiaro e scuro
-- Lettore: clic su una parola per far ripartire l'audio da lì; parole incerte evidenziate; elenco dei passaggi da riascoltare
+- Lettore: clic su una parola per far ripartire l'audio da lì; parole incerte evidenziate; elenco dei passaggi da riascoltare; flashcard da una frase selezionata
 - Correzione a mano nel lettore: selezioni una parola o una frase, scrivi la correzione, salvi
 - Esportazione in Markdown, JSON, DOCX e testo semplice (la copia DOCX/TXT non ha orari né segni di revisione)
 - Correzione facoltativa con Ollama, limitata a sostituzioni, con report delle correzioni
@@ -51,6 +52,11 @@ Tempi misurati sull'hardware del progetto (trascrizione e correzione da `src/sbo
 - Materiale del corso: caricamento di file PDF, DOCX, PPTX, TXT e Markdown; il tipo di file si controlla dal contenuto, non dal nome; i PDF scansionati si possono leggere con un modello visivo locale (OCR), un documento alla volta
 - Ricerca testuale in tutte le lezioni e i documenti, filtrabile per corso; un risultato in una lezione apre il lettore a quel secondo
 - Esercitazioni (crocette, domande aperte, orale) e riassunti generati dal corso, con citazioni, scaricabili in Markdown e DOCX (compito e soluzioni in file separati)
+- Svolgimento delle esercitazioni: crocette corrette subito; risposte aperte e orali valutate dall'LLM contro i punti della soluzione (Corretta, Parziale, Errata, con i punti coperti e quelli mancanti) oppure, sul processore, autovalutate; tentativi ripresi e punteggiati, errori raccolti per il ripasso
+- Frasi da esame: le frasi in cui il docente segnala cosa chiederà ("all'esame", "vi chiederò", "ricordatevelo") trovate nelle trascrizioni con regole, senza LLM, e collegate al momento della lezione
+- Ripasso: flashcard dal lettore, dai concetti dei materiali di studio, dalle frasi da esame e dagli errori delle esercitazioni, pianificate con FSRS; sessione giornaliera da tastiera; ogni carta ricontrolla se la sua fonte è cambiata
+- Esportazione e importazione di un corso in un pacchetto `.sbobina.zip` (lezioni senza audio, materiali scelti, esercitazioni, carte), validato prima di scrivere su disco
+- Formule matematiche rese con KaTeX in esercitazioni, riassunti, chat, materiali di studio, carte e testo da OCR
 - Domande sul corso: chat in cui ogni frase della risposta cita un passaggio del materiale; se il materiale non copre la domanda, la risposta lo dice
 - Materiali di studio per lezione: riassunto, concetti chiave e possibili domande d'esame, ciascuno collegato al momento della lezione da cui viene
 - Confronto Word Error Rate (WER) con una trascrizione di riferimento fatta a mano
@@ -63,6 +69,7 @@ Tempi misurati sull'hardware del progetto (trascrizione e correzione da `src/sbo
 | Riconoscimento vocale | faster-whisper 1.2 (CTranslate2), librerie CUDA 12 da wheel pip (extra `cuda`) |
 | LLM locale | client Ollama; `qwen3.5:9b` per correzione, materiali di studio, esercitazioni, riassunti e chat; `qwen2.5vl:7b` per l'OCR |
 | Documenti | pypdfium2 (testo dei PDF e rendering delle pagine), python-docx, python-pptx, Pillow |
+| Studio | fsrs 6 (pianificazione delle flashcard), KaTeX 0.19 incluso nel repository per le formule |
 | Ricerca | indice SQLite FTS5 con ordinamento BM25, ricostruito dai file su disco |
 | Web | FastAPI, Uvicorn, template Jinja2, JavaScript senza framework, Server-Sent Events per l'avanzamento |
 | Esportazione e metriche | python-docx, jiwer |
@@ -86,7 +93,7 @@ flowchart LR
     index --> data
 ```
 
-Trascrizioni, materiali di studio, esercitazioni, riassunti e OCR condividono una sola coda e girano uno alla volta in un processo figlio, così un crash o un annullamento non fermano il server web. Al riavvio, i lavori rimasti in corso vengono segnati come interrotti. L'estrazione del testo dai documenti caricati gira in un altro processo figlio con un tempo massimo e, fuori da Windows, un limite di memoria. La chat del corso gira nel processo web; un lock lettori-scrittore impedisce che lei e la fase di trascrizione usino la GPU nello stesso momento. Tutto lo stato sta in file normali sotto `data/`; l'indice di ricerca si può cancellare e viene ricostruito alla ricerca successiva.
+Trascrizioni, materiali di studio, esercitazioni, riassunti e OCR condividono una sola coda e girano uno alla volta in un processo figlio, così un crash o un annullamento non fermano il server web. Al riavvio, i lavori rimasti in corso vengono segnati come interrotti. L'estrazione del testo dai documenti caricati e l'importazione di un pacchetto di corso girano in altri processi figli con un limite di memoria (fuori da Windows); l'estrazione ha anche un tempo massimo. La chat del corso e la valutazione delle risposte girano nel processo web; un lock lettori-scrittore impedisce che usino la GPU nello stesso momento della fase di trascrizione. Tutto lo stato sta in file normali sotto `data/`; l'indice di ricerca si può cancellare e viene ricostruito alla ricerca successiva.
 
 ## Prerequisiti
 
@@ -148,6 +155,8 @@ Ogni parametro ha un valore predefinito. Per cambiarne uno, copia `.env.example`
 | `SBOBINA_OCR_MODEL` | ⚠️ | Modello visivo per i PDF scansionati, default `qwen2.5vl:7b` |
 | `SBOBINA_OCR_SCALE` | ⚠️ | Scala di rendering delle pagine per l'OCR, default `1.0` (a `2.0` una pagina richiedeva oltre 10 min sul processore) |
 | `SBOBINA_CHAT_TIMEOUT_S` | ⚠️ | Attesa massima per una risposta della chat, default `120` |
+| `SBOBINA_PRACTICE_GRADING_MODE` | ⚠️ | Valutazione delle risposte aperte: `judge` (LLM), `self` (autovalutazione) o `auto` (default: LLM con CUDA, autovalutazione sul processore) |
+| `SBOBINA_REVIEW_NEW_PER_DAY` | ⚠️ | Carte nuove al giorno per corso nel Ripasso, default `20` |
 | `SBOBINA_WEB_PORT` | ⚠️ | Default `8765` |
 | `SBOBINA_DATA_DIR` | ⚠️ | Dove vengono salvati lezioni e corsi, default `data` |
 | `SBOBINA_WEB_MAX_UPLOAD_MB` | ⚠️ | Limite di caricamento dell'audio, default `1024` |
@@ -157,7 +166,7 @@ Ogni parametro ha un valore predefinito. Per cambiarne uno, copia `.env.example`
 
 ## Riga di comando
 
-La pipeline di trascrizione funziona senza interfaccia web. Le funzioni dei corsi (materiale, ricerca, esercitazioni, chat, OCR) sono disponibili solo nell'interfaccia web.
+La pipeline di trascrizione funziona senza interfaccia web. Le funzioni dei corsi (materiale, ricerca, esercitazioni, chat, OCR, frasi da esame, Ripasso, esportazione e importazione) sono disponibili solo nell'interfaccia web.
 
 | Comando | Cosa fa |
 | --- | --- |
@@ -179,7 +188,7 @@ speech-to-text/
 │   └── web/              # app FastAPI, supervisore della coda, archivi, template, file statici
 ├── tests/                # suite pytest, rispecchia src/ (web/ per l'interfaccia)
 ├── docs/                 # guide utente, checklist multipiattaforma, report attività
-├── specs/                # design, piani e misure (interfaccia web, materiali di studio, spazio del corso)
+├── specs/                # design, piani e misure (interfaccia web, materiali di studio, spazio del corso, ciclo di studio)
 ├── avvia.sh / avvia.bat  # avvio in un passo
 └── .env.example          # impostazioni facoltative
 ```
@@ -187,7 +196,7 @@ speech-to-text/
 ## Testing
 
 ```bash
-uv run pytest            # 1585 test
+uv run pytest            # 2353 test
 uv run ruff check .
 uv run mypy src tests
 ```
@@ -196,7 +205,7 @@ I test sostituiscono faster-whisper e Ollama con dei fake, quindi girano senza t
 
 ## Sicurezza
 
-Il server ascolta solo sull'interfaccia di loopback e controlla gli header `Host` e `Origin`. I documenti caricati vengono letti in un processo figlio con limiti di dimensione, memoria e tempo. Per segnalare una vulnerabilità, consulta [SECURITY.it.md](./SECURITY.it.md).
+Il server ascolta solo sull'interfaccia di loopback, controlla gli header `Host` e `Origin` e manda una Content-Security-Policy con le pagine HTML. I documenti caricati vengono letti in un processo figlio con limiti di dimensione, memoria e tempo, e i pacchetti di corso importati vengono validati prima di scrivere qualsiasi file. Per segnalare una vulnerabilità, consulta [SECURITY.it.md](./SECURITY.it.md).
 
 ## Licenza
 

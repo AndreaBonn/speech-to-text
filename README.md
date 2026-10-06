@@ -12,7 +12,7 @@ You record a lecture with your phone, drop the file into a page in your browser,
 
 Under the hood it runs [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper large-v3 on an NVIDIA GPU, large-v3-turbo on the CPU). An optional second pass sends the text to a local LLM through [Ollama](https://ollama.com) to fix misheard words; the LLM may only substitute short word spans, and every edit is listed in a corrections report. The web UI and the command line share the same pipeline.
 
-Lectures are grouped by course. Each course has a page where you add the course material (book, slides, notes as PDF, DOCX, PPTX, TXT or Markdown), search lectures and material together, generate practice exams and summaries, and ask questions about the course. Everything the local LLM writes comes with the sentence of the lecture or the page of the document it is taken from, and items whose quote cannot be found in the material are dropped.
+Lectures are grouped by course. Each course has a page where you add the course material (book, slides, notes as PDF, DOCX, PPTX, TXT or Markdown), search lectures and material together, generate practice exams and summaries, take the exams with graded answers, and ask questions about the course. Sentences where the lecturer talks about the exam are found automatically, and anything you want to remember becomes a flashcard reviewed with spaced repetition. Everything the local LLM writes comes with the sentence of the lecture or the page of the document it is taken from, and items whose quote cannot be found in the material are dropped. A course can be exported to a `.sbobina.zip` package and imported on another computer.
 
 **Not a technical user?** Read the [user guide](./docs/user-guide.md): it covers installation and everyday use on Windows, macOS and Linux, step by step.
 
@@ -29,7 +29,7 @@ INFO Interfaccia su http://127.0.0.1:8765
 
 The browser then opens on the upload page. Messages are in Italian because the intended users are Italian students.
 
-Measured on this project's hardware (transcription and correction from `src/sbobina/model_catalog.py`, course features from `specs/001-course-workspace/eval*.md`):
+Measured on this project's hardware (transcription and correction from `src/sbobina/model_catalog.py`, course features from `specs/001-course-workspace/eval*.md`, answer grading from `specs/002-study-loop/eval-grading.md`):
 
 | Step | Hardware | Time |
 | --- | --- | --- |
@@ -38,12 +38,13 @@ Measured on this project's hardware (transcription and correction from `src/sbob
 | LLM correction, 85-min lecture, qwen3.5:9b | NVIDIA RTX 4060 8 GB | about 18 min |
 | Practice exam (10 questions) or summary, qwen3.5:9b | NVIDIA RTX 4060 8 GB | 33 to 84 s |
 | Course question, qwen3.5:9b, model already loaded | NVIDIA RTX 4060 8 GB | median 10 s, slowest 17 s |
+| Grading one open answer, qwen3.5:9b | NVIDIA RTX 4060 8 GB | median 8.3 s, slowest 21.5 s |
 | OCR of one scanned page, qwen2.5vl:7b | same machine; the model does not fit in 8 GB and runs on the CPU | 4 to 5 min |
 
 ## Features
 
 - Web UI on `127.0.0.1`: upload, job queue with live progress, history, model downloads, light and dark theme
-- Reader: click a word to play the audio from that point; uncertain words highlighted; list of passages to re-listen
+- Reader: click a word to play the audio from that point; uncertain words highlighted; list of passages to re-listen; flashcards from a selected phrase
 - Manual correction in the reader: select a word or a phrase, type the fix, save
 - Exports: Markdown, JSON, DOCX and plain text (the DOCX/TXT copy has no timestamps or review marks)
 - Optional Ollama correction with substitution-only guards and a corrections report
@@ -51,6 +52,11 @@ Measured on this project's hardware (transcription and correction from `src/sbob
 - Course material: upload PDF, DOCX, PPTX, TXT and Markdown files; the file type is checked from its content, not its name; scanned PDFs can be read with a local vision model (OCR), one document at a time
 - Full-text search over every lecture and document, filtered by course; a lecture hit opens the reader at that second
 - Practice exams (multiple choice, open questions, oral) and summaries generated from the course, with citations, downloadable as Markdown and DOCX (exam and solutions as separate files)
+- Taking practice exams: multiple choice checked at once; open and oral answers graded by the LLM against the solution points (correct, partial, wrong, with covered and missing points) or, on the CPU, self-graded; attempts can be resumed and are scored, mistakes are collected for review
+- Exam cues: sentences where the lecturer signals what will be asked ("all'esame", "vi chiederò", "ricordatevelo") found in transcripts by rules, without an LLM, and linked to their moment in the lecture
+- Review: flashcards from the reader, from study-note concepts, from exam cues and from practice mistakes, scheduled with FSRS; daily keyboard-driven session; each card rechecks whether its source changed
+- Course export and import as a `.sbobina.zip` package (lectures without audio, chosen material, practice exams, cards), validated before anything is written to disk
+- Math formulas rendered with KaTeX in exams, summaries, chat, study notes, cards and OCR text
 - Course questions: chat in which every sentence of the answer cites a passage of the material; if the material does not cover the question, the answer says so
 - Study notes per lecture: summary, key concepts and likely exam questions, each linked to the lecture time it comes from
 - Word Error Rate (WER) comparison against a hand-made reference transcript
@@ -63,6 +69,7 @@ Measured on this project's hardware (transcription and correction from `src/sbob
 | Speech recognition | faster-whisper 1.2 (CTranslate2), CUDA 12 libraries from pip wheels (`cuda` extra) |
 | Local LLM | Ollama client; `qwen3.5:9b` for correction, study notes, exams, summaries and chat; `qwen2.5vl:7b` for OCR |
 | Documents | pypdfium2 (PDF text and page rendering), python-docx, python-pptx, Pillow |
+| Study | fsrs 6 (flashcard scheduling), KaTeX 0.19 vendored for formulas |
 | Search | SQLite FTS5 index with BM25 ranking, rebuilt from the files on disk |
 | Web | FastAPI, Uvicorn, Jinja2 templates, vanilla JavaScript, Server-Sent Events for progress |
 | Exports and metrics | python-docx, jiwer |
@@ -86,7 +93,7 @@ flowchart LR
     index --> data
 ```
 
-Transcriptions, study notes, exams, summaries and OCR runs share one queue and run one at a time in a child process, so a crash or a cancel does not take the web server down. On restart, jobs left running are marked as interrupted. Text extraction from uploaded documents runs in a separate child with a timeout and, outside Windows, a memory limit. Course chat runs in the web process; a readers-writer lock keeps it and the transcription stage from using the GPU at the same time. All state lives in plain files under `data/`; the search index can be deleted and is rebuilt on the next search.
+Transcriptions, study notes, exams, summaries and OCR runs share one queue and run one at a time in a child process, so a crash or a cancel does not take the web server down. On restart, jobs left running are marked as interrupted. Text extraction from uploaded documents and course package imports run in other child processes with a memory limit (outside Windows); extraction also has a timeout. Course chat and answer grading run in the web process; a readers-writer lock keeps them from using the GPU at the same time as the transcription stage. All state lives in plain files under `data/`; the search index can be deleted and is rebuilt on the next search.
 
 ## Prerequisites
 
@@ -148,6 +155,8 @@ Every setting has a default. To change one, copy `.env.example` to `.env` and ed
 | `SBOBINA_OCR_MODEL` | ⚠️ | Vision model for scanned PDFs, default `qwen2.5vl:7b` |
 | `SBOBINA_OCR_SCALE` | ⚠️ | Page render scale for OCR, default `1.0` (at `2.0` a page took over 10 min on the CPU) |
 | `SBOBINA_CHAT_TIMEOUT_S` | ⚠️ | Maximum wait for a chat answer, default `120` |
+| `SBOBINA_PRACTICE_GRADING_MODE` | ⚠️ | Grading of open answers: `judge` (LLM), `self` (self-grading) or `auto` (default: LLM with CUDA, self-grading on the CPU) |
+| `SBOBINA_REVIEW_NEW_PER_DAY` | ⚠️ | New review cards per day per course, default `20` |
 | `SBOBINA_WEB_PORT` | ⚠️ | Default `8765` |
 | `SBOBINA_DATA_DIR` | ⚠️ | Where lectures and courses are stored, default `data` |
 | `SBOBINA_WEB_MAX_UPLOAD_MB` | ⚠️ | Audio upload limit, default `1024` |
@@ -157,7 +166,7 @@ Every setting has a default. To change one, copy `.env.example` to `.env` and ed
 
 ## Command line
 
-The transcription pipeline runs without the web UI. Course features (material, search, exams, chat, OCR) are available only in the web UI.
+The transcription pipeline runs without the web UI. Course features (material, search, exams, chat, OCR, exam cues, review, export and import) are available only in the web UI.
 
 | Command | What it does |
 | --- | --- |
@@ -179,7 +188,7 @@ speech-to-text/
 │   └── web/              # FastAPI app, queue supervisor, stores, templates, static files
 ├── tests/                # pytest suite, mirrors src/ (web/ for the UI)
 ├── docs/                 # user guides, cross-platform checklist, activity report
-├── specs/                # design, plans and measurements (web UI, study notes, course workspace)
+├── specs/                # design, plans and measurements (web UI, study notes, course workspace, study loop)
 ├── avvia.sh / avvia.bat  # one-step launchers
 └── .env.example          # optional settings
 ```
@@ -187,7 +196,7 @@ speech-to-text/
 ## Testing
 
 ```bash
-uv run pytest            # 1585 tests
+uv run pytest            # 2353 tests
 uv run ruff check .
 uv run mypy src tests
 ```
@@ -196,7 +205,7 @@ The tests replace faster-whisper and Ollama with fakes, so they run without tran
 
 ## Security
 
-The server listens only on the loopback interface and checks the `Host` and `Origin` headers. Uploaded documents are parsed in a child process with size, memory and time limits. To report a vulnerability, see [SECURITY.md](./SECURITY.md).
+The server listens only on the loopback interface, checks the `Host` and `Origin` headers and sends a Content-Security-Policy with HTML pages. Uploaded documents are parsed in a child process with size, memory and time limits, and imported course packages are validated before any file is written. To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 
 ## License
 
