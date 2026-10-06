@@ -5,6 +5,8 @@ chat_turn.py. ``app.state.chat_client``, when set, replaces the production
 Ollama client: tests set it to a scripted model instead of calling Ollama.
 """
 
+import hashlib
+import json
 from typing import Annotated, Any, cast
 from uuid import UUID
 
@@ -55,8 +57,15 @@ def _settings_fingerprint(settings: Settings) -> tuple[object, ...]:
         tuple((entry.provider, entry.model) for entry in settings.llm_chain),
         settings.llm_ollama_fallback,
         settings.ollama_model,
-        frozenset(keys),
+        _keys_digest(keys=keys),
     )
+
+
+def _keys_digest(keys: dict[str, str]) -> str:
+    # A replaced key must rebuild the chain (its breaker may hold an auth
+    # failure); a digest avoids keeping the keys themselves in app.state.
+    material = json.dumps(sorted(keys.items())).encode("utf-8")
+    return hashlib.sha256(material).hexdigest()
 
 
 def _build_local_client(settings: Settings) -> ChatClient:

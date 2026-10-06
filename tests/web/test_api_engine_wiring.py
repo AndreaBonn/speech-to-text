@@ -2,6 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
+import pytest
 from fastapi import Request
 
 from sbobina.correction import CorrectionResult, CorrectorUnavailableError
@@ -127,3 +128,25 @@ def test_check_outcome_local_engine_keeps_historic_message() -> None:
     except CorrectorUnavailableError as raised:
         message = str(raised)
     assert message.endswith("Ollama irraggiungibile")
+
+
+def test_chat_client_is_rebuilt_when_a_key_is_replaced(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SBOBINA_GROQ_API_KEY", "gsk-old-0123456789abcdef")
+    request = _request(settings=Settings(**_api_kwargs()))
+    first = _chat_client(request=request)
+
+    monkeypatch.setenv("SBOBINA_GROQ_API_KEY", "gsk-new-0123456789abcdef")
+    cast(Any, request.app.state).settings = Settings(**_api_kwargs())
+    rebuilt = _chat_client(request=request)
+
+    assert rebuilt is not first
+
+
+def _api_kwargs() -> dict[str, Any]:
+    return {
+        "llm_engine": "api",
+        "llm_chain": [LlmChainEntry(provider="groq", model="llama-a")],
+        "llm_ollama_fallback": False,
+    }
