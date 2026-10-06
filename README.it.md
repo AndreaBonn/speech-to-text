@@ -7,6 +7,8 @@ Uno strumento per trascrivere in locale le lezioni registrate in italiano: audio
 ![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Python](https://img.shields.io/badge/python-3.12-3776ab)
 [![CI](https://github.com/AndreaBonn/speech-to-text/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AndreaBonn/speech-to-text/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FAndreaBonn%2Fspeech-to-text%2Fbadges%2Fbadges%2Ftest-badge.json)](https://github.com/AndreaBonn/speech-to-text/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FAndreaBonn%2Fspeech-to-text%2Fbadges%2Fbadges%2Fcoverage-badge.json)](https://github.com/AndreaBonn/speech-to-text/actions/workflows/ci.yml)
 
 Registri la lezione col telefono, trascini il file in una pagina del browser e ottieni il testo diviso in paragrafi con l'orario. Le parole di cui il modello non è sicuro sono evidenziate, così sai quali passaggi riascoltare.
 

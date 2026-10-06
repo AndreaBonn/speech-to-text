@@ -18,6 +18,8 @@ jobs:
   check:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      badges: ${{ steps.upload-badges.outcome == 'success' }}
     steps:
       - name: Check out the code
         # actions/checkout v7.0.1
@@ -50,4 +52,69 @@ jobs:
         run: uv run mypy src tests
 
       - name: Test
-        run: uv run pytest
+        id: test
+        run: >-
+          uv run pytest --cov=sbobina --cov-branch
+          --cov-report=json:coverage.json --junitxml=junit.xml
+
+      # Runs after a red test step too, so the test badge shows the failures.
+      - name: Write badges
+        id: badges
+        if: ${{ !cancelled() && steps.test.outcome != 'skipped' }}
+        run: >-
+          uv run python scripts/write_badges.py
+          --junit junit.xml --coverage coverage.json --out badges
+
+      - name: Upload badges
+        id: upload-badges
+        if: ${{ !cancelled() && steps.badges.outcome == 'success' }}
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: badges
+          path: badges/
+          retention-days: 1
+
+  # The only job that can write: it commits to the generated "badges" branch,
+  # which the README reads through shields.io. Never runs for pull requests.
+  publish-badges:
+    needs: check
+    if: >-
+      ${{ !cancelled() && needs.check.outputs.badges == 'true'
+      && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download badges
+        # actions/download-artifact v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: badges
+          path: new-badges
+
+      # Adds a commit on top of the branch (created on the first run) and only
+      # when a badge changed, so no history is ever rewritten.
+      - name: Publish to the badges branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git init --quiet --initial-branch=badges site
+          cd site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch --quiet --depth=1 "$remote" badges; then
+            git reset --quiet --hard FETCH_HEAD
+          fi
+          mkdir -p badges
+          cp ../new-badges/*.json badges/
+          git add badges
+          if git diff --cached --quiet; then
+            echo "Badges unchanged"
+            exit 0
+          fi
+          git commit --quiet --message "chore: update badges"
+          git push --quiet "$remote" badges:badges

@@ -14,3 +14,7 @@ sbobine/
 *.mp3
 # Browser verification output (Playwright MCP screenshots and snapshots).
 .playwright-mcp/
+# Coverage and test reports written by CI (badges come from them).
+.coverage
+coverage.json
+junit.xml
