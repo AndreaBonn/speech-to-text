@@ -129,3 +129,93 @@ BASIS: measured.
 - Formati a crocette e orale: stesso prompt `compito-v3`, non eseguiti.
 - Aderenza all'argomento: un riassunto dell'esecuzione 1 citava la pagina di un altro argomento;
   non è oggetto di V9 e non è stata misurata.
+
+# V10 e V9 su slide reali del corso (2026-10-06)
+
+Prima misura su materiale vero: `data/prove/Lezioni 11 29 Ottobre.pdf`, slide di macroeconomia
+(modello di Solow) con formule. Il PDF ha già il testo, quindi l'app non ne farebbe l'OCR: le 9
+pagine con più segni di formula (`=`, `^`, `Δ` e simili nel testo nativo) sono rese come immagine
+con `render_pdf_page` e lette con `ocr-v2` attraverso `ocr_missing_pages`, come farebbe l'azione
+OCR. È una **scansione simulata**: pagine nitide, senza rotazione né rumore. Il testo nativo
+fa da riferimento.
+
+Script: `scripts/eval_math_real.py` (OCR) e `scripts/eval_citations_real.py` (citazioni); dati in
+`data/eval/math-real/` (fuori dal repo).
+`BUDGET: 1 esecuzione per pagina e formato, prompt e codice invariati durante la misura | soglia
+V9 20% dal piano; nessuna soglia per V10`
+
+## OCR (V10)
+
+| Pagina | Formule fra delimitatori | Leggibili da KaTeX | Richiamo parole | Secondi |
+|---|---|---|---|---|
+| 2 | 10 | 10 | 0,944 | 184 |
+| 3 | 3 | 3 | 0,833 | 122 |
+| 4 | 6 | 6 | 0,943 | 105 |
+| 6 | 7 | 7 | 0,828 | 114 |
+| 7 | 5 | 5 | 0,906 | 97 |
+| 8 | 5 | 5 | 0,900 | 95 |
+| 10 | 8 | 8 | 0,815 | 95 |
+| 22 | 11 | 11 | 0,839 | 111 |
+| 24 | 9 | 9 | 0,808 | 114 |
+
+64 formule, tutte leggibili da KaTeX, nessun `$` come delimitatore. Controllo a mano delle pagine
+2 e 22 (21 formule): tutte corrispondono al testo del PDF; `Y/L` diventa `\frac{Y}{L}` e la `s`
+del tasso di risparmio `\mathbf{s}`. Le altre 7 pagine non sono state controllate a mano.
+
+Il richiamo (parole del testo nativo presenti nel testo letto) sottostima la qualità: le parole
+"mancanti" sono quasi tutte i punti elenco della slide (un glifo privato, ``), `δ` scritto
+dall'OCR come `\delta`, e due refusi della slide che l'OCR ha corretto ("amortamento",
+"poichè").
+
+Difetto trovato e corretto (commit `8c0bc09`): su 2 pagine su 9 `ocr-v2` ha scritto le liste come
+LaTeX (`\begin{itemize}`, `\item`). Il lettore le mostrava come sorgente e la parola `item` rompeva
+la contiguità delle citazioni. La pulizia OCR ora toglie gli ambienti di lista e scrive ogni
+`\item` come "- ", accanto alla pulizia dei titoli di F69. Le misure sotto sono state fatte
+**prima** della correzione, sul testo con `\item`.
+
+## Citazioni (V9)
+
+Stessa procedura di T068: un compito a domande aperte da 3 e un riassunto per pagina, con
+`compito-v4` e `riassunto-v2`, argomento uguale al titolo della slide; 18 generazioni. La misura
+si è interrotta dopo 13 generazioni per un blocco della GPU (`CUDA error: unspecified launch
+failure`, riavvio della macchina) ed è ripresa dalle generazioni salvate.
+
+| Generazioni `DONE` | Citazioni scartate | Testi con formula fra delimitatori | Testi con barre doppie |
+|---|---|---|---|
+| 18/18, tutte al primo tentativo | **11/103 (11%)** | 44/116 | 0 |
+
+Sotto la soglia del 20%, ma lontano dall'1% delle pagine sintetiche. Le 11 scartate, classificate
+a mano (BASIS: inferred, la causa è letta dal confronto fra citazione e testo, non misurata):
+
+| Causa | Quante |
+|---|---|
+| Il modello riscrive la formula: `δk` invece di `\delta k`, `c*` invece di `c^*`, `s` senza `\mathbf` | 5 |
+| Formula da sola, sotto le 3 parole (`\delta k`, `= sy`) | 2 |
+| Citazione che salta un pezzo del testo o unisce due pagine | 3 |
+| La parola `item` del markup di lista fra due frasi | 1 |
+
+La divisione dello script fra citazioni "con" e "senza formula" (5/82 e 6/21) non va usata: guarda
+i delimitatori nella citazione, e quando il modello riscrive la formula in testo semplice li
+toglie, quindi una scartata per colpa della formula finisce fra quelle "senza".
+
+La citazione scartata per `item` ora viene trovata, verificato sul testo pulito della pagina 2.
+Altre 2 delle 11 contengono `\item` copiato dal modello: con la correzione il modello non lo vede
+più, ma non è stato rimisurato (BASIS: inferred).
+
+Un compito (pagina 22, "La Regola Aurea") ha perso tutte e 3 le domande: tutte citavano formule
+riscritte in Unicode. La pipeline lo chiude `DONE` con 0 domande, e la pagina delle generazioni
+mostra "0 su 3 tenute" con il motivo di ogni scarto: comportamento previsto, non un errore.
+
+**Decisione T069a: resta no**, perché l'11% è sotto la soglia. Il candidato, se il tasso salisse
+su altro materiale, è già visibile: in `normalize_tokens`, rendere equivalenti i comandi LaTeX
+delle lettere greche e i loro caratteri Unicode (`\delta` e `δ`), separando la lettera dalla
+parola che segue (`δk` oggi è un token solo). Coprirebbe 2 delle 5 riscritture (BASIS: inferred,
+non provato).
+
+## Non misurato
+
+- Una scansione vera (carta fotografata o scanner): qui le pagine sono rese dal PDF nativo.
+  BASIS: unknown.
+- V9 dopo la correzione delle liste: le misure sono sul testo con `\item`.
+- Variabilità fra esecuzioni: una esecuzione per pagina e formato.
+- Formati a crocette e orale.

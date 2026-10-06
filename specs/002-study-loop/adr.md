@@ -666,8 +666,15 @@ stessa finestra.
   l'OCR aveva letto "A x = b". **T069a non si apre**. Due esecuzioni precedenti (con
   l'indicazione sull'escape nei prompt, poi con i passaggi su più righe) hanno fatto emergere le
   correzioni registrate in D5. Stessi limiti di V10 (pagine sintetiche, una esecuzione per
-  versione). Dettaglio in `eval-math.md`. BASIS: measured su pagine sintetiche, unknown su pagine
-  reali.
+  versione). Dettaglio in `eval-math.md`. BASIS: measured su pagine sintetiche.
+  **Slide reali (2026-10-06): sotto soglia.** 18 generazioni su 9 slide di macroeconomia del corso
+  (scansione simulata: pagine del PDF nativo rese come immagine e lette con `ocr-v2`), con
+  `compito-v4`: 18/18 `DONE`, 11 citazioni scartate su 103 (11%). Cause, classificate a mano: 5
+  formule riscritte dal modello (`δk` per `\delta k`), 2 formule sotto le 3 parole, 3 citazioni
+  che saltano testo o uniscono pagine, 1 per il markup `\item` dell'OCR (corretto in `8c0bc09`).
+  T069a resta chiuso; il candidato, se servisse, è l'equivalenza fra comandi LaTeX delle lettere
+  greche e caratteri Unicode in `normalize_tokens`. BASIS: measured sul testo prima della
+  correzione delle liste; unknown su una scansione vera.
 - **V10** OCR `qwen2.5vl:7b` con prompt `ocr-v2.md` su 10 pagine con formule: formule parsabili da
   KaTeX e corrette a confronto con la pagina.
   **Esito (2026-10-05): misurata, provvisoria.** Su 10 pagine sintetiche di Claude (U5 delegata,
@@ -678,8 +685,12 @@ stessa finestra.
   maiuscoli letti minuscoli). Base `ocr-v1`: 30/39 trovate, 22/39 corrette, 3 `$` come
   delimitatore. 118-123 s per pagina, tutto su CPU: il modello non entra nella GPU da 8 GB. Le
   pagine sono più pulite di una scansione vera, quindi i numeri sono un limite superiore; né ADR
-  né piano fissano una soglia. Dettaglio in `eval-math.md`. BASIS: measured su pagine sintetiche,
-  unknown su pagine reali.
+  né piano fissano una soglia. Dettaglio in `eval-math.md`. BASIS: measured su pagine sintetiche.
+  **Slide reali (2026-10-06).** Sulle stesse 9 slide di V9 (scansione simulata): 64 formule fra
+  delimitatori, tutte leggibili da KaTeX, nessun `$`; controllo a mano su 2 pagine (21 formule),
+  tutte corrette. 95-184 s per pagina su CPU. Su 2 pagine le liste uscivano come LaTeX
+  (`\begin{itemize}`, `\item`): ora la pulizia OCR le scrive come "- ". BASIS: measured su 2 pagine
+  controllate a mano, inferred sulle altre 7, unknown su una scansione vera.
 - **V11** Test di import ostile: zip slip, symlink, membro con header falso sulla dimensione,
   rapporto di compressione estremo, manifest con hash sbagliato, `format_version` futuro. Ogni caso
   rifiutato senza file scritti fuori dallo staging.
