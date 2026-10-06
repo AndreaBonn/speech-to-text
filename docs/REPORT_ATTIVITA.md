@@ -654,6 +654,13 @@ su `main`.
   mancante del giudice): ora la riparazione rinuncia quando in una
   stringa resta un numero dispari di virgolette corrette. Test con il
   caso del reviewer.
+- Provata in `normalize_tokens` l'equivalenza fra lettere greche Unicode e
+  comandi LaTeX (`δk` letto come `\delta k`). Misura offline sulle citazioni
+  salvate: 2 scarti recuperati su 21 sulle slide reali, nessuna citazione
+  tenuta persa, nessun effetto sulle sintetiche. Guadagno marginale contro
+  righe in più nel tokenizer di tutte le citazioni: modifica annullata e
+  registrata fra i tentativi scartati in `specs/002-study-loop/eval-math.md`
+  (0eb0d56).
 
 ### Verifiche
 
