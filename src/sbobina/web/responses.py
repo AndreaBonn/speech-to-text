@@ -11,6 +11,7 @@ from starlette.responses import JSONResponse
 from sbobina.web.errors import (
     AppError,
     ConflictError,
+    ForbiddenError,
     GatewayTimeoutError,
     NotFoundError,
     ServiceUnavailableError,
@@ -53,6 +54,10 @@ async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
     if isinstance(exc, NotFoundError):
         return error_response(
             code=exc.code, message=exc.message, status_code=status.HTTP_404_NOT_FOUND
+        )
+    if isinstance(exc, ForbiddenError):
+        return error_response(
+            code=exc.code, message=exc.message, status_code=status.HTTP_403_FORBIDDEN
         )
     if isinstance(exc, GpuBusyError):
         return _build_gpu_busy_response(exc=exc)

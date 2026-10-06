@@ -75,3 +75,7 @@ class JobNotCancellableError(ConflictError):
         super().__init__(
             message=f"Job {job_id} non annullabile", code="JOB_NOT_CANCELLABLE"
         )
+
+
+class ForbiddenError(AppError):
+    """The request is refused regardless of its content (HTTP 403)."""

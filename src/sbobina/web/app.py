@@ -33,6 +33,7 @@ from sbobina.web.api_practice_grading import router as practice_grading_router
 from sbobina.web.api_practice_mistakes import router as practice_mistakes_router
 from sbobina.web.api_review import router as review_router
 from sbobina.web.api_search import router as search_router
+from sbobina.web.api_settings import router as settings_router
 from sbobina.web.api_study import router as study_router
 from sbobina.web.api_system import create_system_router
 from sbobina.web.api_wer import WER_REQUEST_LIMIT_BYTES
@@ -207,6 +208,7 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     app.add_exception_handler(HTTPException, http_error_handler)
     app.include_router(create_system_router(settings=settings))
     app.include_router(create_models_router(settings=settings))
+    app.include_router(settings_router)
     app.include_router(jobs_router)
     app.include_router(package_import_router)
     app.include_router(courses_router)
