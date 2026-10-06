@@ -594,12 +594,17 @@ su `main`.
   identiche, risposte a metà giudicate parziali 10/10 contro 5/7 prima,
   nessuna errata giudicata corretta, 2 complete su 10 giudicate parziali
   (6ec0178, script `scripts/eval_grading.py`).
+- Blocchi dello studio troncati: su una lezione reale 3 blocchi su 5 si
+  fermavano al limite di 2048 token dentro un capitolo, e un budget più
+  alto non entra nel contesto (prompt da 4600-5250 token per blocco). Ora
+  si tengono i capitoli scritti per intero, validati uno per uno: 0
+  blocchi falliti invece di 3, 58 voci tenute invece di 31 (d803e43).
 
 ### Verifiche
 
 | Controllo | Risultato |
 |---|---|
-| `uv run pytest` | 2334 passed |
+| `uv run pytest` | 2339 passed |
 | `uv run ruff check .` | All checks passed |
 | `uv run ruff format --check .` | pulito |
 | `uv run mypy src tests` | pulito |
@@ -611,8 +616,6 @@ su `main`.
 
 ### Aperto a fine sessione
 
-- 3 blocchi falliti nello studio della lezione misurata per A30, da
-  indagare.
 - Le pagine V10 e V9 sono sintetiche: le pagine reali del corso non sono
   state misurate.
 - Nessun push: i commit restano locali su `main`.
