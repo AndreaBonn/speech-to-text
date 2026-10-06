@@ -33,6 +33,7 @@ class FakeClient:
         self.calls: list[str] = []
         self.wait_error: Exception | None = None
         self.delete_error: Exception | None = None
+        self.submit_error: Exception | None = None
         FakeClient.instances.append(self)
 
     def upload(self, audio_path: Path, on_progress: Any) -> str:
@@ -42,10 +43,16 @@ class FakeClient:
 
     def submit(self, upload_url: str, language: str) -> str:
         self.calls.append(f"submit:{language}")
+        if self.submit_error is not None:
+            raise self.submit_error
         return "t1"
 
-    def wait(self, transcript_id: str, max_wait_s: float) -> dict[str, Any]:
+    def wait(
+        self, transcript_id: str, max_wait_s: float, on_poll: Any = None
+    ) -> dict[str, Any]:
         self.calls.append("wait")
+        if on_poll is not None:
+            on_poll(300.0)
         if self.wait_error is not None:
             raise self.wait_error
         return {"status": "completed", "audio_duration": 1, "speech_model_used": "u3"}
@@ -161,3 +168,42 @@ def test_transcribe_to_dir_assemblyai_never_loads_whisper(
 
     assert json_path.exists()
     assert fake_client.instances[0].calls[0] == "upload"
+
+
+def test_transcribe_file_reports_progress_while_waiting_remotely(
+    fake_client: type[FakeClient], tmp_path: Path
+) -> None:
+    progress: list[float] = []
+
+    assemblyai_transcriber.transcribe_file(
+        tmp_path / "a.m4a",
+        config=_config(),
+        on_progress=lambda d, t: progress.append(d),
+    )
+
+    remote = [value for value in progress if 0.3 < value < 0.9]
+    assert remote == [pytest.approx(0.6)]
+
+
+def test_transcribe_file_failed_submit_warns_about_the_orphan_upload(
+    fake_client: type[FakeClient],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    original_init = FakeClient.__init__
+
+    def failing_submit(self: FakeClient, config: ClientConfig) -> None:
+        original_init(self, config)
+        self.submit_error = ProviderUnavailableError(
+            kind=FailureKind.SERVER, provider="assemblyai", retry_after_s=None
+        )
+
+    monkeypatch.setattr(FakeClient, "__init__", failing_submit)
+
+    with caplog.at_level(logging.WARNING), pytest.raises(ProviderUnavailableError):
+        assemblyai_transcriber.transcribe_file(tmp_path / "a.m4a", config=_config())
+
+    notices = [r for r in caplog.records if getattr(r, USER_NOTICE, False)]
+    assert "non avviata" in notices[0].getMessage()
+    assert "delete" not in fake_client.instances[0].calls

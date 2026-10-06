@@ -31,7 +31,14 @@ _DONE = 1.0
 # Remote work is usually a fraction of the audio length; long lectures stay
 # well within two hours (the client never waits less than 15 minutes).
 _MAX_REMOTE_WAIT_S = 7200.0
+# Remote progress approaches _REMOTE_DONE; half of the way after this long.
+_REMOTE_HALF_LIFE_S = 300.0
 DELETE_FAILED_NOTICE = "Trascrizione remota non cancellata su AssemblyAI (id %s)"
+ORPHAN_UPLOAD_NOTICE = (
+    "Audio caricato su AssemblyAI ma trascrizione non avviata: il file non è "
+    "collegato a nessuna trascrizione da cancellare e resta sul servizio "
+    "fino alla sua scadenza"
+)
 
 
 def _report(on_progress: ProgressCallback | None, fraction: float) -> None:
@@ -55,6 +62,20 @@ def _delete_quietly(client: AssemblyAIClient, transcript_id: str) -> None:
         logger.warning(DELETE_FAILED_NOTICE, transcript_id, extra={USER_NOTICE: True})
 
 
+def _remote_fraction(elapsed_s: float) -> float:
+    """Indeterminate remote work shown as steady progress that never ends."""
+    share = elapsed_s / (elapsed_s + _REMOTE_HALF_LIFE_S)
+    return _UPLOAD_SHARE + (_REMOTE_DONE - _UPLOAD_SHARE) * share
+
+
+def _submit(client: AssemblyAIClient, upload_url: str, config: Settings) -> str:
+    try:
+        return client.submit(upload_url=upload_url, language=config.language)
+    except ProviderUnavailableError:
+        logger.warning(ORPHAN_UPLOAD_NOTICE, extra={USER_NOTICE: True})
+        raise
+
+
 def _run_remote(
     client: AssemblyAIClient,
     audio_path: Path,
@@ -67,9 +88,15 @@ def _run_remote(
             on_progress=on_progress, fraction=_UPLOAD_SHARE * sent / max(total, 1)
         ),
     )
-    transcript_id = client.submit(upload_url=upload_url, language=config.language)
+    transcript_id = _submit(client=client, upload_url=upload_url, config=config)
     try:
-        reply = client.wait(transcript_id=transcript_id, max_wait_s=_MAX_REMOTE_WAIT_S)
+        reply = client.wait(
+            transcript_id=transcript_id,
+            max_wait_s=_MAX_REMOTE_WAIT_S,
+            on_poll=lambda elapsed: _report(
+                on_progress=on_progress, fraction=_remote_fraction(elapsed_s=elapsed)
+            ),
+        )
         _report(on_progress=on_progress, fraction=_REMOTE_DONE)
         meta = TranscriptMeta(
             source=str(audio_path),

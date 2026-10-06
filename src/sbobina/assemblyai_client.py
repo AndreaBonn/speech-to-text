@@ -36,6 +36,8 @@ _TRANSIENT_KINDS = frozenset(
 )
 
 type UploadProgress = Callable[[int, int], None]
+# Seconds spent waiting so far, reported once per poll.
+type PollProgress = Callable[[float], None]
 
 
 class RemoteTranscriptionError(Exception):
@@ -124,10 +126,18 @@ class AssemblyAIClient:
             raise
         return reply
 
-    def wait(self, transcript_id: str, max_wait_s: float) -> dict[str, Any]:
+    def wait(
+        self,
+        transcript_id: str,
+        max_wait_s: float,
+        on_poll: PollProgress | None = None,
+    ) -> dict[str, Any]:
         """Poll until the transcript is done; transient errors are retried."""
-        deadline = self._config.now() + max(max_wait_s, _MIN_WAIT_S)
+        started = self._config.now()
+        deadline = started + max(max_wait_s, _MIN_WAIT_S)
         while self._config.now() < deadline:
+            if on_poll is not None:
+                on_poll(self._config.now() - started)
             reply = self._poll_once(transcript_id=transcript_id)
             status = reply.get("status") if reply is not None else None
             if status == _TERMINAL_OK and reply is not None:
