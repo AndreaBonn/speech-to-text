@@ -1,8 +1,9 @@
 """Settings page API: engine, chain, transcription engine and API keys.
 
-Every route needs an Origin header equal to the app's own (S2): the global
+Every mutation needs an Origin header equal to the app's own (S2): the global
 OriginMiddleware lets a mutation without Origin through, and these routes
-decide where lecture text and audio are sent.
+decide where lecture text and audio are sent. Reads only refuse a foreign
+Origin, since browsers send none on same-origin GETs.
 """
 
 from collections.abc import Callable
@@ -40,7 +41,13 @@ class KeyBody(BaseModel):
 
 def _settings(request: Request) -> Settings:
     settings: Settings = request.app.state.settings
-    if request.headers.get("origin") != web_origin(settings=settings):
+    origin = request.headers.get("origin")
+    # Browsers omit Origin on same-origin GETs: a read needs only that a
+    # present Origin is ours (the view is masked); a write needs it present.
+    is_read = request.method == "GET"
+    if (origin is None and not is_read) or (
+        origin is not None and origin != web_origin(settings=settings)
+    ):
         raise ForbiddenError(
             message="Origine della richiesta non consentita", code="FORBIDDEN"
         )

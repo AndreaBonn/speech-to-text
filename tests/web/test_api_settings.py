@@ -175,3 +175,19 @@ def test_no_get_route_ever_returns_a_saved_key(client: TestClient) -> None:
 
     assert SETTINGS_URL in paths
     assert all(SENTINEL_KEY not in body for body in bodies)
+
+
+def test_read_settings_without_origin_is_allowed_like_a_browser_get(
+    client: TestClient,
+) -> None:
+    client.headers.pop("Origin")
+
+    response = client.get(SETTINGS_URL)
+
+    assert response.status_code == 200
+
+
+def test_read_settings_with_a_foreign_origin_is_403(client: TestClient) -> None:
+    response = client.get(SETTINGS_URL, headers={"Origin": "http://evil.example"})
+
+    assert response.status_code == 403
