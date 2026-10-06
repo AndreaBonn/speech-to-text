@@ -635,6 +635,14 @@ su `main`.
   scarto dovuto a `\item`. L'11% e il 15% sono variabilità fra run; T069a
   resta chiuso. Specifiche aggiornate in un commit successivo (docs(specs):
   record the second real-slide V9 run).
+- Commit 40b431e: un riassunto che il modello rompe a metà ora tiene le
+  sezioni complete, come i compiti (F40) e lo studio. La causa del
+  riassunto fallito della pagina 4 non era il limite di token, come
+  scritto prima: riprodotto con le risposte salvate, il modello copia
+  nella citazione `Il "miglior" stato stazionario` senza fare l'escape
+  delle virgolette e il JSON si rompe nella quarta sezione, identico a
+  entrambi i tentativi; ora si tengono 3 sezioni su 4. Specifiche
+  corrette in d90dc42.
 
 ### Verifiche
 
@@ -657,8 +665,9 @@ su `main`.
 
 - Non misurato: una scansione vera (V10 usa il PDF nativo come scansione
   simulata).
-- I riassunti tagliati dal limite di token falliscono: non hanno il
-  recupero delle sezioni complete (1 su 9 nella seconda esecuzione).
+- Le virgolette non escapate nelle citazioni fanno ancora perdere la
+  sezione in cui compaiono; la correzione possibile è una riparazione
+  del JSON in `chat_json`, non ancora fatta.
 - Nessun push: i commit restano locali su `main`.
 
 ### Note per il Cliente
