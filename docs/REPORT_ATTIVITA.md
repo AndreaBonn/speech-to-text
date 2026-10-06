@@ -599,6 +599,27 @@ su `main`.
   alto non entra nel contesto (prompt da 4600-5250 token per blocco). Ora
   si tengono i capitoli scritti per intero, validati uno per uno: 0
   blocchi falliti invece di 3, 58 voci tenute invece di 31 (d803e43).
+- Script di misura su slide reali del corso (10175f6): `eval_math_real.py`
+  e `eval_citations_real.py`, con JSONL incrementale per riprendere la
+  misura dopo un'interruzione.
+- V10 su 9 slide reali di macroeconomia ("Lezioni 11 29 Ottobre.pdf"), rese
+  dal PDF nativo come scansione simulata: 64 formule, tutte leggibili da
+  KaTeX e senza simbolo `$`; 21 formule su 2 pagine controllate a mano,
+  tutte corrette; 95-184 secondi a pagina su CPU.
+- Corretto l'OCR (8c0bc09): le liste LaTeX (`\begin{itemize}`/`\item`)
+  venivano trascritte come testo illeggibile; `_strip_latex_structure` in
+  `ocr_pipeline.py` le trasforma ora in voci con trattino. Il difetto
+  compariva su 2 delle 9 pagine misurate in V10.
+- V9 richiusa sulle slide reali: 18 generazioni su 18 completate, 11
+  citazioni scartate su 103 (11%), sotto la soglia del 20%; T069a resta
+  chiuso. Cause degli scarti: 5 formule riscritte dal modello (per
+  esempio `δk` al posto di `\delta k`), 2 formule sotto le 3 parole, 3
+  citazioni che saltano testo o uniscono pagine diverse, 1 dovuta alle
+  liste con `\item`. La misura si è interrotta una volta per un crash
+  della GPU (CUDA unspecified launch failure, con riavvio della
+  macchina) ed è ripresa dalle generazioni già salvate.
+- Documentazione aggiornata in `specs/002-study-loop/eval-math.md` e
+  `adr.md` con gli esiti V9 e V10 (61fe682).
 
 ### Verifiche
 
@@ -613,11 +634,13 @@ su `main`.
 | `a11y-gate` (axe) | 0 violazioni |
 | Misura V9, citazioni scartate | 1/89 |
 | Giudice (A31) | accordo 28/30, metà giudicate parziali 10/10 |
+| V10 su slide reali, formule leggibili da KaTeX | 64/64 |
+| V9 richiusa su slide reali, citazioni scartate | 11/103 (11%) |
 
 ### Aperto a fine sessione
 
-- Le pagine V10 e V9 sono sintetiche: le pagine reali del corso non sono
-  state misurate.
+- Non misurati: una scansione vera (V10 usa il PDF nativo come scansione
+  simulata) e V9 dopo la correzione delle liste LaTeX.
 - Nessun push: i commit restano locali su `main`.
 
 ### Note per il Cliente
