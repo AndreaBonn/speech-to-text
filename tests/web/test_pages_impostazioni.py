@@ -18,4 +18,7 @@ def test_impostazioni_page_returns_shell(tmp_path: Path) -> None:
     assert "Ordine dei modelli" in body
     assert "Chiavi API" in body
     assert "Trascrizione" in body
+    assert "/static/js/settings-dom.js" in body
+    assert "/static/js/settings-chain.js" in body
+    assert "/static/js/settings-keys.js" in body
     assert "/static/js/impostazioni.js" in body
