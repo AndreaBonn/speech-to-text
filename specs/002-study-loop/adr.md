@@ -673,8 +673,11 @@ stessa finestra.
   formule riscritte dal modello (`δk` per `\delta k`), 2 formule sotto le 3 parole, 3 citazioni
   che saltano testo o uniscono pagine, 1 per il markup `\item` dell'OCR (corretto in `8c0bc09`).
   T069a resta chiuso; il candidato, se servisse, è l'equivalenza fra comandi LaTeX delle lettere
-  greche e caratteri Unicode in `normalize_tokens`. BASIS: measured sul testo prima della
-  correzione delle liste; unknown su una scansione vera.
+  greche e caratteri Unicode in `normalize_tokens`. Seconda esecuzione sul testo senza `\item`
+  e con il raffreddamento della GPU fra le generazioni: 17/18 `DONE`, 17/111 scartate (15%), tutte
+  nei riassunti e 8 da una sola generazione che ha scritto le formule in testo semplice; nessuna
+  per `\item`. La differenza fra 11% e 15% è variabilità fra esecuzioni. BASIS: measured su due
+  esecuzioni; unknown su una scansione vera.
 - **V10** OCR `qwen2.5vl:7b` con prompt `ocr-v2.md` su 10 pagine con formule: formule parsabili da
   KaTeX e corrette a confronto con la pagina.
   **Esito (2026-10-05): misurata, provvisoria.** Su 10 pagine sintetiche di Claude (U5 delegata,

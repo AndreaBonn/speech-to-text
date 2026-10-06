@@ -212,10 +212,35 @@ delle lettere greche e i loro caratteri Unicode (`\delta` e `δ`), separando la 
 parola che segue (`δk` oggi è un token solo). Coprirebbe 2 delle 5 riscritture (BASIS: inferred,
 non provato).
 
+## Seconda esecuzione: testo senza `\item` (2026-10-06)
+
+Stesse 18 generazioni, sul testo OCR ripassato dalla pulizia corrente (0 `\item` rimasti), con
+60 s di pausa e l'attesa che la GPU scenda sotto 75 °C prima di ogni generazione: il portatile si
+era spento due volte con le generazioni una dopo l'altra. Con le pause non si è spento.
+
+| Generazioni `DONE` | Citazioni scartate | Testi con formula fra delimitatori | Testi con barre doppie |
+|---|---|---|---|
+| 17/18 | **17/111 (15%)** | 43/122 | 0 |
+
+Le 17 scartate sono tutte nei riassunti; i 9 compiti non ne hanno persa nessuna. Un solo
+riassunto ("Lo stato stazionario") ne ha 8: in quella generazione il modello ha scritto ogni
+formula in testo semplice (`δk`, `k*`, `Y/L`). Cause (BASIS: inferred, classificate a mano):
+circa 10 formule riscritte dal modello, 6 formule da sole sotto le 3 parole (`= sy`,
+`\delta k`), 1 con i delimitatori scambiati (`\( k \]`). Nessuna per `\item`.
+
+Il passaggio da 11% a 15% non è un peggioramento del codice: una esecuzione per pagina, e una
+singola generazione sposta 8 citazioni. Entrambe le esecuzioni restano sotto il 20%, quindi
+**T069a resta chiuso**. La causa dominante resta la riscrittura delle formule da parte del
+modello, non l'OCR.
+
+Il riassunto della pagina 4 è finito `FAILED`: tagliato dal limite di token in uscita a entrambi
+i tentativi (nella prima esecuzione era riuscito). I riassunti non hanno il recupero delle parti
+complete che hanno i compiti (F40) e lo studio. La prima volta questo caso aveva fatto cadere lo
+script con `KeyError`: era un errore introdotto in `d803e43`, corretto in `0cacd8f`.
+
 ## Non misurato
 
 - Una scansione vera (carta fotografata o scanner): qui le pagine sono rese dal PDF nativo.
   BASIS: unknown.
-- V9 dopo la correzione delle liste: le misure sono sul testo con `\item`.
 - Variabilità fra esecuzioni: una esecuzione per pagina e formato.
 - Formati a crocette e orale.
