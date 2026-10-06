@@ -14,7 +14,7 @@ import re
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
-from sbobina.config_dir import resolve_config_dir
+from sbobina.config_dir import ConfigDirUnsafeError, resolve_config_dir
 from sbobina.credential_store import CredentialStore, resolve_keys
 from sbobina.settings import Settings
 
@@ -105,9 +105,23 @@ class SecretRedactionFilter(logging.Filter):
             text = pattern.sub(_REDACTED, text)
         return text
 
+    def _redact_message(self, record: logging.LogRecord) -> None:
+        # Formatters such as uvicorn's AccessFormatter unpack record.args, so
+        # the tuple keeps its shape and only string items are rewritten.
+        if isinstance(record.msg, str):
+            record.msg = self._redact(record.msg)
+        if isinstance(record.args, tuple):
+            record.args = tuple(
+                self._redact(arg) if isinstance(arg, str) else arg
+                for arg in record.args
+            )
+        message = record.getMessage()
+        if self._redact(message) != message:
+            # A key inside a non-string argument: collapse to plain text.
+            record.msg, record.args = self._redact(message), ()
+
     def filter(self, record: logging.LogRecord) -> bool:
-        record.msg = self._redact(record.getMessage())
-        record.args = None
+        self._redact_message(record=record)
         if record.exc_info and not record.exc_text:
             formatted = logging.Formatter().formatException(record.exc_info)
             record.exc_text = self._redact(formatted)
@@ -136,9 +150,12 @@ def _build_dynamic_secret_source(
 ) -> Callable[[], Iterable[str]] | None:
     try:
         config_dir: Path = resolve_config_dir(settings=settings, create=False)
-    except Exception:
-        logger.debug(
-            "redazione dinamica disattivata: cartella di configurazione non risolvibile",
+    except (ConfigDirUnsafeError, OSError):
+        # Keys saved from the UI (AssemblyAI has no recognizable prefix) would
+        # then reach the logs unredacted: say so where the user can see it.
+        logger.warning(
+            "Redazione delle chiavi salvate disattivata: cartella di "
+            "configurazione non risolvibile",
             exc_info=True,
         )
         return None

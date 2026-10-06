@@ -165,3 +165,41 @@ def test_install_redaction_dynamic_source_leaves_unrelated_text_unchanged(
     root.info("nessuna chiave qui, solo testo")
 
     assert stream.getvalue().strip() == "nessuna chiave qui, solo testo"
+
+
+class _UnpackingFormatter(logging.Formatter):
+    """Mirrors uvicorn's AccessFormatter, which unpacks record.args."""
+
+    def formatMessage(self, record: logging.LogRecord) -> str:  # noqa: N802
+        assert isinstance(record.args, tuple)
+        client, path = record.args
+        return f"{client} {path}"
+
+
+def _filtered_record(*args: object) -> logging.LogRecord:
+    record = logging.LogRecord(
+        name="uvicorn.access",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg='%s - "%s"',
+        args=args,
+        exc_info=None,
+    )
+    SecretRedactionFilter(known_secrets=[SENTINEL]).filter(record)
+    return record
+
+
+def test_filter_keeps_args_a_formatter_unpacks() -> None:
+    record = _filtered_record("127.0.0.1:41336", "GET /impostazioni")
+
+    assert _UnpackingFormatter().format(record) == "127.0.0.1:41336 GET /impostazioni"
+
+
+def test_filter_redacts_a_key_inside_a_string_arg_keeping_the_tuple() -> None:
+    record = _filtered_record("127.0.0.1:41336", f"GET /x?key={SENTINEL}")
+
+    output = _UnpackingFormatter().format(record)
+
+    assert SENTINEL not in output
+    assert output.startswith("127.0.0.1:41336 GET /x?key=")
