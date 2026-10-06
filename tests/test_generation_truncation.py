@@ -165,3 +165,55 @@ def test_generate_retries_a_summary_whose_reply_is_unreadable() -> None:
     assert result.outcome is GenerationOutcome.DONE
     assert len(result.sections) == 1
     assert len(chat.requests) == 2
+
+
+def _section(number: int) -> dict[str, object]:
+    return {
+        "titolo": f"Sezione {number}",
+        "frasi": [
+            {
+                "testo": "Parte da un fatto noto.",
+                "citazioni": [{"passaggio": "P1", "testo": QUOTE}],
+            }
+        ],
+    }
+
+
+def _cut_summary(complete: int) -> str:
+    """A summary cut by the token limit inside the section after `complete`."""
+    whole = json.dumps({"sezioni": [_section(n) for n in range(complete + 1)]})
+    return whole[: whole.rindex('"frasi"')]
+
+
+def test_generate_keeps_the_complete_sections_of_a_cut_summary() -> None:
+    # Measured on a real slide (page 4): the reply broke inside the fourth
+    # section at both attempts (an unescaped '"' in a quote), after three
+    # whole sections, and the generation failed.
+    request = GenerationRequest.model_validate({"format": "summary", "count": 1})
+    chat = FakeChat(responses=[_cut_summary(complete=2)])
+
+    result = generate(
+        request=request,
+        passages=[_passage()],
+        chat=chat,
+        options=GenerationOptions(model="test"),
+    )
+
+    assert result.outcome is GenerationOutcome.DONE
+    assert [s.title for s in result.sections] == ["Sezione 0", "Sezione 1"]
+    assert len(chat.requests) == 1
+
+
+def test_generate_keeps_the_sections_before_an_unescaped_quote() -> None:
+    whole = json.dumps({"sezioni": [_section(n) for n in range(3)]})
+    broken = whole.replace('"titolo": "Sezione 2"', '"titolo": "Il "miglior" stato"', 1)
+    chat = FakeChat(responses=[broken])
+
+    result = generate(
+        request=GenerationRequest.model_validate({"format": "summary", "count": 1}),
+        passages=[_passage()],
+        chat=chat,
+        options=GenerationOptions(model="test"),
+    )
+
+    assert [s.title for s in result.sections] == ["Sezione 0", "Sezione 1"]

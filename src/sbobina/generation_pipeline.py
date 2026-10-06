@@ -159,16 +159,23 @@ def complete_questions(content: str) -> list[Any]:
 def _salvage(
     content: str, schema_model: type[BaseModel], wanted: int | None
 ) -> BaseModel | None:
-    """Keep the questions an unreadable reply wrote in full, up to the request.
+    """Keep the items an unreadable reply wrote in full, up to the request.
 
     Measured (F40): qwen writes longer than num_predict allows on dense
     material and stops inside a question, the same at every attempt, so a
     retry never helps. The complete questions are kept, even fewer than asked:
-    the page shows "2 su 3 richieste". A reply with none still fails.
+    the page shows "2 su 3 richieste". A summary (no ``wanted``) keeps its
+    complete sections: on a real slide the same reply broke at both attempts
+    on a quote copied with unescaped '"', after three whole sections.
+    A reply with none still fails.
     """
-    if not wanted:
-        # A summary has no questions to keep: let the caller retry it.
-        return None
+    if wanted is None:
+        sections = keep_valid(
+            items=complete_items(content=content, key="sezioni"),
+            response_model=schema_model,
+            field="sections",
+        )
+        return schema_model.model_validate({"sezioni": sections}) if sections else None
     items = complete_questions(content=content)
     valid = keep_valid(items=items, response_model=schema_model, field="questions")
     if not valid:
