@@ -688,9 +688,9 @@ senza la pagina.
 | V3 Groq | 429 con `retry-after` | https://console.groq.com/docs/rate-limits |
 | V1 Gemini | endpoint OpenAI-compatible `https://generativelanguage.googleapis.com/v1beta/openai/` con `response_format` json_schema; chiave come Bearer, quindi mai `?key=` | https://ai.google.dev/gemini-api/docs/openai |
 | V2/V3 Anthropic | `POST /v1/messages`, header `x-api-key` + `anthropic-version: 2023-06-01`; 429 `rate_limit_error` con `retry-after`, 529 `overloaded_error`, 500 `api_error` | https://platform.claude.com/docs/en/api/errors |
+| V2 Anthropic output | structured output in `output_config.format = {type: "json_schema", schema}`; `max_tokens` obbligatorio; `stop_reason` `max_tokens` per troncamento; testo in `content[].text` | https://platform.claude.com/docs/en/api/beta/messages |
 
-Restano aperte: posizione esatta dello structured output Anthropic (`output_config.format`
-oppure top-level, da verificare con la skill `claude-api` in T010), vincoli di schema di OpenAI
+Restano aperte: vincoli di schema di OpenAI
 `strict` e Gemini, cancellazione dell'upload AssemblyAI, V4-V7, V9.
 
 Le domande aperte sopra sono state chiuse dall'utente il 2026-10-06 (`plan.md` § Riconciliazione,
