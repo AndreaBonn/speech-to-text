@@ -111,7 +111,9 @@ def settings_view(settings: Settings) -> dict[str, JsonValue]:
         return _unsafe_view(settings=settings)
     keys = runtime_keys(settings=settings)
     return {
-        "preferences": resolved.preferences.model_dump(mode="json"),
+        # The engine as it acts: an unconsented cloud engine shows as local,
+        # so choosing it again opens the consent dialog.
+        "preferences": consented_preferences(resolved=resolved).model_dump(mode="json"),
         "locked_by_env": [field for field in sorted(resolved.locked_by_env)],
         "keys": _keys_json(settings=settings, store=store),
         "warnings": _warnings(resolved=resolved, keys=keys, store=store),

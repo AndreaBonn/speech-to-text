@@ -214,9 +214,11 @@ def test_read_settings_reports_a_cloud_engine_saved_without_consent(
         json.dumps({"llm_engine": "api", "llm_chain": API_CHAIN}), encoding="utf-8"
     )
 
-    warnings = client.get(SETTINGS_URL).json()["data"]["warnings"]
+    data = client.get(SETTINGS_URL).json()["data"]
 
-    assert warnings["consent_missing"] == ["llm_engine"]
+    assert data["warnings"]["consent_missing"] == ["llm_engine"]
+    # Shown as it acts: choosing API again must open the consent dialog.
+    assert data["preferences"]["llm_engine"] == "local"
 
 
 def test_read_settings_reports_an_unreadable_credentials_file(
