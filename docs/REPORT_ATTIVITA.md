@@ -620,6 +620,21 @@ su `main`.
   macchina) ed è ripresa dalle generazioni già salvate.
 - Documentazione aggiornata in `specs/002-study-loop/eval-math.md` e
   `adr.md` con gli esiti V9 e V10 (61fe682).
+- Fix 0cacd8f: un riassunto con JSON illeggibile interrompeva la generazione
+  con `KeyError` invece di essere ritentato, una regressione introdotta da
+  d803e43 (il recupero dei capitoli per lo studio). Ora viene ritentato e,
+  se fallisce di nuovo, la generazione termina FAILED. Difetto trovato
+  durante la misura sulle slide reali; aggiunto il test di regressione.
+- Script di misura 2a3faa8: una pausa di 60 secondi prima di ogni
+  generazione, con attesa che la GPU scenda sotto i 75°C, perché il laptop
+  si era spento due volte con generazioni consecutive (alle 11:15 e alle
+  11:33); con le pause non si è più spento.
+- Secondo run V9 su testo OCR senza `\item`: 17 generazioni su 18 concluse
+  DONE, 17 citazioni scartate su 111 (15%), tutte nei riassunti, 8 da un
+  solo riassunto che scriveva le formule come testo semplice; nessuno
+  scarto dovuto a `\item`. L'11% e il 15% sono variabilità fra run; T069a
+  resta chiuso. Specifiche aggiornate in un commit successivo (docs(specs):
+  record the second real-slide V9 run).
 
 ### Verifiche
 
@@ -636,11 +651,14 @@ su `main`.
 | Giudice (A31) | accordo 28/30, metà giudicate parziali 10/10 |
 | V10 su slide reali, formule leggibili da KaTeX | 64/64 |
 | V9 richiusa su slide reali, citazioni scartate | 11/103 (11%) |
+| V9 su slide reali, testo senza `\item` | 17/111 (15%) |
 
 ### Aperto a fine sessione
 
-- Non misurati: una scansione vera (V10 usa il PDF nativo come scansione
-  simulata) e V9 dopo la correzione delle liste LaTeX.
+- Non misurato: una scansione vera (V10 usa il PDF nativo come scansione
+  simulata).
+- I riassunti tagliati dal limite di token falliscono: non hanno il
+  recupero delle sezioni complete (1 su 9 nella seconda esecuzione).
 - Nessun push: i commit restano locali su `main`.
 
 ### Note per il Cliente
