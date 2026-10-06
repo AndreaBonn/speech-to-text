@@ -33,6 +33,11 @@
     return el;
   }
 
+  // The settings page shows the same warnings in its own banner.
+  if (window.location.pathname === "/impostazioni") {
+    return;
+  }
+
   fetch("/api/v1/settings")
     .then(function (response) {
       if (!response.ok) {
