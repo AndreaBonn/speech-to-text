@@ -94,6 +94,8 @@ Differenze rispetto al testo dei task:
 - T031: il modulo è `credential_store.py` (classe `CredentialStore`): un deny di permesso su `secret*` impediva di leggere un file con quel nome.
 - T051: segmenti dalle frasi dell'endpoint `/sentences` (K3), non raggruppamento per pausa.
 - T053: il motore di trascrizione è fotografato in `JobConfig.transcription_engine` alla creazione del job; l'id remoto AssemblyAI non viene salvato (cancellazione nel `finally`, crash fra submit e delete parcheggiato).
-- T025: `served_by` non è registrato nelle risposte della chat (A7 di `/analyze`, aperto).
+- T025: `served_by` registrato per singolo turno di chat con un `ContextVar` (A7 di `/analyze`, chiuso) e mostrato sotto la risposta.
 
 Non fatti, richiedono l'utente: T028 e T057 (prove reali con chiavi e audio dell'utente), T070 (proposta per README, SECURITY e guida, solo su richiesta).
+
+Chiusi dopo `/analyze` (2026-10-06): A1 (funzioni oltre 30 righe), A2 (motore di trascrizione fotografato nel job), A3 (consenso obbligatorio per i motori cloud letti da file), A4 e A5 (cartella di config non sicura e file chiavi illeggibile segnalati in pagina), A6 (test end-to-end con chiave sentinella), A7, A8 (verifiche in `adr.md`), A10, A11, A12. Aperto A9: prove con provider reali e misura AssemblyAI sul gold set, servono chiavi e consenso dell'utente.
