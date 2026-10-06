@@ -97,6 +97,21 @@ class CredentialStore:
         """Provider -> key, from the file only (no env override)."""
         return _read_raw(self.path)
 
+    def is_unreadable(self) -> bool:
+        """True when a file exists but its keys cannot be read (A5).
+
+        `get_keys` treats it as empty so the app keeps working; the Settings
+        page must still tell "no key saved" apart from "saved keys lost".
+        """
+        if self.path.is_symlink():
+            return True
+        if not self.path.exists():
+            return False
+        try:
+            return not isinstance(json.loads(self.path.read_text("utf-8")), dict)
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+            return True
+
     def set_key(self, provider: str, key: str) -> None:
         provider = _validate_provider(provider)
         key = _validate_key(key)
@@ -133,10 +148,10 @@ def resolve_keys(settings: Settings, store: CredentialStore | None) -> dict[str,
 
 
 def masked_view(
-    settings: Settings, store: CredentialStore
+    settings: Settings, store: CredentialStore | None
 ) -> dict[str, dict[str, str | bool | None]]:
     """Provider -> `{configured, last4, source}`; never the key itself."""
-    file_keys = store.get_keys()
+    file_keys = store.get_keys() if store is not None else {}
     view: dict[str, dict[str, str | bool | None]] = {}
     for provider in SECRET_PROVIDERS:
         env_value = _settings_key(settings=settings, provider=provider)

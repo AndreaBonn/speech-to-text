@@ -12,13 +12,15 @@ from typing import Literal
 
 from pydantic import JsonValue
 
-from sbobina.config_dir import resolve_config_dir
+from sbobina.config_dir import ConfigDirUnsafeError, resolve_config_dir
 from sbobina.credential_store import SECRET_PROVIDERS, CredentialStore, masked_view
 from sbobina.runtime_config import runtime_keys
 from sbobina.settings import LlmChainEntry, Settings, TranscriptionEngine
 from sbobina.user_preferences import (
     ResolvedPreferences,
     UserPreferences,
+    consent_missing,
+    consented_preferences,
     preferences_path,
     resolve_preferences,
     save_preferences,
@@ -61,29 +63,58 @@ def _resolved(settings: Settings) -> ResolvedPreferences:
     return resolve_preferences(settings=settings, path=path)
 
 
-def _warnings(prefs: UserPreferences, keys: dict[str, str]) -> dict[str, JsonValue]:
+def _warnings(
+    resolved: ResolvedPreferences, keys: dict[str, str], store: CredentialStore
+) -> dict[str, JsonValue]:
+    prefs = consented_preferences(resolved=resolved)
     missing: list[JsonValue] = []
     if prefs.llm_engine == "api":
         missing = [e.provider for e in prefs.llm_chain if e.provider not in keys]
     if prefs.transcription_engine == "assemblyai" and "assemblyai" not in keys:
         missing.append("assemblyai")
+    consent: list[JsonValue] = list(consent_missing(resolved=resolved))
     return {
         "missing_keys": list(dict.fromkeys(missing)),
         "empty_chain": prefs.llm_engine == "api" and not prefs.llm_chain,
+        "consent_missing": consent,
+        "credentials_unreadable": store.is_unreadable(),
+        "config_dir_unsafe": False,
+    }
+
+
+def _unsafe_view(settings: Settings) -> dict[str, JsonValue]:
+    """The view when the config dir is refused: defaults, env keys, read-only."""
+    keys: dict[str, JsonValue] = {}
+    for provider, entry in masked_view(settings=settings, store=None).items():
+        item: dict[str, JsonValue] = {name: value for name, value in entry.items()}
+        keys[provider] = item
+    return {
+        "preferences": UserPreferences().model_dump(mode="json"),
+        "locked_by_env": [],
+        "keys": keys,
+        "warnings": {
+            "missing_keys": [],
+            "empty_chain": False,
+            "consent_missing": [],
+            "credentials_unreadable": False,
+            "config_dir_unsafe": True,
+        },
     }
 
 
 def settings_view(settings: Settings) -> dict[str, JsonValue]:
     """Everything the Settings page shows; key values are never included."""
-    resolved = _resolved(settings=settings)
-    _, store = _paths(settings=settings)
-    prefs = resolved.preferences
-    keys_view = _keys_json(settings=settings, store=store)
+    try:
+        resolved = _resolved(settings=settings)
+        _, store = _paths(settings=settings)
+    except ConfigDirUnsafeError:
+        return _unsafe_view(settings=settings)
+    keys = runtime_keys(settings=settings)
     return {
-        "preferences": prefs.model_dump(mode="json"),
+        "preferences": resolved.preferences.model_dump(mode="json"),
         "locked_by_env": [field for field in sorted(resolved.locked_by_env)],
-        "keys": keys_view,
-        "warnings": _warnings(prefs=prefs, keys=runtime_keys(settings=settings)),
+        "keys": _keys_json(settings=settings, store=store),
+        "warnings": _warnings(resolved=resolved, keys=keys, store=store),
     }
 
 

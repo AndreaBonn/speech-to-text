@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel, Field, JsonValue
 
 from sbobina import key_check, settings_service
+from sbobina.config_dir import ConfigDirUnsafeError
 from sbobina.credential_store import MAX_KEY_LENGTH, InvalidKeyError
 from sbobina.runtime_config import runtime_keys
 from sbobina.settings import LlmChainEntry, Settings, TranscriptionEngine
@@ -63,10 +64,15 @@ def _known(provider: str) -> str:
     return provider
 
 
-def _save(action: Callable[[], None]) -> None:
+def _save[T](action: Callable[[], T]) -> T:
     """Map the service's rule violations to HTTP errors."""
     try:
-        action()
+        return action()
+    except ConfigDirUnsafeError as error:
+        raise ConflictError(
+            message="Cartella di configurazione non sicura: impostazioni in sola lettura",
+            code="CONFIG_DIR_UNSAFE",
+        ) from error
     except settings_service.CloudAckRequiredError as error:
         raise ConflictError(
             message=_CLOUD_ACK_MESSAGE, code="CLOUD_ACK_REQUIRED"
@@ -108,9 +114,12 @@ def put_transcription(
 def put_key(
     provider: str, body: KeyBody, settings: SettingsDep
 ) -> dict[str, JsonValue]:
+    known = _known(provider=provider)
     try:
-        view = settings_service.set_key(
-            settings=settings, provider=_known(provider=provider), key=body.key
+        view = _save(
+            lambda: settings_service.set_key(
+                settings=settings, provider=known, key=body.key
+            )
         )
     except InvalidKeyError as error:
         raise AppValidationError(message=str(error)) from error
@@ -119,7 +128,8 @@ def put_key(
 
 @router.delete("/keys/{provider}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_key(provider: str, settings: SettingsDep) -> Response:
-    settings_service.delete_key(settings=settings, provider=_known(provider=provider))
+    known = _known(provider=provider)
+    _save(lambda: settings_service.delete_key(settings=settings, provider=known))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

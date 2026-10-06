@@ -1,3 +1,5 @@
+import json
+import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import cast
@@ -36,7 +38,13 @@ def test_read_settings_defaults_to_local_without_warnings(client: TestClient) ->
     data = client.get(SETTINGS_URL).json()["data"]
 
     assert data["preferences"]["llm_engine"] == "local"
-    assert data["warnings"] == {"missing_keys": [], "empty_chain": False}
+    assert data["warnings"] == {
+        "missing_keys": [],
+        "empty_chain": False,
+        "consent_missing": [],
+        "credentials_unreadable": False,
+        "config_dir_unsafe": False,
+    }
     assert data["keys"]["groq"] == {"configured": False, "last4": None, "source": None}
 
 
@@ -191,3 +199,59 @@ def test_read_settings_with_a_foreign_origin_is_403(client: TestClient) -> None:
     response = client.get(SETTINGS_URL, headers={"Origin": "http://evil.example"})
 
     assert response.status_code == 403
+
+
+def _config_dir() -> Path:
+    return Path(os.environ["XDG_CONFIG_HOME"]) / "sbobina"
+
+
+def test_read_settings_reports_a_cloud_engine_saved_without_consent(
+    client: TestClient,
+) -> None:
+    config_dir = _config_dir()
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "preferences.json").write_text(
+        json.dumps({"llm_engine": "api", "llm_chain": API_CHAIN}), encoding="utf-8"
+    )
+
+    warnings = client.get(SETTINGS_URL).json()["data"]["warnings"]
+
+    assert warnings["consent_missing"] == ["llm_engine"]
+
+
+def test_read_settings_reports_an_unreadable_credentials_file(
+    client: TestClient,
+) -> None:
+    config_dir = _config_dir()
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "credentials.json").write_text("{not json", encoding="utf-8")
+
+    warnings = client.get(SETTINGS_URL).json()["data"]["warnings"]
+
+    assert warnings["credentials_unreadable"] is True
+
+
+def test_read_settings_healthy_files_raise_no_new_warning(client: TestClient) -> None:
+    client.put(f"{SETTINGS_URL}/keys/groq", json={"key": SENTINEL_KEY})
+
+    warnings = client.get(SETTINGS_URL).json()["data"]["warnings"]
+
+    assert warnings["credentials_unreadable"] is False
+    assert warnings["consent_missing"] == []
+    assert warnings["config_dir_unsafe"] is False
+
+
+def test_settings_with_a_config_dir_inside_data_dir_are_reported_and_read_only(
+    tmp_path: Path,
+) -> None:
+    data_dir = tmp_path / "data"
+    settings = Settings(data_dir=data_dir, config_dir=data_dir / "config")
+    app = create_app(settings=settings, data_dir=data_dir)
+    with TestClient(app=app, base_url=BASE_URL, headers={"Origin": BASE_URL}) as unsafe:
+        view = unsafe.get(SETTINGS_URL)
+        write = unsafe.put(f"{SETTINGS_URL}/keys/groq", json={"key": SENTINEL_KEY})
+
+    assert view.status_code == 200
+    assert view.json()["data"]["warnings"]["config_dir_unsafe"] is True
+    assert write.status_code == 409
+    assert write.json()["error"]["code"] == "CONFIG_DIR_UNSAFE"
