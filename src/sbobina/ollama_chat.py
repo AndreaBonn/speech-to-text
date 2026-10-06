@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -56,6 +57,49 @@ def escape_latex_backslashes(content: str) -> str:
         parts.append(char)
         index += 1
     return "".join(parts)
+
+
+# What follows a quote that really closes a JSON string: a key's ":", the end
+# of an object or array, the end of the reply, or a comma before the next
+# string, object or array (the schemas hold no bare numbers after a string).
+_STRING_END = re.compile(r'\s*(?:[:}\]]|$|,\s*["{\[])')
+
+
+def escape_inner_quotes(content: str) -> str:
+    """Escape the quotes inside a JSON string that do not close it.
+
+    Measured on a real slide (2026-10-06): qwen copied 'Il "miglior" stato'
+    into a citation without escaping, the same at both attempts, and the
+    summary lost the section. A quote followed by ":" still reads as a
+    closer, so that case stays broken. Copied quotes come in pairs: a string
+    left with an odd number of them means a '", "' inside one list item was
+    read as an item boundary, so the content comes back untouched.
+    """
+    parts: list[str] = []
+    in_string = False
+    escaped = index = 0
+    while index < len(content):
+        char = content[index]
+        step = 2 if in_string and char == "\\" else 1
+        if char == '"' and in_string and not _STRING_END.match(content, index + 1):
+            parts.append('\\"')
+            escaped += 1
+        else:
+            if char == '"' and in_string and escaped % 2:
+                return content
+            escaped = 0 if char == '"' else escaped
+            in_string = in_string != (char == '"')
+            parts.append(content[index : index + step])
+        index += step
+    return "".join(parts)
+
+
+def _parses(content: str) -> bool:
+    try:
+        json.loads(content)
+    except json.JSONDecodeError:
+        return False
+    return True
 
 
 def _open_brackets(content: str) -> list[str] | None:
@@ -129,12 +173,26 @@ def chat_json(client: Client, request: ChatRequest) -> str:
     except ValueError as err:
         raise InvalidResponseError(f"{type(err).__name__}: {err}") from err
     _log_usage(response=response)
-    content = escape_latex_backslashes(
-        content=strip_markdown_fence(content=response.message.content or "")
-    )
+    raw = strip_markdown_fence(content=response.message.content or "")
+    content = escape_latex_backslashes(content=raw)
     if response.done_reason == "length":
         return content
     closed = close_open_brackets(content=content)
     if closed != content:
         logger.warning("Risposta di Ollama con parentesi non chiuse: chiuse in coda")
-    return closed
+    return closed if _parses(content=closed) else _with_inner_quotes(raw, closed)
+
+
+def _with_inner_quotes(raw: str, closed: str) -> str:
+    """The reply with its inner quotes escaped, only if that makes it parse.
+
+    The quotes are fixed on the raw reply: the LaTeX escaping reads string
+    boundaries from the quotes, so it must run after them.
+    """
+    repaired = close_open_brackets(
+        content=escape_latex_backslashes(content=escape_inner_quotes(content=raw))
+    )
+    if not _parses(content=repaired):
+        return closed
+    logger.warning("Risposta di Ollama con virgolette non escapate: corrette")
+    return repaired
