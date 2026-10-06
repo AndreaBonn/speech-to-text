@@ -42,6 +42,29 @@ def test_report_lists_applied_near_miss_suggestions_and_removed_fillers() -> Non
     assert "- [00:06:23] Grazie." in report
 
 
+def test_report_shows_served_by_when_given() -> None:
+    result = CorrectionResult(transcript=TRANSCRIPT, applied=[], rejected=[])
+
+    report = render_corrections_report(
+        result,
+        model="qwen3.5:9b",
+        removed=[],
+        served_by={"groq/llama-x": 48, "ollama/qwen3.5:9b": 2},
+    )
+
+    assert (
+        "Modelli usati: groq/llama-x 48 blocchi, ollama/qwen3.5:9b 2 blocchi." in report
+    )
+
+
+def test_report_omits_served_by_line_when_not_given() -> None:
+    result = CorrectionResult(transcript=TRANSCRIPT, applied=[], rejected=[])
+
+    report = render_corrections_report(result, model="qwen3.5:9b", removed=[])
+
+    assert "Modelli usati" not in report
+
+
 def test_report_keeps_only_suggestions_just_below_the_similarity_threshold() -> None:
     result = CorrectionResult(
         transcript=TRANSCRIPT,

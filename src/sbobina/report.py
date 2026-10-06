@@ -46,13 +46,24 @@ def _header(
     return lines
 
 
+def _served_by_line(served_by: dict[str, int] | None) -> list[str]:
+    if not served_by:
+        return []
+    parts = ", ".join(f"{label} {count} blocchi" for label, count in served_by.items())
+    return [f"Modelli usati: {parts}.", ""]
+
+
 def render_corrections_report(
-    result: CorrectionResult, model: str, removed: list[Segment]
+    result: CorrectionResult,
+    model: str,
+    removed: list[Segment],
+    served_by: dict[str, int] | None = None,
 ) -> str:
     """Markdown list of every change made by ``sbobina correggi``, with timestamps."""
     suggestions = [r for r in result.rejected if is_near_miss(r)]
     lines = [
         *_header(result, model, suggestions=len(suggestions), removed=len(removed)),
+        *_served_by_line(served_by),
         *_section(
             "Correzioni applicate",
             [

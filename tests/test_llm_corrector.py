@@ -5,6 +5,7 @@ import httpx
 import ollama
 import pytest
 
+from sbobina.chat_pipeline import ChatClient
 from sbobina.correction import CorrectorUnavailableError, Edit, InvalidResponseError
 from sbobina.llm_corrector import (
     ModelDownloadError,
@@ -15,6 +16,20 @@ from sbobina.llm_corrector import (
     parse_response,
 )
 from sbobina.notices import USER_NOTICE
+from sbobina.ollama_chat import ChatRequest, chat_json
+
+
+def _chat_via(host: str) -> ChatClient:
+    """Build the ChatClient make_ollama_corrector now takes (T023): the
+    factory used to do this; these tests patch ``ollama.Client`` directly,
+    so they build it the same way the factory does."""
+    client = ollama.Client(host=host)
+
+    def chat(request: ChatRequest) -> str:
+        return chat_json(client=client, request=request)
+
+    return chat
+
 
 ANSWER_WITH_ONE_EDIT = (
     '{"correzioni": [{"originale": "legione", "corretto": "lesione"}]}'
@@ -81,7 +96,9 @@ def test_ollama_corrector_translates_connection_failure(
             raise ConnectionError("Failed to connect to Ollama")
 
     monkeypatch.setattr(ollama, "Client", DownClient)
-    corrector = make_ollama_corrector(model="m", host="http://x", subject=None)
+    corrector = make_ollama_corrector(
+        chat=_chat_via(host="http://x"), model="m", subject=None
+    )
 
     with pytest.raises(CorrectorUnavailableError):
         corrector("testo", "")
@@ -98,7 +115,9 @@ def test_ollama_corrector_truncated_body_is_an_invalid_response(
             raise json.JSONDecodeError("Expecting value", doc="", pos=0)
 
     monkeypatch.setattr(ollama, "Client", GarbledClient)
-    corrector = make_ollama_corrector(model="m", host="http://x", subject=None)
+    corrector = make_ollama_corrector(
+        chat=_chat_via(host="http://x"), model="m", subject=None
+    )
 
     with pytest.raises(InvalidResponseError):
         corrector("testo", "")
@@ -205,7 +224,9 @@ def test_ollama_corrector_returns_edits_from_the_model_answer(
 ) -> None:
     monkeypatch.setattr(_AnsweringClient, "content", ANSWER_WITH_ONE_EDIT)
     monkeypatch.setattr(ollama, "Client", _AnsweringClient)
-    corrector = make_ollama_corrector(model="m", host="http://x", subject=None)
+    corrector = make_ollama_corrector(
+        chat=_chat_via(host="http://x"), model="m", subject=None
+    )
 
     assert corrector("la legione", "") == [
         Edit(original="legione", corrected="lesione")
@@ -217,7 +238,9 @@ def test_ollama_corrector_empty_message_is_an_invalid_response(
 ) -> None:
     monkeypatch.setattr(_AnsweringClient, "content", None)
     monkeypatch.setattr(ollama, "Client", _AnsweringClient)
-    corrector = make_ollama_corrector(model="m", host="http://x", subject=None)
+    corrector = make_ollama_corrector(
+        chat=_chat_via(host="http://x"), model="m", subject=None
+    )
 
     with pytest.raises(InvalidResponseError):
         corrector("la legione", "")

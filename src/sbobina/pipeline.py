@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from sbobina import llm_corrector
+from sbobina import llm_corrector, llm_factory
 from sbobina.cleanup import remove_silence_fillers
 from sbobina.correction import (
     CorrectionResult,
@@ -12,6 +12,7 @@ from sbobina.correction import (
     chunk_segments,
     correct_transcript,
 )
+from sbobina.llm_chain import ServedByRecorder
 from sbobina.models import Segment, Transcript, load_transcript, save_transcript
 from sbobina.render import RenderOptions, render_markdown
 from sbobina.report import render_corrections_report
@@ -125,29 +126,39 @@ def _correct(
     config: Settings,
     subject: str | None,
     on_progress: Callable[[int, int], None] | None,
-) -> CorrectionResult:
-    llm_corrector.ensure_model(model=config.ollama_model, host=config.ollama_host)
+) -> tuple[CorrectionResult, dict[str, int]]:
+    recorder = ServedByRecorder()
+    chat = llm_factory.build_chat_client(
+        settings=config, keys=llm_factory.keys_from_settings(config), recorder=recorder
+    )
     corrector = llm_corrector.make_ollama_corrector(
-        model=config.ollama_model, host=config.ollama_host, subject=subject
+        chat=chat, model=config.ollama_model, subject=subject
     )
     chunk_words = config.correction_chunk_words
     total = len(chunk_segments(transcript.segments, max_words=chunk_words))
     if on_progress is not None:
         corrector = with_progress(corrector, total=total, on_done=on_progress)
-    return correct_transcript(transcript, corrector=corrector, max_words=chunk_words)
+    result = correct_transcript(transcript, corrector=corrector, max_words=chunk_words)
+    return result, recorder.snapshot()
 
 
-def _write_correction_outputs(
-    json_path: Path,
-    result: CorrectionResult,
-    removed: list[Segment],
-    config: Settings,
-) -> Path:
-    corrected_json, report_path = corrected_paths(json_path)
-    save_transcript(result.transcript, corrected_json)
-    write_markdown(result.transcript, json_path=corrected_json, config=config)
+@dataclass(frozen=True, kw_only=True)
+class _CorrectionWrite:
+    json_path: Path
+    result: CorrectionResult
+    removed: list[Segment]
+    served_by: dict[str, int]
+
+
+def _write_correction_outputs(write: _CorrectionWrite, config: Settings) -> Path:
+    corrected_json, report_path = corrected_paths(write.json_path)
+    save_transcript(write.result.transcript, corrected_json)
+    write_markdown(write.result.transcript, json_path=corrected_json, config=config)
     report = render_corrections_report(
-        result, model=config.ollama_model, removed=removed
+        write.result,
+        model=config.ollama_model,
+        removed=write.removed,
+        served_by=write.served_by,
     )
     report_path.write_text(report, encoding="utf-8")
     return corrected_json
@@ -176,13 +187,16 @@ def correct_to_dir(
         Receives corrected/total chunk counts every ten chunks and at the end.
     """
     transcript, removed = remove_silence_fillers(load_transcript(json_path))
-    result = _correct(
+    result, served_by = _correct(
         transcript, config=config, subject=subject, on_progress=on_progress
     )
     stopped_at = result.interrupted_at
     if stopped_at is not None and stopped_at <= transcript.segments[0].start:
         return CorrectionOutcome(result=result, corrected_json=None)
     corrected_json = _write_correction_outputs(
-        json_path, result=result, removed=removed, config=config
+        _CorrectionWrite(
+            json_path=json_path, result=result, removed=removed, served_by=served_by
+        ),
+        config=config,
     )
     return CorrectionOutcome(result=result, corrected_json=corrected_json)

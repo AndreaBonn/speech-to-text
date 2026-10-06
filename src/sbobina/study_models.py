@@ -98,6 +98,9 @@ class StudyResult:
     chapters: tuple[StudyChapter, ...]
     discarded: tuple[DiscardCount, ...]
     failed_blocks: tuple[FailedBlock, ...]
+    # Appended last, defaulted: a record saved before T023 has no such key
+    # in its JSON and must still load.
+    served_by: dict[str, int] | None = None
 
 
 class ProposedCitation(BaseModel):

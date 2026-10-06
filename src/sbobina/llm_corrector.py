@@ -6,6 +6,7 @@ from importlib import resources
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from sbobina.chat_pipeline import ChatClient
 from sbobina.correction import (
     Corrector,
     CorrectorUnavailableError,
@@ -13,7 +14,7 @@ from sbobina.correction import (
     InvalidResponseError,
 )
 from sbobina.notices import USER_NOTICE
-from sbobina.ollama_chat import ChatRequest, chat_json, strip_markdown_fence
+from sbobina.ollama_chat import ChatRequest, strip_markdown_fence
 
 logger = logging.getLogger(__name__)
 
@@ -100,11 +101,23 @@ def ensure_model(model: str, host: str) -> bool:
     return True
 
 
-def make_ollama_corrector(model: str, host: str, subject: str | None) -> Corrector:
-    """Build a ``Corrector`` backed by a local Ollama model."""
-    from ollama import Client
+def make_ollama_corrector(
+    chat: ChatClient, model: str, subject: str | None
+) -> Corrector:
+    """Build a ``Corrector`` from an already-built ``ChatClient`` (T023).
 
-    client = Client(host=host)
+    Parameters
+    ----------
+    chat : ChatClient
+        Built by ``llm_factory.build_chat_client``: a plain Ollama client on
+        the ``local`` engine, or a ``FallbackChain`` on ``api`` (which
+        overwrites ``model`` per link, so this one is only the initial
+        placeholder).
+    model : str
+        Model name to put in the initial ``ChatRequest``.
+    subject : str | None
+        Subject of the lecture, given to the model as context.
+    """
     system_prompt = build_system_prompt(subject)
 
     def correct(text: str, context: str) -> list[Edit]:
@@ -114,6 +127,6 @@ def make_ollama_corrector(model: str, host: str, subject: str | None) -> Correct
             user_message=build_user_message(text=text, context=context),
             schema=_CorrectionResponse.model_json_schema(),
         )
-        return parse_response(content=chat_json(client=client, request=request))
+        return parse_response(content=chat(request))
 
     return correct

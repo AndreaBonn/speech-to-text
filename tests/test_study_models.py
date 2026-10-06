@@ -106,6 +106,7 @@ def test_study_result_serializes_only_stable_citation_coordinates(
         "chapters",
         "discarded",
         "failed_blocks",
+        "served_by",
     }
     assert payload["chapters"][0]["summary"][0]["citations"] == [
         {"segment_index": 12, "quote": "causa del contratto"}

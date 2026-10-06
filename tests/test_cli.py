@@ -104,7 +104,7 @@ def test_trascrivi_writes_next_to_audio_unless_output_dir_given(
 def test_correggi_writes_corrected_transcript_and_report(
     transcript_json: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def fake_factory(model: str, host: str, subject: str | None) -> Corrector:
+    def fake_factory(chat: object, model: str, subject: str | None) -> Corrector:
         assert subject == "fisica"
         return lambda text, context: [Edit(original="Sennberg", corrected="Heisenberg")]
 
@@ -133,7 +133,7 @@ def test_correggi_model_option_reaches_corrector_and_report(
 ) -> None:
     models: list[str] = []
 
-    def fake_factory(model: str, host: str, subject: str | None) -> Corrector:
+    def fake_factory(chat: object, model: str, subject: str | None) -> Corrector:
         models.append(model)
         return lambda text, context: []
 
@@ -159,7 +159,7 @@ def test_correggi_returns_error_when_ollama_unreachable(
     monkeypatch.setattr(
         llm_corrector,
         "make_ollama_corrector",
-        lambda model, host, subject: failing_corrector,
+        lambda chat, model, subject: failing_corrector,
     )
 
     assert main(["correggi", str(transcript_json)]) == 1
@@ -187,7 +187,7 @@ def test_correggi_interrupted_midway_saves_done_work_and_returns_error(
     monkeypatch.setattr(
         llm_corrector,
         "make_ollama_corrector",
-        lambda model, host, subject: flaky_corrector,
+        lambda chat, model, subject: flaky_corrector,
     )
 
     assert main(["correggi", str(path)]) == 1

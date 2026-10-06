@@ -71,6 +71,7 @@ def write_material(directory: Path, variant: str = "original") -> dict[str, Any]
         "chapters": [chapter],
         "discarded": [{"reason": "QUOTE_NOT_FOUND", "count": 2}],
         "failed_blocks": [{"start": 20.0, "end": 30.0}],
+        "served_by": None,
     }
     (directory / "audio.studio.json").write_text(json.dumps(obj=material))
     return material

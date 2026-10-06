@@ -1,6 +1,6 @@
 from dataclasses import replace
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 from conftest import make_segment, make_transcript, make_word
@@ -124,9 +124,7 @@ def test_correct_to_dir_success_writes_cleaned_outputs_and_progress(
         )
 
     ensure.assert_called_once_with(model="test-model", host="http://gpu:1")
-    factory.assert_called_once_with(
-        model="test-model", host="http://gpu:1", subject="fisica"
-    )
+    factory.assert_called_once_with(chat=ANY, model="test-model", subject="fisica")
     assert outcome.interrupted is False
     assert outcome.result.interrupted_at is None
     assert calls == [(1, 1)]
