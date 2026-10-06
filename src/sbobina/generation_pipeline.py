@@ -8,10 +8,8 @@ topic is empty) is a separate module built on retrieve_windows, so generate()
 stays testable with passages given directly, no I/O.
 """
 
-import json
 import logging
 import math
-import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -39,6 +37,7 @@ from sbobina.generation_validation import (
     validate_exam_response,
     validate_summary_response,
 )
+from sbobina.json_salvage import complete_items, keep_valid
 from sbobina.ollama_chat import ChatRequest, strip_markdown_fence
 from sbobina.retrieval import RetrievedPassage
 
@@ -152,26 +151,9 @@ def _build_request(
     )
 
 
-_LIST_SEPARATORS = " \t\r\n,"
-_QUESTIONS_ARRAY = re.compile(r'"domande"\s*:\s*\[')
-
-
 def complete_questions(content: str) -> list[Any]:
     """The question objects a reply wrote in full before it broke off."""
-    match = _QUESTIONS_ARRAY.search(content)
-    if match is None:
-        return []
-    decoder = json.JSONDecoder()
-    items: list[Any] = []
-    index = match.end()
-    while True:
-        while index < len(content) and content[index] in _LIST_SEPARATORS:
-            index += 1
-        try:
-            item, index = decoder.raw_decode(content, index)
-        except json.JSONDecodeError:
-            return items
-        items.append(item)
+    return complete_items(content=content, key="domande")
 
 
 def _salvage(
@@ -185,12 +167,10 @@ def _salvage(
     the page shows "2 su 3 richieste". A reply with none still fails.
     """
     items = complete_questions(content=content) if wanted else []
-    if not wanted or not items:
+    valid = keep_valid(items=items, response_model=schema_model, field="questions")
+    if not wanted or not valid:
         return None
-    try:
-        return schema_model.model_validate({"domande": items[:wanted]})
-    except ValidationError:
-        return None
+    return schema_model.model_validate({"domande": valid[:wanted]})
 
 
 def _request_response(

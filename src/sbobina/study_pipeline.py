@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -9,6 +10,7 @@ from typing import Literal
 from pydantic import ValidationError
 
 from sbobina.correction import InvalidResponseError
+from sbobina.json_salvage import complete_items, keep_valid
 from sbobina.models import Transcript
 from sbobina.ollama_chat import ChatRequest, strip_markdown_fence
 from sbobina.study_blocks import StudyBlock, build_study_blocks
@@ -24,6 +26,9 @@ from sbobina.study_validation import convert_chapter, validate_chapter
 
 PROMPT_FILE = "studio-v2.md"
 MAX_ATTEMPTS = 2
+# Kept from an unreadable reply in the log: the result only marks the block failed.
+LOGGED_REPLY_CHARS = 500
+logger = logging.getLogger("sbobina")
 REVISION_CHARS = 16
 type StudyChat = Callable[[ChatRequest], str]
 type StudyProgress = Callable[[int, int], None]
@@ -68,13 +73,34 @@ def _build_request(options: StudyOptions) -> ChatRequest:
     )
 
 
+def _salvage(content: str) -> StudyResponse | None:
+    """The chapters a reply cut by num_predict wrote in full.
+
+    Measured on a real lecture: 3 of 5 blocks stop inside a chapter at 2048
+    tokens, identically on retry, and a larger budget does not fit num_ctx
+    with a 1200-word block. The complete chapters (1 or 2 per block) are kept.
+    """
+    chapters = keep_valid(
+        items=complete_items(content=content, key="capitoli"),
+        response_model=StudyResponse,
+        field="chapters",
+    )
+    return StudyResponse.model_validate({"capitoli": chapters}) if chapters else None
+
+
 def _request_response(chat: StudyChat, request: ChatRequest) -> StudyResponse | None:
     for _ in range(MAX_ATTEMPTS):
+        content = ""
         try:
             content = strip_markdown_fence(content=chat(request))
             return StudyResponse.model_validate_json(content)
         except (InvalidResponseError, ValidationError):
-            continue
+            salvaged = _salvage(content=content)
+            if salvaged is not None:
+                return salvaged
+            logger.warning(
+                "Risposta dello studio non leggibile: %r", content[:LOGGED_REPLY_CHARS]
+            )
     return None
 
 

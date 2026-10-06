@@ -267,3 +267,34 @@ def test_validate_chapter_rejects_quote_missing_from_the_original_segments() -> 
     items = len(chapter.summary) + len(chapter.concepts) + len(chapter.questions)
     assert kept == chapter
     assert (dropped, dict(counts)) == (None, {RejectionReason.QUOTE_NOT_FOUND: items})
+
+
+def _cut_study_reply() -> str:
+    """One full chapter, then a second cut by the token limit (measured: 3 of 5 blocks)."""
+    whole = json.loads(response_fixture())
+    whole["capitoli"].append(dict(whole["capitoli"][0], titolo="Seconda"))
+    text = json.dumps(whole)
+    return text[: text.rindex('"concetti"')]
+
+
+def test_generate_study_keeps_the_complete_chapters_of_a_cut_reply() -> None:
+    chat = FakeChat(responses=[_cut_study_reply()])
+
+    result = generate_study(
+        transcript=transcript_fixture(), chat=chat, options=StudyOptions(model="test")
+    )
+
+    assert [chapter.title for chapter in result.chapters] == ["Contratto"]
+    assert result.failed_blocks == ()
+
+
+def test_generate_study_still_fails_a_block_with_no_complete_chapter() -> None:
+    cut = response_fixture()[:40]
+    result = generate_study(
+        transcript=transcript_fixture(),
+        chat=FakeChat(responses=[cut]),
+        options=StudyOptions(model="test"),
+    )
+
+    assert result.chapters == ()
+    assert len(result.failed_blocks) == 1
