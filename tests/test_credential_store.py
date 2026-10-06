@@ -213,3 +213,17 @@ def test_get_keys_regular_file_is_read(tmp_path: Path) -> None:
     assert CredentialStore(config_dir=tmp_path).get_keys() == {
         "groq": "gsk-regular-0123456789"
     }
+
+
+def test_is_unreadable_reports_a_non_string_key_value(tmp_path: Path) -> None:
+    (tmp_path / "credentials.json").write_text('{"openai": 123}', encoding="utf-8")
+
+    assert CredentialStore(config_dir=tmp_path).is_unreadable() is True
+
+
+def test_is_unreadable_accepts_string_keys(tmp_path: Path) -> None:
+    (tmp_path / "credentials.json").write_text(
+        '{"openai": "sk-ok-0123456789"}', encoding="utf-8"
+    )
+
+    assert CredentialStore(config_dir=tmp_path).is_unreadable() is False

@@ -124,9 +124,13 @@ class CredentialStore:
         if not self.path.exists():
             return False
         try:
-            return not isinstance(json.loads(self.path.read_text("utf-8")), dict)
+            raw = json.loads(self.path.read_text("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             return True
+        # A non-string value is a key the reader drops: lost all the same.
+        return not isinstance(raw, dict) or not all(
+            isinstance(value, str) for value in raw.values()
+        )
 
     def set_key(self, provider: str, key: str) -> None:
         provider = _validate_provider(provider)
