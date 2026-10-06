@@ -221,10 +221,19 @@ class Supervisor:
                 logger.exception("Supervisione fallita per il job %s", item.job_id)
                 with self._condition:
                     self._stop_process(graceful=False)
-                    self._finish_failed(item=item, code="SUPERVISOR_ERROR")
+                    self._record_supervisor_error(item=item)
             finally:
                 with self._condition:
                     self._active = None
+
+    def _record_supervisor_error(self, item: WorkItem) -> None:
+        # Marking the failure re-reads the record, which can be what broke the
+        # run (a corrupted file): the record keeps its last state, so a human
+        # must look at it, but one bad item must never end the worker loop.
+        try:
+            self._finish_failed(item=item, code="SUPERVISOR_ERROR")
+        except Exception:
+            logger.critical("Errore non registrato per %s", item.job_id, exc_info=True)
 
     def _finish_failed(self, item: WorkItem, code: str) -> None:
         finish_fn = FINISH_FAILED_ACTIONS.get(item.action)

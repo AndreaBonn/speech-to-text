@@ -15,6 +15,7 @@ from sbobina.web import generation_supervisor, supervisor
 from sbobina.web.errors import NotFoundError
 from sbobina.web.generation_store import (
     create_generation,
+    generation_path,
     load_generation,
     save_generation,
 )
@@ -228,3 +229,34 @@ def test_execute_generation_action_after_stop_launches_no_child(
     )
 
     assert launched == []
+
+
+def test_generation_corrupted_while_running_does_not_stop_the_queue(
+    harness: Harness,
+) -> None:
+    # Both the run and its failure handler re-read the record: a corrupted
+    # file must fail this item only, never kill the worker for every job.
+    course_id = _register_course(harness=harness)
+    _generation_marker(harness=harness, course_id=course_id, name="hold").touch()
+    harness.supervisor.start()
+    generation = harness.supervisor.submit_generation(
+        course_key="fisica", request=REQUEST
+    )
+    wait_for(
+        predicate=_generation_marker(
+            harness=harness, course_id=course_id, name="generation.started"
+        ).exists
+    )
+    generation_path(
+        courses_dir=harness.store.courses_dir,
+        course_id=course_id,
+        gen_id=generation.id,
+    ).write_text("{broken", encoding="utf-8")
+    (harness.store.courses_dir / course_id / "generation.exit").write_text("1")
+    kept = harness.create()
+    harness.supervisor.submit(job_id=kept)
+
+    _generation_marker(harness=harness, course_id=course_id, name="hold").unlink()
+
+    wait_for(predicate=lambda: harness.finished(job_id=kept))
+    assert harness.supervisor.is_running()
