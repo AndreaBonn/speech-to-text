@@ -85,7 +85,7 @@ def _read_file_preferences(path: Path) -> UserPreferences:
         return UserPreferences()
 
 
-def _env_locked_fields() -> frozenset[str]:
+def env_locked_fields() -> frozenset[str]:
     # A fresh Settings() sees only env and .env: the `settings` a child
     # rebuilds from a full dump has every field in model_fields_set.
     return frozenset(_ENV_LOCKABLE_FIELDS) & Settings().model_fields_set
@@ -94,7 +94,7 @@ def _env_locked_fields() -> frozenset[str]:
 def resolve_preferences(settings: Settings, path: Path) -> ResolvedPreferences:
     """Merge `preferences.json` with env overrides (env > file > default)."""
     file_preferences = _read_file_preferences(path)
-    locked = _env_locked_fields()
+    locked = env_locked_fields()
     merged = file_preferences.model_dump()
     for field in locked:
         merged[field] = getattr(settings, field)

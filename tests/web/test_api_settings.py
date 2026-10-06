@@ -257,3 +257,17 @@ def test_settings_with_a_config_dir_inside_data_dir_are_reported_and_read_only(
     assert view.json()["data"]["warnings"]["config_dir_unsafe"] is True
     assert write.status_code == 409
     assert write.json()["error"]["code"] == "CONFIG_DIR_UNSAFE"
+
+
+def test_unsafe_config_dir_view_shows_the_engine_pinned_by_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SBOBINA_LLM_ENGINE", "api")
+    data_dir = tmp_path / "data"
+    settings = Settings(data_dir=data_dir, config_dir=data_dir / "config")
+    app = create_app(settings=settings, data_dir=data_dir)
+    with TestClient(app=app, base_url=BASE_URL, headers={"Origin": BASE_URL}) as unsafe:
+        data = unsafe.get(SETTINGS_URL).json()["data"]
+
+    assert data["preferences"]["llm_engine"] == "api"
+    assert "llm_engine" in data["locked_by_env"]

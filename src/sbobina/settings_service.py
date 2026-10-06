@@ -21,6 +21,7 @@ from sbobina.user_preferences import (
     UserPreferences,
     consent_missing,
     consented_preferences,
+    env_locked_fields,
     preferences_path,
     resolve_preferences,
     save_preferences,
@@ -83,14 +84,21 @@ def _warnings(
 
 
 def _unsafe_view(settings: Settings) -> dict[str, JsonValue]:
-    """The view when the config dir is refused: defaults, env keys, read-only."""
+    """The view when the config dir is refused: what runs (env and defaults
+    only, like runtime_settings), keys from env, read-only."""
+    running = UserPreferences(
+        llm_engine=settings.llm_engine,
+        llm_chain=settings.llm_chain,
+        llm_ollama_fallback=settings.llm_ollama_fallback,
+        transcription_engine=settings.transcription_engine,
+    )
     keys: dict[str, JsonValue] = {}
     for provider, entry in masked_view(settings=settings, store=None).items():
         item: dict[str, JsonValue] = {name: value for name, value in entry.items()}
         keys[provider] = item
     return {
-        "preferences": UserPreferences().model_dump(mode="json"),
-        "locked_by_env": [],
+        "preferences": running.model_dump(mode="json"),
+        "locked_by_env": [field for field in sorted(env_locked_fields())],
         "keys": keys,
         "warnings": {
             "missing_keys": [],
