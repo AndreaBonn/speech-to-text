@@ -1,4 +1,5 @@
 import logging
+from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from typing import Literal
 
@@ -40,6 +41,10 @@ class PracticeServices:
     settings: Settings
     arbiter: GpuArbiter
     chat: GradingChat
+    # Same split as ChatServices (chat_turn.py): True guards the whole judge
+    # call (local engine), False leaves the guard on the Ollama link alone,
+    # already inside the chain the api engine built.
+    guard_whole_client: bool = True
 
 
 def grade_answer(
@@ -54,8 +59,11 @@ def grade_answer(
         format=attempt.format,
         answer=answer.text,
     )
+    guard = (
+        services.arbiter.chat_turn() if services.guard_whole_client else nullcontext()
+    )
     try:
-        with services.arbiter.chat_turn():
+        with guard:
             result = grade(
                 request=request,
                 chat=services.chat,

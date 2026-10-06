@@ -36,11 +36,13 @@ router = APIRouter(prefix="/api/v1/courses/{key:path}/generations/{gen_id}/attem
 
 
 def _grading_services(request: Request) -> PracticeServices:
+    settings = request.app.state.settings
     return PracticeServices(
         store=request.app.state.job_store,
-        settings=request.app.state.settings,
+        settings=settings,
         arbiter=request.app.state.gpu_arbiter,
         chat=_chat_client(request=request),
+        guard_whole_client=settings.llm_engine == "local",
     )
 
 

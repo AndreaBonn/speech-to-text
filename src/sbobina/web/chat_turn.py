@@ -24,6 +24,7 @@ from sbobina.chat_pipeline import (
 )
 from sbobina.correction import CorrectorUnavailableError
 from sbobina.generation_pipeline import ITALIAN_TOKENS_PER_WORD, estimate_tokens
+from sbobina.llm_errors import ChainExhaustedError, FailureKind
 from sbobina.ollama_chat import CONTEXT_WINDOW_TOKENS, ChatRequest
 from sbobina.retrieval import RetrievedPassage
 from sbobina.web.chat_records import (
@@ -35,7 +36,7 @@ from sbobina.web.chat_records import (
 from sbobina.web.chat_store import append_answer, append_question
 from sbobina.web.course_retrieval import WindowedQuery, course_scope, retrieve_windows
 from sbobina.web.errors import AppError, GatewayTimeoutError, ServiceUnavailableError
-from sbobina.web.gpu_lock import GpuArbiter
+from sbobina.web.gpu_lock import GpuArbiter, GpuBusyError
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_service import search_session
 
@@ -53,6 +54,10 @@ class ChatServices:
     arbiter: GpuArbiter
     chat_client: ChatClient
     model: str
+    # True (local engine): the arbiter guards the whole client, as before api
+    # engines existed. False (api engine): the guard already sits on the
+    # Ollama link alone, inside the fallback chain built by llm_factory.
+    guard_whole_client: bool = True
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -102,7 +107,28 @@ def _guarded(arbiter: GpuArbiter, inner: ChatClient) -> ChatClient:
     return guarded_client
 
 
-def _ollama_error(error: Exception) -> AppError:
+def _busy_response(
+    error: ChainExhaustedError, arbiter: GpuArbiter
+) -> GpuBusyError | None:
+    """Same 409 as today's GPU-busy path, when every link failed for that reason.
+
+    ``arbiter.status()`` is read now, not at the time each link failed: if the
+    transcription lease has since been released, ``stage`` is None and the
+    caller falls back to the generic 503 instead of a stale 409.
+    """
+    if not error.causes or any(
+        cause.kind != FailureKind.BUSY for cause in error.causes
+    ):
+        return None
+    stage, estimate_s = arbiter.status()
+    return None if stage is None else GpuBusyError(stage=stage, estimate_s=estimate_s)
+
+
+def _ollama_error(error: Exception, arbiter: GpuArbiter) -> AppError:
+    if isinstance(error, ChainExhaustedError):
+        return _busy_response(error=error, arbiter=arbiter) or ServiceUnavailableError(
+            message=str(error), code="LLM_UNAVAILABLE"
+        )
     if isinstance(error, httpx.TimeoutException) or isinstance(
         error.__cause__, httpx.TimeoutException
     ):
@@ -132,15 +158,20 @@ def _passages(
 def _answer(
     services: ChatServices, query: ChatQuery, passages: list[RetrievedPassage]
 ) -> ChatAnswer:
+    chat = (
+        _guarded(arbiter=services.arbiter, inner=services.chat_client)
+        if services.guard_whole_client
+        else services.chat_client
+    )
     try:
         return answer(
             query=query,
             passages=passages,
-            chat=_guarded(arbiter=services.arbiter, inner=services.chat_client),
+            chat=chat,
             options=ChatOptions(model=services.model, num_predict=CHAT_NUM_PREDICT),
         )
     except (ConnectionError, httpx.TransportError, CorrectorUnavailableError) as error:
-        raise _ollama_error(error=error) from error
+        raise _ollama_error(error=error, arbiter=services.arbiter) from error
 
 
 def ask(

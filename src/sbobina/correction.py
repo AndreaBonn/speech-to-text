@@ -38,6 +38,8 @@ class CorrectionResult:
     rejected: list[RejectedEdit]
     failed_chunks: list[float] = field(default_factory=list)  # start times
     interrupted_at: float | None = None
+    # The error that stopped the run; its str() never carries a key.
+    interrupted_error: CorrectorUnavailableError | None = None
 
 
 def chunk_segments(
@@ -100,10 +102,12 @@ def correct_transcript(
         except InvalidResponseError:
             failed.append(chunk[0].start)
             corrected_chunk, result = chunk, apply_edits((), [])
-        except CorrectorUnavailableError:
+        except CorrectorUnavailableError as error:
             remaining = tuple(s for rest in chunks[index:] for s in rest)
             final = replace(transcript, segments=(*segments, *remaining))
-            return CorrectionResult(final, applied, rejected, failed, chunk[0].start)
+            return CorrectionResult(
+                final, applied, rejected, failed, chunk[0].start, error
+            )
         segments += corrected_chunk
         applied += result.applied
         rejected += result.rejected

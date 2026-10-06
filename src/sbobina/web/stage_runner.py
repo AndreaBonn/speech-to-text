@@ -9,6 +9,7 @@ from pathlib import Path
 from threading import Thread
 
 from sbobina.correction import CorrectorUnavailableError
+from sbobina.llm_errors import ChainExhaustedError
 from sbobina.log_redaction import install_redaction
 from sbobina.notices import USER_NOTICE
 from sbobina.pipeline import (
@@ -187,9 +188,17 @@ def _check_outcome(outcome: Path | CorrectionOutcome) -> None:
     if not isinstance(outcome, CorrectionOutcome):
         raise TypeError("Risultato della pipeline di correzione non valido")
     if outcome.interrupted:
-        # correct_transcript sets interrupted_at only for CorrectorUnavailableError.
+        # correct_transcript sets interrupted_at only for CorrectorUnavailableError;
+        # interrupted_error carries its message (chain causes, no keys) when the
+        # engine is "api" and falls back to the historic text for Ollama-only runs.
+        cause = outcome.result.interrupted_error
+        reason = (
+            str(cause)
+            if isinstance(cause, ChainExhaustedError)
+            else "Ollama irraggiungibile"
+        )
         raise CorrectorUnavailableError(
-            f"Correzione interrotta a {outcome.result.interrupted_at} s: Ollama irraggiungibile"
+            f"Correzione interrotta a {outcome.result.interrupted_at} s: {reason}"
         )
 
 
@@ -230,9 +239,7 @@ def run_stage(
         _run_job_stage(stage=stage, job_dir=job_dir, pipeline=pipeline, now=now)
         return 0
     except CorrectorUnavailableError:
-        logger.exception(
-            "Stage %s fallito per il job %s: Ollama irraggiungibile", stage, job_dir
-        )
+        logger.exception("Stage %s fallito per il job %s", stage, job_dir)
         ollama_stages = ("correct", "study", GENERATION_STAGE, OCR_STAGE)
         return OLLAMA_UNAVAILABLE_EXIT if stage in ollama_stages else 1
     except Exception:

@@ -13,6 +13,7 @@ from ollama import Client
 from pydantic import BaseModel, Field
 from starlette.responses import Response
 
+from sbobina import llm_factory
 from sbobina.chat_pipeline import ChatClient
 from sbobina.course_registry import find_by_key
 from sbobina.courses import course_key
@@ -44,27 +45,64 @@ class ChatMessageBody(BaseModel):
     question: str = Field(min_length=1, max_length=MAX_QUESTION_CHARS)
 
 
-def _chat_client(request: Request) -> ChatClient:
-    existing = getattr(request.app.state, "chat_client", None)
-    if existing is not None:
-        return cast(ChatClient, existing)
-    settings: Settings = request.app.state.settings
+def _settings_fingerprint(settings: Settings) -> tuple[object, ...]:
+    """What `_chat_client` must rebuild on: a settings change otherwise keeps
+    serving a cached chain whose breaker state (and provider keys) are stale."""
+    keys = llm_factory.keys_from_settings(settings=settings)
+    return (
+        settings.llm_engine,
+        tuple((entry.provider, entry.model) for entry in settings.llm_chain),
+        settings.llm_ollama_fallback,
+        settings.ollama_model,
+        frozenset(keys),
+    )
+
+
+def _build_local_client(settings: Settings) -> ChatClient:
+    """Unchanged from before the api engine existed, chat_timeout_s included."""
     client = Client(host=settings.ollama_host, timeout=settings.chat_timeout_s)
 
     def built(chat_request: ChatRequest) -> str:
         return chat_json(client=client, request=chat_request)
 
-    request.app.state.chat_client = built
     return built
 
 
+def _chat_client(request: Request) -> ChatClient:
+    """The app's chat client, cached per engine/chain/keys fingerprint.
+
+    ``app.state.chat_client``, when a caller (test or future wiring) sets it
+    directly, always wins and skips this cache: that is the seam tests use to
+    inject a scripted model instead of building one from settings.
+    """
+    existing = getattr(request.app.state, "chat_client", None)
+    if existing is not None:
+        return cast(ChatClient, existing)
+    settings: Settings = request.app.state.settings
+    fingerprint = _settings_fingerprint(settings=settings)
+    if getattr(request.app.state, "_chat_client_fingerprint", None) == fingerprint:
+        return cast(ChatClient, request.app.state._built_chat_client)
+    client = (
+        _build_local_client(settings=settings)
+        if settings.llm_engine == "local"
+        else llm_factory.build_from_settings(
+            settings=settings, guard=request.app.state.gpu_arbiter.chat_turn
+        )
+    )
+    request.app.state._built_chat_client = client
+    request.app.state._chat_client_fingerprint = fingerprint
+    return client
+
+
 def _services(request: Request) -> ChatServices:
+    settings: Settings = request.app.state.settings
     return ChatServices(
         store=request.app.state.job_store,
         index_path=request.app.state.search_index_path,
         arbiter=request.app.state.gpu_arbiter,
         chat_client=_chat_client(request=request),
-        model=request.app.state.settings.ollama_model,
+        model=settings.ollama_model,
+        guard_whole_client=settings.llm_engine == "local",
     )
 
 
