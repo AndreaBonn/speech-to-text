@@ -240,7 +240,10 @@ limite di token, come scritto in un primo momento: riprodotto con le risposte sa
 nella quarta sezione, identico a entrambi i tentativi. Le prime tre sezioni sono complete. La
 prima volta questo caso aveva fatto cadere lo script con `KeyError`: era un errore introdotto in
 `d803e43`, corretto in `0cacd8f`. Ora il riassunto tiene le sezioni complete, come i compiti
-(F40) e lo studio: su questa risposta 3 sezioni su 4.
+(F40) e lo studio: su questa risposta 3 sezioni su 4. Da `fc8b99e` `chat_json` corregge anche
+le virgolette non escapate quando la risposta non si legge: la stessa risposta si legge intera (4
+sezioni). La quarta sezione perde comunque le sue frasi, perché le citazioni riscrivono la
+formula (`c^*` senza `\mathbf`): è la causa già nota di V9, non il JSON.
 
 ## Non misurato
 
