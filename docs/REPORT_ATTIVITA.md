@@ -527,3 +527,95 @@ sul computer: i modelli di trascrizione, generazione e OCR girano in locale.
 Complessità alta: feature completa su cinque fasi, 81 commit su `main`.
 Suite a 1503+ test verdi, ruff e mypy puliti. Piano completo, gate
 finale T049 chiuso.
+
+## 2026-10-06 - 02:04 | Sessione #6 [FEATURE]
+
+### Richiesta
+
+Completare la fase F4 del piano `specs/002-study-loop` (formule LaTeX con
+KaTeX), applicare la remediation del gate `/analyze` (A14-A21) e chiudere i
+punti aperti F40, F41 e F51, arrivando alla fine del piano. Commit atomici
+su `main`.
+
+### Azioni Eseguite
+
+- T066, verifica XSS delle superfici con formule (c51d909): payload di
+  classe C4 testati su generazioni, esercitazioni, ripasso, chat, studio e
+  documento. Esito positivo, poi la verifica è stata estesa anche alle
+  citazioni e agli errori mostrati in console.
+- Correzione delle barre LaTeX nel JSON prodotto dai modelli (5e2bd04):
+  `qwen` scriveva `\(` con una sola barra, rendendo illeggibili due risposte
+  su tre; `chat_json` ora le raddoppia.
+- T067, aggiornati i prompt `compito-v3`, `riassunto-v2`, `chat-v3` e
+  `studio-v2` con le formule racchiuse fra `\(` e `\[` (46aeccb). Tolta poi
+  l'indicazione "la barra si scrive doppia", che causava un doppio
+  raddoppio (0687ae7).
+- T068, misura V9 (55854c0, a74e051, 5dfe761): risultato finale 20
+  generazioni su 20 riuscite al primo tentativo, una citazione scartata su
+  89 (1%), zero su 75 con formula. T069a giudicato non necessario.
+- T069, gate di fine fase F4: `code-reviewer`, `security-reviewer` (nessun
+  finding P0/P1/P2), `a11y-gate` (axe zero violazioni in tema chiaro e
+  scuro, MathML presente per lo screen reader su ogni formula), render
+  osservato a 375 e 1280 px, `/analyze` con remediation A14-A21 applicata
+  (4b706d6, b417424, d9a086b, bceb833, cc103f1).
+- Correzioni emerse durante il gate: passaggi inviati su una sola riga, che
+  facevano fallire due compiti su dieci (c8a59e3); formule nelle citazioni
+  da documento, mentre quelle da lezione restano testo (b9c219a); titoli
+  `\section` dell'OCR ripuliti (c09973e); formula non valida mostrata come
+  testo semplice invece di violare la CSP (e582e0b); formule larghe
+  contenute nella colonna, raggiungibili da tastiera e leggibili in tema
+  scuro (c051593).
+- F70, corretto il riassunto che proponeva "3 su 1 richieste" (887210f).
+  F51, risolto il 404 sulla pagina della generazione aperta dalle carte
+  del ripasso (e02509f).
+- F40, corretti gli orali con argomento che fallivano al limite di token:
+  ora le domande scritte vengono mantenute per intero (6e45600, 132852a).
+  F81, le citazioni esatte oltre le 40 parole vengono accorciate alle
+  prime 40 invece di far scartare la domanda (4e61247).
+- F41, soluzioni a più punti: `compito-v4` chiede ora le "punti" come
+  lista (5d93a99). Misurato 12 domande su 12 con 2 punti in sonda, 9
+  domande con 2-4 punti sul corso reale; l'effetto sul giudice non è
+  misurato, perché il dataset V6 era costruito per soluzioni a un punto.
+  Documentazione in e79481a.
+
+### Verifiche
+
+| Controllo | Risultato |
+|---|---|
+| `uv run pytest` | 2327 passed |
+| `uv run ruff check .` | All checks passed |
+| `uv run ruff format --check .` | pulito |
+| `uv run mypy src tests` | pulito |
+| `verify_math_xss` | PASS |
+| `verify_math_text` | 11/11 |
+| `a11y-gate` (axe) | 0 violazioni |
+| Misura V9, citazioni scartate | 1/89 |
+
+### Aperto a fine sessione
+
+- Effetto di `compito-v4` (soluzioni a più punti) sul giudice automatico:
+  da misurare con un nuovo dataset, perché V6 era costruito su soluzioni a
+  un punto.
+- L'accorciamento delle citazioni oltre 40 parole (F81) non è applicato ai
+  materiali di studio (`study_citations`).
+- Le pagine V10 e V9 sono sintetiche: le pagine reali del corso non sono
+  state misurate.
+- Nessun push: i commit restano locali su `main`.
+
+### Note per il Cliente
+
+Le formule matematiche scritte nei materiali del corso vengono ora mostrate
+correttamente anche nella chat, negli esercizi e nei riassunti generati,
+comprese le versioni accessibili per chi usa uno screen reader. Alcuni
+problemi emersi durante i controlli sono stati corretti: frasi d'esame
+troncate, titoli disordinati nei documenti scansionati e link che
+portavano a una pagina inesistente. Il lavoro resta sul computer locale, in
+attesa di essere caricato online.
+
+### Riepilogo (Complessità / Stato)
+
+Complessità alta: chiusura della fase F4 del piano `002-study-loop`,
+remediation `/analyze` applicata, più quattro punti aperti da sessioni
+precedenti (F40, F41, F51, F81) risolti. Suite a 2327 test verdi, ruff e
+mypy puliti. Piano a fine percorso; restano aperte solo la misura del
+giudice su `compito-v4` e il push.
