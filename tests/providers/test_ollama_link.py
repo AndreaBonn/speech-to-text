@@ -5,11 +5,11 @@ from typing import cast
 import httpx
 import ollama
 import pytest
-from sbobina.providers.ollama_link import make_ollama_link_client
 
 from sbobina.correction import InvalidResponseError
 from sbobina.llm_errors import FailureKind, ProviderUnavailableError
 from sbobina.ollama_chat import ChatRequest
+from sbobina.providers.ollama_link import make_ollama_link_client
 from sbobina.web.gpu_lock import GpuBusyError
 
 

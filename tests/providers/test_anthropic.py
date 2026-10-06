@@ -5,16 +5,16 @@ import logging
 
 import httpx
 import pytest
-from sbobina.providers.anthropic import (
-    DEFAULT_MAX_TOKENS,
-    list_models,
-    make_anthropic_client,
-)
 
 from sbobina.correction import InvalidResponseError
 from sbobina.llm_corrector import _CorrectionResponse
 from sbobina.llm_errors import FailureKind, ProviderUnavailableError
 from sbobina.ollama_chat import ChatRequest
+from sbobina.providers.anthropic import (
+    DEFAULT_MAX_TOKENS,
+    list_models,
+    make_anthropic_client,
+)
 
 SENTINEL_KEY = "sk-ant-SENTINEL-0123456789abcdef"
 
