@@ -103,14 +103,33 @@ def test_resolve_rejects_quote_shorter_than_three_words() -> None:
     assert result == SourceRejection(reason=SourceRejectionReason.QUOTE_LENGTH)
 
 
-def test_resolve_rejects_quote_longer_than_forty_words() -> None:
+def test_resolve_trims_a_found_quote_longer_than_forty_words_to_forty() -> None:
+    # F81: on lecture material qwen copies 50-70 word stretches; every such
+    # question was dropped. A prefix of an exact contiguous match is still one.
+    words = [f"parola{i}" for i in range(60)]
+    passages = [
+        RetrievedPassage(
+            text=" ".join(words),
+            source=DocumentSource(doc_id="manuale", page=1, chunk=0),
+            passage_id="manuale:p1:c0",
+        )
+    ]
+    citation = ProposedSourceCitation(label="P1", quote=" ".join(words[5:55]))
+
+    result = resolve_citation(passages=passages, citation=citation)
+
+    assert isinstance(result, SourceCitation)
+    assert result.quote == " ".join(words[5:45])
+
+
+def test_resolve_rejects_a_long_quote_that_is_not_in_the_passage() -> None:
     passages = [_doc_passage()]
     long_quote = " ".join(["causa"] * 41)
     citation = ProposedSourceCitation(label="P1", quote=long_quote)
 
     result = resolve_citation(passages=passages, citation=citation)
 
-    assert result == SourceRejection(reason=SourceRejectionReason.QUOTE_LENGTH)
+    assert result == SourceRejection(reason=SourceRejectionReason.QUOTE_NOT_FOUND)
 
 
 def test_resolve_accepts_quote_at_three_word_boundary() -> None:

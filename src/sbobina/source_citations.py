@@ -78,6 +78,40 @@ def _location(source: RetrievalSource) -> DocumentCitation | LectureCitation:
     return LectureCitation(job_id=source.job_id, timestamp=source.start)
 
 
+def _bounded_quote(quote: str) -> str:
+    """The quote cut to its first MAX_QUOTE_WORDS tokens, at a word boundary.
+
+    Measured (F81): on lecture material qwen copies 50-70 word stretches and
+    every such question was dropped. A prefix of a contiguous exact match is
+    still one, so the 3-40 word rule holds on what is stored.
+    """
+    words = quote.split()
+    if len(normalize_tokens(text=quote)) <= MAX_QUOTE_WORDS:
+        return quote
+    while len(normalize_tokens(text=" ".join(words))) > MAX_QUOTE_WORDS:
+        words = words[:-1]
+    return " ".join(words)
+
+
+def _passage_with_quote(
+    labelled: RetrievedPassage,
+    passages: Sequence[RetrievedPassage],
+    quote_tokens: tuple[str, ...],
+) -> RetrievedPassage | None:
+    # The labelled passage first; then any other passage the model was given,
+    # since a 9B model copies the right words under the wrong label (T046).
+    return next(
+        (
+            candidate
+            for candidate in (labelled, *passages)
+            if _contains_sequence(
+                tokens=normalize_tokens(text=candidate.text), quote=quote_tokens
+            )
+        ),
+        None,
+    )
+
+
 def resolve_citation(
     passages: Sequence[RetrievedPassage],
     citation: ProposedSourceCitation,
@@ -86,26 +120,19 @@ def resolve_citation(
     passage = _passage_at(passages=passages, label=citation.label)
     if passage is None:
         return SourceRejection(reason=SourceRejectionReason.PASSAGE_NOT_GIVEN)
-    quote_tokens = normalize_tokens(text=citation.quote)
-    if not MIN_QUOTE_WORDS <= len(quote_tokens) <= MAX_QUOTE_WORDS:
+    quote = _bounded_quote(quote=citation.quote)
+    quote_tokens = normalize_tokens(text=quote)
+    # _bounded_quote already caps the length at MAX_QUOTE_WORDS.
+    if len(quote_tokens) < MIN_QUOTE_WORDS:
         return SourceRejection(reason=SourceRejectionReason.QUOTE_LENGTH)
-    # The labelled passage first; then any other passage the model was given,
-    # since a 9B model copies the right words under the wrong label (T046).
-    found = next(
-        (
-            candidate
-            for candidate in (passage, *passages)
-            if _contains_sequence(
-                tokens=normalize_tokens(text=candidate.text), quote=quote_tokens
-            )
-        ),
-        None,
+    found = _passage_with_quote(
+        labelled=passage, passages=passages, quote_tokens=quote_tokens
     )
     if found is None:
         return SourceRejection(reason=SourceRejectionReason.QUOTE_NOT_FOUND)
     passage = found
     return SourceCitation(
         passage_id=passage.passage_id,
-        quote=citation.quote,
+        quote=quote,
         location=_location(source=passage.source),
     )
