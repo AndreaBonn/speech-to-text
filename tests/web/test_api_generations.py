@@ -1,6 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from generation_api_fixtures import (
     COURSES_URL,
@@ -12,9 +13,15 @@ from generation_api_fixtures import (
 )
 
 from sbobina.generation_models import (
+    GenerationFormat,
+    GenerationRecord,
+    GenerationRequest,
     GenerationStatus,
 )
+from sbobina.web import api_generations, generation_store
+from sbobina.web.errors import NotFoundError
 from sbobina.web.generation_store import (
+    create_generation,
     generation_path,
 )
 
@@ -224,3 +231,29 @@ def test_delete_generation_twice_is_not_a_server_error(
 
     assert first.status_code == 204
     assert second.status_code == 404
+
+
+def test_list_records_file_deleted_between_glob_and_read_is_not_reported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    courses_dir = tmp_path / "courses"
+    request = GenerationRequest(format=GenerationFormat.OPEN, count=1)
+    kept = create_generation(courses_dir=courses_dir, course_id="c", request=request)
+    gone = create_generation(courses_dir=courses_dir, course_id="c", request=request)
+    real_load = generation_store.load_generation
+
+    def load_after_delete(
+        courses_dir: Path, course_id: str, gen_id: str
+    ) -> GenerationRecord:
+        if gen_id == gone.id:
+            raise NotFoundError(entity="Generazione", id=gen_id)
+        return real_load(courses_dir=courses_dir, course_id=course_id, gen_id=gen_id)
+
+    monkeypatch.setattr(api_generations, "load_generation", load_after_delete)
+
+    records, unavailable = api_generations._list_records(
+        courses_dir=courses_dir, course_id="c"
+    )
+
+    assert [record.id for record in records] == [kept.id]
+    assert unavailable == []

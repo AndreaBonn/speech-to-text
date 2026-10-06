@@ -8,9 +8,10 @@ from package_fixtures import ORIGINAL
 from package_import_fixtures import IMPORT_TIME, LECTURE_COUNT, make_package, snapshot
 from study_fixtures import transcript_fixture
 
-from sbobina.course_registry import iter_courses
+from sbobina.course_registry import get_or_create, iter_courses
 from sbobina.models import load_transcript
 from sbobina.package_import import PackageStorageError, import_package
+from sbobina.package_import_commit import ImportStaging
 from sbobina.web.card_store import load_cards
 from sbobina.web.document_store import document_dir, iter_documents, read_text
 from sbobina.web.generation_store import iter_generations
@@ -216,3 +217,53 @@ def test_import_package_staging_cleanup_failure_keeps_a_published_import(
 
     assert (data / "courses" / result.course.id / "course.json").is_file()
     assert "injected cleanup failure" in caplog.text
+
+
+def test_import_package_unrelated_courses_do_not_trigger_reimport_warning(
+    tmp_path: Path,
+) -> None:
+    data = tmp_path / "destination"
+    get_or_create(courses_dir=data / "courses", key="chimica", label="Chimica")
+    other = make_package(directory=tmp_path / "other")
+    import_package(source=other, data_dir=data, now=IMPORT_TIME)
+    source = make_package(directory=tmp_path / "source")
+
+    first = import_package(source=source, data_dir=data, now=IMPORT_TIME)
+    second = import_package(source=source, data_dir=data, now=IMPORT_TIME)
+
+    assert first.warning is None
+    assert second.warning is not None
+    assert second.warning.startswith("già importato il ")
+
+
+def test_import_package_courses_path_blocked_leaves_no_jobs_tree(
+    tmp_path: Path,
+) -> None:
+    source = make_package(directory=tmp_path)
+    data = tmp_path / "destination"
+    data.mkdir()
+    (data / "courses").write_text(data="not a directory", encoding="utf-8")
+
+    with pytest.raises(PackageStorageError):
+        import_package(source=source, data_dir=data, now=IMPORT_TIME)
+
+    assert sorted(path.name for path in data.iterdir()) == ["courses"]
+
+
+def test_import_staging_publish_refuses_to_overwrite_an_existing_course(
+    tmp_path: Path,
+) -> None:
+    staging = ImportStaging(
+        courses=tmp_path / "courses" / ".import-a", jobs=tmp_path / "jobs" / ".import-b"
+    )
+    (staging.courses / "course-1").mkdir(parents=True)
+    staging.jobs.mkdir(parents=True)
+    existing = tmp_path / "courses" / "course-1"
+    existing.mkdir()
+    (existing / "course.json").write_text(data="previous", encoding="utf-8")
+
+    with pytest.raises(FileExistsError):
+        staging.publish(course_id="course-1", job_ids=())
+
+    assert (existing / "course.json").read_text(encoding="utf-8") == "previous"
+    assert staging.committed is False

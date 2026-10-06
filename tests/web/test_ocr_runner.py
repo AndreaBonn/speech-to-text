@@ -8,7 +8,12 @@ from sbobina.correction import CorrectorUnavailableError
 from sbobina.document_models import DocumentStatus
 from sbobina.settings import settings
 from sbobina.web import ocr_runner
-from sbobina.web.document_store import read_document, read_document_in, read_text
+from sbobina.web.document_store import (
+    original_path,
+    read_document,
+    read_document_in,
+    read_text,
+)
 from sbobina.web.job_store import JobStore
 from sbobina.web.ocr_runner import run_ocr
 from sbobina.web.ocr_store import OcrStatus, create_ocr, load_ocr
@@ -146,3 +151,32 @@ def test_ocr_client_has_a_timeout(
     )
 
     assert created[0]["timeout"] == settings.ocr_timeout_s
+
+
+def test_read_page_renders_the_original_and_reads_it_with_the_ocr_model(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, doc_dir = add_scanned_document(courses_dir=tmp_path)
+    document = read_document_in(doc_dir=doc_dir)
+    rendered: list[tuple[Path, int, float]] = []
+    read: list[tuple[str, bytes]] = []
+
+    def render(path: Path, index: int, scale: float) -> bytes:
+        rendered.append((path, index, scale))
+        return b"png-bytes"
+
+    def read_image(client: object, model: str, png: bytes) -> str:
+        read.append((model, png))
+        return "testo letto"
+
+    monkeypatch.setattr(ocr_runner, "Client", lambda **_: object())
+    monkeypatch.setattr(llm_corrector, "ensure_model", lambda **_: None)
+    monkeypatch.setattr(ocr_runner, "render_pdf_page", render)
+    monkeypatch.setattr(ocr_runner, "read_page_image", read_image)
+    read_page = ocr_runner._build_read_page(document_dir=doc_dir, document=document)
+
+    assert read_page(3) == "testo letto"
+    assert rendered == [
+        (original_path(doc_dir=doc_dir, kind=document.kind), 3, settings.ocr_scale)
+    ]
+    assert read == [(settings.ocr_model, b"png-bytes")]

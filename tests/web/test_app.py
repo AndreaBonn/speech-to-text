@@ -236,3 +236,22 @@ def test_lifespan_removes_orphan_imported_lectures(tmp_path: Path) -> None:
     assert labels_before == ["Storia"]
     assert not (store.jobs_dir / str(orphan.id)).exists()
     assert (store.jobs_dir / str(normal.id)).is_dir()
+
+
+def test_lifespan_import_cleanup_failure_is_logged_and_server_starts(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    def fail(data_dir: Path) -> None:
+        raise PermissionError("injected cleanup failure")
+
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+
+    with (
+        patch("sbobina.web.app.remove_import_staging", side_effect=fail),
+        caplog.at_level(level="WARNING", logger="sbobina.web.app"),
+        TestClient(app, base_url=BASE_URL) as client,
+    ):
+        assert client.get("/api/v1/courses").status_code == 200
+
+    assert "Import cleanup failed at startup" in caplog.text
+    assert "injected cleanup failure" in caplog.text

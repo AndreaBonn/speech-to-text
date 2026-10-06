@@ -60,3 +60,13 @@ def test_practice_page_attempt_of_another_course_is_404(tmp_path: Path) -> None:
 
     assert found.status_code == 200
     assert other.status_code == 404
+
+
+def test_practice_page_unknown_course_is_404(tmp_path: Path) -> None:
+    _, attempt_id = make_attempt_on_disk(tmp_path=tmp_path)
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        response = client.get(f"/corsi/inesistente/esercitazioni/{attempt_id}")
+
+    assert response.status_code == 404
+    assert "Esercitazione non trovata" in response.text

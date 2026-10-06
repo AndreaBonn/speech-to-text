@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import anyio
 import pytest
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 from starlette.types import Message
@@ -168,3 +169,53 @@ def test_download_events_sends_unchanged_state_once_then_pings_when_idle(
         ": ping",
         ": ping",
     ]
+
+
+def test_download_events_idle_stream_waits_for_the_ping_interval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ping_interval_s = 0.3
+    monkeypatch.setattr(api_models, "DOWNLOADS_POLL_INTERVAL_S", 0.01)
+    monkeypatch.setattr(api_models, "DOWNLOADS_PING_INTERVAL_S", ping_interval_s)
+
+    class EmptyManager:
+        def list(self) -> list[DownloadState]:
+            return []
+
+    async def scenario() -> tuple[str, float]:
+        async def receive() -> Message:
+            return {"type": "http.request"}
+
+        request = Request(scope={"type": "http"}, receive=receive)
+        stream = api_models._download_events(
+            request=request, manager=cast(DownloadManager, EmptyManager())
+        )
+        started = anyio.current_time()
+        with anyio.fail_after(5):
+            first = await anext(stream)
+        return first, anyio.current_time() - started
+
+    first, elapsed = anyio.run(scenario)
+
+    assert first == ": ping\n\n"
+    assert elapsed >= ping_interval_s
+
+
+def test_download_events_route_streams_server_sent_events(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    router = api_models.create_models_router(settings=Settings())
+    (endpoint,) = [
+        route.endpoint
+        for route in router.routes
+        if isinstance(route, APIRoute)
+        and route.path == "/api/v1/models/downloads/events"
+    ]
+
+    async def receive() -> Message:
+        return {"type": "http.disconnect"}
+
+    request = Request(scope={"type": "http", "app": app}, receive=receive)
+    response = anyio.run(endpoint, request)
+
+    assert response.media_type == "text/event-stream"
+    assert response.headers["cache-control"] == "no-cache"

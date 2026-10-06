@@ -167,3 +167,16 @@ def test_choice_concurrent_submissions_preserve_answers(
     saved = client.get(url=attempt_url).json()["data"]
     assert len(saved["answers"]) == len(set(indices))
     assert saved["status"] == ("graded" if len(set(indices)) == 2 else "in_progress")
+
+
+def test_text_answer_on_multiple_choice_attempt_returns_422(
+    client: TestClient, attempt_url: str
+) -> None:
+    response = client.post(
+        url=f"{attempt_url}/answers/0",
+        json={"text": "Una risposta aperta", "answer_id": str(uuid4())},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["message"] == "La domanda non è aperta o orale."
+    assert client.get(url=attempt_url).json()["data"]["answers"] == []

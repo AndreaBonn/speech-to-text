@@ -1,4 +1,5 @@
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from study_fixtures import FakeChat
@@ -13,11 +14,13 @@ from sbobina.generation_models import (
 )
 from sbobina.models import Segment, Transcript, Word, save_transcript
 from sbobina.ollama_chat import ChatRequest
+from sbobina.retrieval import DocumentSource, LectureSource, RetrievedPassage
 from sbobina.settings import settings
 from sbobina.web.api_files import TRANSCRIPT_FILES
 from sbobina.web.generation_queue import transition_generation
 from sbobina.web.generation_runner import (
     GenerationJob,
+    _collect_sources,
     execute_generation,
     run_generation_stage,
 )
@@ -283,3 +286,36 @@ def test_run_generation_stage_completes_the_running_generation_of_the_course_dir
     assert ensured == [settings.ollama_model]
     assert saved.status == GenerationStatus.DONE
     assert saved.questions[0].citations[0].job_id == str(lecture.id)
+
+
+def test_collect_sources_drops_a_document_deleted_before_collection(
+    tmp_path: Path,
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    lecture = store.create(config=JobConfig(subject="Fisica"))
+    _write_lecture(store=store, job_id=str(lecture.id))
+    course = get_or_create(courses_dir=store.courses_dir, key="fisica", label="Fisica")
+    job = _job(
+        store=store,
+        course_id=course.id,
+        course_key=course.key,
+        request=GenerationRequest(format=GenerationFormat.OPEN, count=1),
+    )
+    passages = [
+        RetrievedPassage(
+            text="testo",
+            source=DocumentSource(doc_id=str(uuid4()), page=0, chunk=0),
+            passage_id="gone:p0:c0",
+        ),
+        RetrievedPassage(
+            text="testo",
+            source=LectureSource(job_id=str(lecture.id), segment_index=0, start=0.0),
+            passage_id=f"L{lecture.id}-S0",
+        ),
+    ]
+
+    sources = _collect_sources(job=job, passages=passages)
+
+    assert [(source.doc_id, source.job_id) for source in sources] == [
+        (None, str(lecture.id))
+    ]

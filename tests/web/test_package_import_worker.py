@@ -18,6 +18,8 @@ from sbobina.web.package_import_worker import (
     PackageImportOptions,
     PackageImportOutcome,
     PackageImportStatus,
+    _log_child_output,
+    remove_import_staging,
     run_package_import,
 )
 
@@ -251,6 +253,7 @@ def test_run_package_import_mapped_error_preserves_code(
         b'{"status":"timeout"}',
         b'{"status":"imported"}',
         b'{"status":"imported","course_id":3,"course_label":"Physics"}',
+        b'{"status":"imported","course_id":"c","course_label":"F","warning":5}',
         b'{"status":"rejected","code":"PACKAGE_INVALID"}',
     ],
 )
@@ -353,6 +356,18 @@ def test_run_package_import_timeout_before_publish_stays_a_timeout(
 ) -> None:
     existing = harness.data_dir / "courses" / "22222222-2222-4222-8222-222222222222"
     existing.mkdir(parents=True)
+    (existing / "course.json").write_text(
+        json.dumps(
+            {
+                "id": existing.name,
+                "key": "chimica",
+                "label": "Chimica",
+                "created_at": NOW.isoformat(),
+                "updated_at": NOW.isoformat(),
+            }
+        ),
+        encoding="utf-8",
+    )
     (existing / "imported_from.json").write_text("{}", encoding="utf-8")
     (harness.root / "hold").touch()
     timed = replace(harness, options=replace(harness.options, timeout_s=0.5))
@@ -378,3 +393,55 @@ def test_run_package_import_timeout_between_renames_removes_published_lectures(
     assert outcome.status == PackageImportStatus.TIMEOUT
     jobs = sorted(path.name for path in (harness.data_dir / "jobs").iterdir())
     assert jobs == [str(kept.id)]
+
+
+def test_run_package_import_timeout_with_unreadable_course_stays_a_timeout(
+    harness: Harness, caplog: pytest.LogCaptureFixture
+) -> None:
+    broken = harness.data_dir / "courses" / "55555555-5555-4555-8555-555555555555"
+    broken.mkdir(parents=True)
+    (broken / "course.json").write_text("{not json", encoding="utf-8")
+    (harness.root / "publish").touch()
+    (harness.root / "hold").touch()
+    timed = replace(harness, options=replace(harness.options, timeout_s=0.5))
+
+    outcome = timed.run_import()
+
+    assert outcome.status == PackageImportStatus.TIMEOUT
+    assert "Could not check for a published import" in caplog.text
+
+
+def test_remove_import_staging_never_follows_a_symlink_or_deletes_a_file(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "keep.txt").write_text("keep", encoding="utf-8")
+    courses = tmp_path / "data" / "courses"
+    jobs = tmp_path / "data" / "jobs"
+    courses.mkdir(parents=True)
+    jobs.mkdir()
+    staged = courses / ".import-staged"
+    staged.mkdir()
+    (staged / "partial.json").write_text("{}", encoding="utf-8")
+    (courses / ".import-link").symlink_to(outside, target_is_directory=True)
+    (jobs / ".import-file").write_text("not a folder", encoding="utf-8")
+
+    remove_import_staging(data_dir=tmp_path / "data")
+
+    assert not staged.exists()
+    assert (outside / "keep.txt").read_text(encoding="utf-8") == "keep"
+    assert (courses / ".import-link").is_symlink()
+    assert (jobs / ".import-file").is_file()
+
+
+def test_log_child_output_missing_log_is_reported_without_raising(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    outcome = PackageImportOutcome(
+        status=PackageImportStatus.FAILED, code="PACKAGE_IMPORT_FAILED", message="x"
+    )
+
+    _log_child_output(log_path=tmp_path / "missing.log", outcome=outcome)
+
+    assert "Import child log unreadable" in caplog.text

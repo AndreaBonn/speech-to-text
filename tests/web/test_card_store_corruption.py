@@ -9,7 +9,13 @@ from uuid import uuid4
 import pytest
 from test_card_store import COURSE, DRAFT, NOW, _create, _review
 
-from sbobina.card_models import CardCreated, GenerationAnchor, dump_card_event
+from sbobina.card_models import (
+    CardCreated,
+    CardDeleted,
+    CardEdited,
+    GenerationAnchor,
+    dump_card_event,
+)
 from sbobina.web import card_store
 
 OTHER_GENERATION_ID = str(uuid4())
@@ -58,3 +64,28 @@ def test_load_cards_skips_invalid_record_and_warns(
     with caplog.at_level(logging.WARNING):
         assert card_store.load_cards(courses_dir=tmp_path, course_id=COURSE) == [card]
     assert "Skipping" in caplog.text
+
+
+def test_load_cards_edit_after_delete_does_not_resurrect_the_card(
+    tmp_path: Path,
+) -> None:
+    # append_card_event refuses unknown ids, but an imported or hand-edited
+    # log can still carry an edit after the delete: the fold must ignore it.
+    kept = _create(root=tmp_path)
+    removed = _create(root=tmp_path, draft=replace(DRAFT, dedup_key="altra"))
+    card_store.append_card_event(
+        courses_dir=tmp_path,
+        course_id=COURSE,
+        event=CardDeleted(card_id=removed.id, occurred_at=NOW),
+    )
+    path = card_store.cards_path(courses_dir=tmp_path, course_id=COURSE)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(
+            dump_card_event(
+                event=CardEdited(
+                    card_id=removed.id, occurred_at=NOW, front="nuovo", back="nuovo"
+                )
+            )
+        )
+
+    assert card_store.load_cards(courses_dir=tmp_path, course_id=COURSE) == [kept]

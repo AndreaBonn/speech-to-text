@@ -190,3 +190,37 @@ def test_self_grade_during_judge_call_wins_over_judgement(
     assert answer["self_grade"] == "errata"
     assert answer["judgement"] is None
     assert judge.calls == 1
+
+
+def test_text_answer_for_another_generation_is_not_found(
+    client: TestClient, attempt_url: str, judge: JudgeSpy
+) -> None:
+    prefix, _, rest = attempt_url.partition("/generations/")
+    attempt_id = rest.rsplit("/", maxsplit=1)[1]
+    foreign = f"{prefix}/generations/{uuid4()}/attempts/{attempt_id}/answers/0"
+
+    response = client.post(url=foreign, json=submission())
+
+    assert response.status_code == 404
+    assert client.get(url=attempt_url).json()["data"]["answers"] == []
+    assert judge.calls == 0
+
+
+def test_text_answer_question_out_of_range_is_not_found(
+    client: TestClient, attempt_url: str, judge: JudgeSpy
+) -> None:
+    response = client.post(url=f"{attempt_url}/answers/99", json=submission())
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
+    assert judge.calls == 0
+
+
+def test_text_answer_malformed_attempt_id_is_not_found(
+    client: TestClient, attempt_url: str
+) -> None:
+    malformed = attempt_url.rsplit("/", maxsplit=1)[0] + "/not-a-uuid"
+
+    response = client.post(url=f"{malformed}/answers/0", json=submission())
+
+    assert response.status_code == 404

@@ -15,6 +15,7 @@ from sbobina.web.search_index import (
     SearchUnavailableError,
     open_index,
 )
+from sbobina.web.search_schema import create_schema
 
 STATE = LectureState(variant="original", path_mtime_ns=123, path_size=456)
 PASSAGE = Passage(
@@ -273,3 +274,18 @@ def test_index_session_propagates_non_corruption_errors_and_keeps_the_index(
 
     with index_session(path=path) as index:
         assert set(index.indexed_lectures()) == {"job"}
+
+
+def test_create_schema_other_fts_errors_are_not_reported_as_missing_fts5() -> None:
+    class FailingFtsConnection(sqlite3.Connection):
+        def execute(self, sql: str, parameters: Any = ()) -> sqlite3.Cursor:
+            if sql.startswith("CREATE VIRTUAL TABLE"):
+                raise sqlite3.OperationalError("disk I/O error")
+            return super().execute(sql, parameters)
+
+    connection = sqlite3.connect(database=":memory:", factory=FailingFtsConnection)
+    try:
+        with pytest.raises(sqlite3.OperationalError, match="disk I/O error"):
+            create_schema(connection=connection)
+    finally:
+        connection.close()

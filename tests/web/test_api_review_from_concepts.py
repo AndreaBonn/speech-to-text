@@ -113,3 +113,24 @@ def test_from_concepts_concurrent_import_counts_only_own_creations(
         0,
         12,
     ]
+
+
+def test_from_concepts_corrupted_study_returns_422_without_cards(
+    client: TestClient, store: JobStore
+) -> None:
+    job_id = _material(store=store)
+    (store.jobs_dir / job_id / "audio.studio.json").write_text(
+        data='{"chapters": "not a list"}', encoding="utf-8"
+    )
+
+    response = client.post(url=_concept_url(job_id=job_id))
+
+    assert response.status_code == 422
+    assert (
+        response.json()["error"]["message"]
+        == "Materiale di studio non valido per le carte"
+    )
+    course = find_by_key(courses_dir=store.courses_dir, key="diritto")
+    assert course is None or not load_cards(
+        courses_dir=store.courses_dir, course_id=course.id
+    )

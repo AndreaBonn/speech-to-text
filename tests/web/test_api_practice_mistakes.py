@@ -10,6 +10,7 @@ from practice_grading_fixtures import app, client, judge
 from test_api_practice import make_url
 from test_practice_store import make_generation
 
+from sbobina.card_models import MAX_CARD_TEXT_LENGTH
 from sbobina.generation_models import GenerationSourceUsed
 from sbobina.web.document_store import read_document, write_document
 from sbobina.web.generation_store import generation_path, save_generation
@@ -157,3 +158,44 @@ def test_unreadable_attempt_does_not_hide_other_mistakes(
     assert response.status_code == 200
     assert [item["question_index"] for item in response.json()["data"]] == [0]
     assert response.json()["meta"]["unavailable_attempts"] == [bad_id]
+
+
+def test_card_for_malformed_attempt_id_is_not_found(
+    client: TestClient, tmp_path: Path
+) -> None:
+    _register_course(tmp_path=tmp_path)
+
+    response = client.post(url=f"{MISTAKES}/not-a-uuid/0/card")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["message"].startswith("Tentativo not-a-uuid")
+
+
+def test_card_from_solution_too_long_for_a_card_returns_422(
+    client: TestClient, tmp_path: Path
+) -> None:
+    course_id = _register_course(tmp_path=tmp_path)
+    courses_dir = _store(tmp_path=tmp_path).courses_dir
+    generation = make_generation(courses_dir=courses_dir, course_id=course_id)
+    long_solution = "x" * (MAX_CARD_TEXT_LENGTH + 1)
+    generation = replace(
+        generation,
+        questions=tuple(
+            replace(question, solution=long_solution)
+            for question in generation.questions
+        ),
+    )
+    save_generation(courses_dir=courses_dir, course_id=course_id, record=generation)
+    attempt = create_attempt(
+        courses_dir=courses_dir, course_id=course_id, generation=generation
+    )
+    attempt_url = f"{make_url(generation=generation)}/{attempt.id}"
+    assert (
+        client.post(url=f"{attempt_url}/answers/0", json={"choice": 0}).status_code
+        == 200
+    )
+
+    response = client.post(url=f"{MISTAKES}/{attempt.id}/0/card")
+
+    assert response.status_code == 422
+    assert client.get(url="/api/v1/courses/fisica/cards").json()["data"] == []

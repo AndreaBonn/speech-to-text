@@ -251,3 +251,31 @@ def test_practice_attempt_invalid_enum_values_rejected() -> None:
         replace(make_attempt(), status=invalid)
     with pytest.raises(ValueError, match="GenerationFormat"):
         replace(make_attempt(), format=invalid)
+
+
+def test_multiple_choice_answer_forged_discriminator_rejected() -> None:
+    answer = MultipleChoiceAnswer(
+        answer_id=str(uuid4()), question_index=0, chosen_index=1
+    )
+    invalid_kind: Any = "open"
+    with pytest.raises(ValueError, match="kind must be multiple_choice"):
+        replace(answer, kind=invalid_kind)
+    assert answer.kind == "multiple_choice"
+
+
+def test_oral_answer_forged_discriminator_rejected() -> None:
+    answer = OralAnswer(answer_id=str(uuid4()), question_index=0, text="Answer")
+    invalid_kind: Any = "open"
+    with pytest.raises(ValueError, match="kind must be oral"):
+        replace(answer, kind=invalid_kind)
+    assert answer.kind == "oral"
+
+
+@pytest.mark.parametrize("answer_type", (OpenAnswer, OralAnswer))
+@pytest.mark.parametrize("blank", ("", "  \n\t "))
+def test_text_answer_blank_text_rejected(
+    answer_type: type[OpenAnswer] | type[OralAnswer], blank: str
+) -> None:
+    assert answer_type(answer_id=str(uuid4()), question_index=0, text="x").text == "x"
+    with pytest.raises(ValueError, match="text must not be blank"):
+        answer_type(answer_id=str(uuid4()), question_index=0, text=blank)

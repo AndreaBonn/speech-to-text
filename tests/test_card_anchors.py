@@ -211,3 +211,49 @@ def test_resolve_generation_existence_and_removal(store: JobStore) -> None:
         resolve_anchor(anchor=anchor, store=store, course_id=COURSE_ID, key=KEY).status
         == "source_removed"
     )
+
+
+def test_resolve_document_corrupted_record_returns_unavailable(
+    store: JobStore,
+) -> None:
+    document = _document()
+    write_document(courses_dir=store.courses_dir, document=document)
+    anchor = DocumentAnchor(
+        doc_id=document.id, sha256=document.sha256, page=0, quote=QUOTE
+    )
+    assert _resolve_any(store=store, anchor=anchor).status == "ok"
+    (
+        document_dir(
+            courses_dir=store.courses_dir, course_id=COURSE_ID, doc_id=document.id
+        )
+        / "document.json"
+    ).write_text(data="{not json", encoding="utf-8")
+
+    assert _resolve_any(store=store, anchor=anchor) == AnchorResolution(
+        href=f"/corsi/{KEY}/documenti/{document.id}?p=0", status="unavailable"
+    )
+
+
+def test_resolve_generation_corrupted_record_returns_unavailable(
+    store: JobStore,
+) -> None:
+    generation = create_generation(
+        courses_dir=store.courses_dir,
+        course_id=COURSE_ID,
+        request=GenerationRequest(format=GenerationFormat.OPEN, count=1),
+    )
+    anchor = GenerationAnchor(generation_id=generation.id, question_index=0)
+    assert _resolve_any(store=store, anchor=anchor).status == "ok"
+    generation_path(
+        courses_dir=store.courses_dir, course_id=COURSE_ID, gen_id=generation.id
+    ).write_text(data="{not json", encoding="utf-8")
+
+    assert _resolve_any(store=store, anchor=anchor) == AnchorResolution(
+        href=f"/corsi/{KEY}/generazioni/{generation.id}", status="unavailable"
+    )
+
+
+def _resolve_any(
+    store: JobStore, anchor: DocumentAnchor | GenerationAnchor
+) -> AnchorResolution:
+    return resolve_anchor(anchor=anchor, store=store, course_id=COURSE_ID, key=KEY)

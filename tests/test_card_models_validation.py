@@ -94,23 +94,35 @@ def test_draft_created_edited_validate_front_like_card(
 def test_lecture_anchor_rejects_empty_ids_negative_index_and_empty_quote() -> None:
     valid = LectureAnchor(job_id=JOB_ID, revision="r", segment_index=0, quote="q")
     assert valid.segment_index == 0
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="job_id"):
         LectureAnchor(job_id="", revision="r", segment_index=0, quote="q")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="segment_index"):
         LectureAnchor(job_id=JOB_ID, revision="r", segment_index=-1, quote="q")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="quote"):
         LectureAnchor(job_id=JOB_ID, revision="r", segment_index=0, quote=" ")
 
 
 def test_document_anchor_rejects_empty_ids_negative_page_and_empty_quote() -> None:
     valid = DocumentAnchor(doc_id=DOC_ID, sha256="s", page=0, quote="q")
     assert valid.page == 0
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="doc_id"):
         DocumentAnchor(doc_id="", sha256="s", page=0, quote="q")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="page"):
         DocumentAnchor(doc_id=DOC_ID, sha256="s", page=-1, quote="q")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="quote"):
         DocumentAnchor(doc_id=DOC_ID, sha256="s", page=0, quote="")
+
+
+def test_lecture_anchor_empty_revision_is_rejected() -> None:
+    assert LectureAnchor(job_id=JOB_ID, revision="r", segment_index=0, quote="q")
+    with pytest.raises(ValueError, match="revision"):
+        LectureAnchor(job_id=JOB_ID, revision="", segment_index=0, quote="q")
+
+
+def test_document_anchor_empty_sha256_is_rejected() -> None:
+    assert DocumentAnchor(doc_id=DOC_ID, sha256="s", page=0, quote="q")
+    with pytest.raises(ValueError, match="sha256"):
+        DocumentAnchor(doc_id=DOC_ID, sha256="", page=0, quote="q")
 
 
 def test_generation_anchor_rejects_empty_id_and_negative_index() -> None:

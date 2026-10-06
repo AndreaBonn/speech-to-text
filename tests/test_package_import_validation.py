@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from zipfile import ZipFile
 
 import pytest
 from package_import_fixtures import (
@@ -9,10 +10,13 @@ from package_import_fixtures import (
     package_members,
     rewrite_package,
     snapshot,
+    write_members,
 )
 
 from sbobina import document_sniff
 from sbobina.package_import import PackageStorageError, import_package
+from sbobina.package_import_load import load_package
+from sbobina.package_models import Manifest
 from sbobina.package_validate import PackageInvalidError
 
 
@@ -144,3 +148,53 @@ def test_import_package_office_limits_reject_original_and_rollback(
         import_package(source=source, data_dir=data, now=IMPORT_TIME)
     assert isinstance(caught.value.__cause__, document_sniff.ArchiveTooLargeError)
     assert snapshot(directory=data) == before
+
+
+def test_import_package_original_extension_not_matching_kind_is_rejected(
+    tmp_path: Path,
+) -> None:
+    source = make_package(directory=tmp_path)
+    members = package_members(source=source)
+    manifest = Manifest.model_validate_json(json_data=members.pop("manifest.json"))
+    members["documents/0/original.pdf"] = members.pop("documents/0/original.txt")
+    inventory = tuple(
+        entry.model_copy(update={"path": "documents/0/original.pdf"})
+        if entry.path == "documents/0/original.txt"
+        else entry
+        for entry in manifest.inventory
+    )
+    invalid = tmp_path / "renamed.sbobina.zip"
+    write_members(
+        target=invalid,
+        members=members,
+        manifest=manifest.model_copy(update={"inventory": inventory}),
+    )
+    data = tmp_path / "destination"
+    with pytest.raises(PackageInvalidError, match="Original extension"):
+        import_package(source=invalid, data_dir=data, now=IMPORT_TIME)
+    assert list(data.rglob("*")) == []
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        {"sha256": "0" * 64},
+        {"size": 1},
+    ],
+    ids=["digest", "size"],
+)
+def test_load_package_member_not_matching_inventory_is_rejected(
+    tmp_path: Path, tamper: dict[str, object]
+) -> None:
+    # load_package re-reads members after validation: a file swapped on disk
+    # in between must not be imported under the validated inventory.
+    source = make_package(directory=tmp_path)
+    with ZipFile(file=source) as archive:
+        manifest = Manifest.model_validate_json(json_data=archive.read("manifest.json"))
+        assert load_package(archive=archive, manifest=manifest).documents
+        first, *rest = manifest.inventory
+        changed = manifest.model_copy(
+            update={"inventory": (first.model_copy(update=tamper), *rest)}
+        )
+        with pytest.raises(PackageInvalidError, match="changed after validation"):
+            load_package(archive=archive, manifest=changed)

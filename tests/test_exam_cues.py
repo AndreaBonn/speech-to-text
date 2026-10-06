@@ -272,3 +272,19 @@ def test_find_exam_cues_followup_keeps_the_punctuation_of_the_segment() -> None:
 
     assert cue.quote == "Attenzione"
     assert cue.followup == "Il termine è annuale! Vale per tutti?"
+
+
+def test_find_exam_cues_followup_already_full_in_its_segment_ignores_later_segments() -> (
+    None
+):
+    rest = " ".join(f"parola{index}" for index in range(35))
+    transcript = make_transcript(
+        segments=[
+            make_segment(words=[make_word(text=f"all'esame. {rest}", start=0.0)]),
+            make_segment(words=[make_word(text="segmento successivo", start=5.0)]),
+        ]
+    )
+
+    (cue,) = find_exam_cues(transcript=transcript, job_id="lecture")
+
+    assert cue.followup.split() == rest.split()[:30]
