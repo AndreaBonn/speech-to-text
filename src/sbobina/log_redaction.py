@@ -96,9 +96,16 @@ class SecretRedactionFilter(logging.Filter):
         self._busy = threading.local()
 
     def _all_secrets(self) -> list[str]:
-        if self._dynamic_secrets is None:
+        # Defense in depth: a record logged while the keys are being read
+        # must not trigger another read (that recursion once stopped the app
+        # at start). Such a record is still redacted with the known keys.
+        if self._dynamic_secrets is None or getattr(self._busy, "active", False):
             return self._known_secrets
-        extra = [secret for secret in self._dynamic_secrets() if secret]
+        self._busy.active = True
+        try:
+            extra = [secret for secret in self._dynamic_secrets() if secret]
+        finally:
+            self._busy.active = False
         return [*self._known_secrets, *extra]
 
     def _redact(self, text: str) -> str:
@@ -124,15 +131,7 @@ class SecretRedactionFilter(logging.Filter):
             record.msg, record.args = self._redact(message), ()
 
     def filter(self, record: logging.LogRecord) -> bool:
-        # Defense in depth: a record logged while this filter reads the keys
-        # must not re-enter it (that recursion once stopped the app at start).
-        if getattr(self._busy, "active", False):
-            return True
-        self._busy.active = True
-        try:
-            self._redact_and_format(record=record)
-        finally:
-            self._busy.active = False
+        self._redact_and_format(record=record)
         return True
 
     def _redact_and_format(self, record: logging.LogRecord) -> None:

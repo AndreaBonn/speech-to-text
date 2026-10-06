@@ -216,3 +216,22 @@ def test_install_redaction_with_a_corrupted_credentials_file_logs_without_recurs
     logging.getLogger("sbobina.test").warning("avvio con chiavi illeggibili")
 
     assert "avvio con chiavi illeggibili" in stream.getvalue()
+
+
+def test_filter_still_redacts_known_keys_in_a_record_nested_in_a_key_lookup() -> None:
+    nested: list[logging.LogRecord] = []
+
+    def source() -> list[str]:
+        record = logging.LogRecord(
+            "sbobina", logging.WARNING, __file__, 1, f"dentro {SENTINEL}", None, None
+        )
+        redaction.filter(record)
+        nested.append(record)
+        return []
+
+    redaction = SecretRedactionFilter(known_secrets=[SENTINEL], dynamic_secrets=source)
+    outer = logging.LogRecord("sbobina", logging.INFO, __file__, 1, "fuori", None, None)
+
+    redaction.filter(outer)
+
+    assert SENTINEL not in nested[0].getMessage()
