@@ -83,3 +83,17 @@ Blocchi: [B-10] T051-T052 · [B-11] T053-T054, T056 · UI: T055
 | --- | --- | --- | --- | --- | --- | --- |
 | T070 | Proposta di modifica per README, SECURITY, `docs/guida-utente.md`, `docs/user-guide.md` (cosa esce dalla macchina con ciascun motore, dove stanno le chiavi, limite Windows su 0600). Eseguita da `doc-writer` solo su richiesta dell'utente. | T049, T059 | C4, R5 | [G] | basso | Proposta presentata all'utente; nessun file di doc toccato senza il suo sì. |
 | T079 | Chiusura: `/analyze` su `specs/003-cloud-providers/`, esiti A1-A3 e verifiche T010/T050 in `adr.md`. | T029, T049, T059 | tutti | [G] | basso | `/analyze` senza CRITICAL; nessun UNVERIFIED residuo nel piano per codice spedito. |
+
+## Stato di implementazione (2026-10-06)
+
+Fatti: T010 (verifiche in `adr.md`), T011-T016, T018, T020-T027, T029, T030-T039, T048, T049, T050-T056, T059.
+
+Differenze rispetto al testo dei task:
+
+- T017: nessun `providers/gemini.py`; Gemini usa l'endpoint OpenAI-compatibile dentro `providers/openai_compat.py` (chiave in header Bearer).
+- T031: il modulo è `credential_store.py` (classe `CredentialStore`): un deny di permesso su `secret*` impediva di leggere un file con quel nome.
+- T051: segmenti dalle frasi dell'endpoint `/sentences` (K3), non raggruppamento per pausa.
+- T053: il motore di trascrizione è fotografato in `JobConfig.transcription_engine` alla creazione del job; l'id remoto AssemblyAI non viene salvato (cancellazione nel `finally`, crash fra submit e delete parcheggiato).
+- T025: `served_by` non è registrato nelle risposte della chat (A7 di `/analyze`, aperto).
+
+Non fatti, richiedono l'utente: T028 e T057 (prove reali con chiavi e audio dell'utente), T070 (proposta per README, SECURITY e guida, solo su richiesta).
