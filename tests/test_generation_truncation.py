@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from study_fixtures import FakeChat
 
 from sbobina.generation_models import GenerationRequest
@@ -103,3 +104,36 @@ def test_complete_questions_reads_the_array_of_the_domande_key() -> None:
     content = 'Ecco le "domande" [richieste]:\n' + _cut_reply(complete=1)
 
     assert complete_questions(content=content) == [_question(0)]
+
+
+def test_generate_logs_an_unreadable_reply_it_could_not_salvage(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # A25: the record only says INVALID_RESPONSE; the log keeps the reply.
+    caplog.set_level("WARNING", logger="sbobina")
+    request = GenerationRequest.model_validate({"format": "oral", "count": 1})
+    chat = FakeChat(responses=["testo che non è JSON"])
+
+    generate(
+        request=request,
+        passages=[_passage()],
+        chat=chat,
+        options=GenerationOptions(model="test"),
+    )
+
+    assert "testo che non è JSON" in caplog.text
+
+
+def test_generate_does_not_log_a_readable_reply(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level("WARNING", logger="sbobina")
+    request = GenerationRequest.model_validate({"format": "oral", "count": 1})
+    chat = FakeChat(responses=[json.dumps({"domande": [_question(0)]})])
+
+    generate(
+        request=request,
+        passages=[_passage()],
+        chat=chat,
+        options=GenerationOptions(model="test"),
+    )
+
+    assert caplog.text == ""

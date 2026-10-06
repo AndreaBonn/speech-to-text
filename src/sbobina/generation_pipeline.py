@@ -9,6 +9,7 @@ stays testable with passages given directly, no I/O.
 """
 
 import json
+import logging
 import math
 import re
 from collections.abc import Callable, Sequence
@@ -42,6 +43,9 @@ from sbobina.ollama_chat import ChatRequest, strip_markdown_fence
 from sbobina.retrieval import RetrievedPassage
 
 MAX_ATTEMPTS = 2
+# Kept from an unreadable reply in the log: the record only says INVALID_RESPONSE.
+LOGGED_REPLY_CHARS = 500
+logger = logging.getLogger("sbobina")
 # adr.md T001(e): 1500 parole di trascrizione -> 3432 token su qwen3.5:9b.
 ITALIAN_TOKENS_PER_WORD = 2.29
 INVALID_RESPONSE_ERROR = "INVALID_RESPONSE"
@@ -206,6 +210,10 @@ def _request_response(
             )
             if salvaged is not None:
                 return salvaged
+            logger.warning(
+                "Risposta di generazione non leggibile: %r",
+                content[:LOGGED_REPLY_CHARS],
+            )
     return None
 
 
