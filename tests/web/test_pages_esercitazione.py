@@ -70,3 +70,16 @@ def test_practice_page_unknown_course_is_404(tmp_path: Path) -> None:
 
     assert response.status_code == 404
     assert "Esercitazione non trovata" in response.text
+
+
+def test_practice_page_corrupted_attempt_explains_the_damage(tmp_path: Path) -> None:
+    _, attempt_id = make_attempt_on_disk(tmp_path=tmp_path)
+    (path,) = _store(tmp_path=tmp_path).courses_dir.rglob(f"{attempt_id}.json")
+    path.write_text("{broken", encoding="utf-8")
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        response = client.get(f"/corsi/fisica/esercitazioni/{attempt_id}")
+
+    assert response.status_code == 503
+    assert "il file è danneggiato" in response.text
+    assert 'id="esercitazione-root"' not in response.text

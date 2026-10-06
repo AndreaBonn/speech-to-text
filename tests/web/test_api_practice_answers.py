@@ -180,3 +180,19 @@ def test_text_answer_on_multiple_choice_attempt_returns_422(
     assert response.status_code == 422
     assert response.json()["error"]["message"] == "La domanda non è aperta o orale."
     assert client.get(url=attempt_url).json()["data"]["answers"] == []
+
+
+def test_corrupted_attempt_returns_503_envelope_on_read_and_answer(
+    client: TestClient, attempt_url: str, tmp_path: Path
+) -> None:
+    attempt_id = attempt_url.rsplit("/", maxsplit=1)[1]
+    (path,) = tmp_path.rglob(f"{attempt_id}.json")
+    path.write_text("{broken", encoding="utf-8")
+
+    read = client.get(url=attempt_url)
+    answer = client.post(url=f"{attempt_url}/answers/0", json={"choice": 0})
+
+    for response in (read, answer):
+        assert response.status_code == 503
+        assert response.json()["error"]["code"] == "ATTEMPT_UNREADABLE"
+    assert path.read_text(encoding="utf-8") == "{broken"

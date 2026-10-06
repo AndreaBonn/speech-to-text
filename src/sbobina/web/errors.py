@@ -40,6 +40,19 @@ class ServiceUnavailableError(AppError):
     """A dependency the request needs is unreachable (HTTP 503)."""
 
 
+class AttemptUnreadableError(ServiceUnavailableError):
+    """A practice attempt file exists but cannot be parsed (HTTP 503).
+
+    Not a 404: the file is kept, and the attempt list reports it as damaged.
+    """
+
+    def __init__(self, attempt_id: str) -> None:
+        super().__init__(
+            message=f"Tentativo {attempt_id} non leggibile: il file è danneggiato",
+            code="ATTEMPT_UNREADABLE",
+        )
+
+
 class GatewayTimeoutError(AppError):
     """An external call exceeded its time budget (HTTP 504)."""
 

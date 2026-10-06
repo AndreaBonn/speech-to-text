@@ -4,7 +4,11 @@
 {% if not_found %}
 <div class="empty-state" role="alert">
   <p class="empty-state__text">
+    {% if damaged %}
+    Esercitazione non leggibile: il file è danneggiato.
+    {% else %}
     Esercitazione non trovata: non esiste, oppure appartiene a un altro corso.
+    {% endif %}
   </p>
   <a class="btn btn--secondary" href="/corsi?corso={{ course_key | urlencode }}">Torna al corso</a>
 </div>

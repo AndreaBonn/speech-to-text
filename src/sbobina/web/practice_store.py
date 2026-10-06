@@ -19,7 +19,7 @@ from sbobina.practice_models import (
     require_uuid4,
 )
 from sbobina.study_files import atomic_write_pair
-from sbobina.web.errors import NotFoundError
+from sbobina.web.errors import AttemptUnreadableError, NotFoundError
 from sbobina.web.path_locks import lock_for
 
 logger = logging.getLogger(__name__)
@@ -88,6 +88,8 @@ def load_attempt(courses_dir: Path, course_id: str, attempt_id: str) -> Practice
         return load_practice_attempt(content=path.read_text(encoding="utf-8"))
     except FileNotFoundError as error:
         raise NotFoundError(entity="Tentativo", id=attempt_id) from error
+    except ValueError as error:
+        raise AttemptUnreadableError(attempt_id=attempt_id) from error
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -117,7 +119,7 @@ def list_attempts(courses_dir: Path, course_id: str) -> AttemptScan:
             )
         except NotFoundError:
             continue  # deleted between glob and read: nothing to report
-        except (OSError, ValueError) as error:
+        except (OSError, AttemptUnreadableError) as error:
             logger.error("Unreadable practice attempt %s: %s", path, error)
             unavailable.append(path.stem)
     return AttemptScan(attempts=tuple(attempts), unavailable_ids=tuple(unavailable))

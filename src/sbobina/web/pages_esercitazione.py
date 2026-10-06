@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 
 from sbobina.course_registry import find_by_key
 from sbobina.courses import course_key
-from sbobina.web.errors import NotFoundError
+from sbobina.web.errors import AttemptUnreadableError, NotFoundError
 from sbobina.web.job_store import JobStore
 from sbobina.web.pages import JobStoreDep, render_page
 from sbobina.web.practice_store import load_attempt
@@ -14,16 +14,17 @@ router = APIRouter()
 
 
 def _render_missing_attempt(
-    request: Request, store: JobStore, key: str
+    request: Request, store: JobStore, key: str, damaged: bool = False
 ) -> HTMLResponse:
     return render_page(
         request=request,
         template_name="esercitazione.html",
         active="corsi",
         store=store,
-        status_code=404,
+        status_code=503 if damaged else 404,
         page_title="Esercitazione",
         not_found=True,
+        damaged=damaged,
         course_key=key,
     )
 
@@ -43,6 +44,10 @@ def esercitazione(
             )
         except NotFoundError:
             attempt = None
+        except AttemptUnreadableError:
+            return _render_missing_attempt(
+                request=request, store=store, key=key, damaged=True
+            )
     if course is None or attempt is None or attempt.course_id != course.id:
         return _render_missing_attempt(request=request, store=store, key=key)
     return render_page(
