@@ -4,7 +4,7 @@ from typing import Literal
 
 import httpx
 
-from sbobina import platform_info
+from sbobina import llm_factory, platform_info
 from sbobina.correction import CorrectorUnavailableError
 from sbobina.grading import GradingChat, GradingRequest, GradingResult, grade
 from sbobina.practice_models import (
@@ -24,6 +24,9 @@ type GradingMode = Literal["judge", "self"]
 def grading_mode(settings: Settings) -> GradingMode:
     if settings.practice_grading_mode != "auto":
         return settings.practice_grading_mode
+    # A cloud judge does not need the local GPU (T024).
+    if llm_factory.has_cloud_key(settings=settings):
+        return "judge"
     runtime = platform_info.resolve_runtime(
         info=platform_info.detect_platform(),
         requested=platform_info.request_from_settings(config=settings),
