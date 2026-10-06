@@ -113,12 +113,42 @@ def effective_settings(settings: Settings, config_dir: Path) -> Settings:
     path = preferences_path(config_dir)
     if not path.exists():
         return settings
-    resolved = resolve_preferences(settings=settings, path=path)
+    preferences = consented_preferences(
+        resolved=resolve_preferences(settings=settings, path=path)
+    )
     return settings.model_copy(
         update={
-            "llm_engine": resolved.preferences.llm_engine,
-            "llm_chain": resolved.preferences.llm_chain,
-            "llm_ollama_fallback": resolved.preferences.llm_ollama_fallback,
-            "transcription_engine": resolved.preferences.transcription_engine,
+            "llm_engine": preferences.llm_engine,
+            "llm_chain": preferences.llm_chain,
+            "llm_ollama_fallback": preferences.llm_ollama_fallback,
+            "transcription_engine": preferences.transcription_engine,
         }
+    )
+
+
+def consent_missing(resolved: ResolvedPreferences) -> list[str]:
+    """Cloud engines saved in the file without the consent the UI records.
+
+    A field pinned by env is the operator's explicit choice and needs none.
+    """
+    prefs, locked = resolved.preferences, resolved.locked_by_env
+    missing: list[str] = []
+    if prefs.llm_engine == "api" and prefs.cloud_ack is None:
+        missing += [] if "llm_engine" in locked else ["llm_engine"]
+    if prefs.transcription_engine == "assemblyai" and prefs.cloud_ack_audio is None:
+        missing += [] if "transcription_engine" in locked else ["transcription_engine"]
+    return missing
+
+
+def consented_preferences(resolved: ResolvedPreferences) -> UserPreferences:
+    """Preferences with every unconsented cloud engine put back to local."""
+    missing = consent_missing(resolved=resolved)
+    if not missing:
+        return resolved.preferences
+    logger.warning(
+        "Motore cloud senza consenso registrato, uso quello locale: %s", missing
+    )
+    local = {"llm_engine": "local", "transcription_engine": "whisper"}
+    return resolved.preferences.model_copy(
+        update={field: local[field] for field in missing}
     )

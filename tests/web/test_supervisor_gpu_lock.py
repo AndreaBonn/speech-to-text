@@ -1,6 +1,7 @@
 import os
 import threading
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Event
 
@@ -151,7 +152,9 @@ def test_assemblyai_transcription_leaves_the_gpu_to_chat(harness: Harness) -> No
     config_dir.mkdir(parents=True, exist_ok=True)
     save_preferences(
         path=preferences_path(config_dir),
-        preferences=UserPreferences(transcription_engine="assemblyai"),
+        preferences=UserPreferences(
+            transcription_engine="assemblyai", cloud_ack_audio=datetime.now(tz=UTC)
+        ),
     )
     job_id = harness.create(hold=True)
     arbiter = harness.supervisor._gpu_arbiter

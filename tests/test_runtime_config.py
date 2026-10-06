@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sbobina.credential_store import CredentialStore
@@ -22,6 +23,7 @@ def test_runtime_settings_applies_saved_engine_and_chain(tmp_path: Path) -> None
         preferences=UserPreferences(
             llm_engine="api",
             llm_chain=[LlmChainEntry(provider="groq", model="llama-x")],
+            cloud_ack=datetime.now(tz=UTC),
         ),
     )
 

@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -188,7 +189,9 @@ def test_job_config_snapshots_the_saved_transcription_engine(
     )
     save_preferences(
         path=preferences_path(tmp_path),
-        preferences=UserPreferences(transcription_engine="assemblyai"),
+        preferences=UserPreferences(
+            transcription_engine="assemblyai", cloud_ack_audio=datetime.now(tz=UTC)
+        ),
     )
 
     assert JobConfig().transcription_engine == "assemblyai"

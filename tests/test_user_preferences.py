@@ -1,5 +1,6 @@
 import logging
 import stat
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pydantic
@@ -103,6 +104,8 @@ def test_effective_settings_applies_resolved_preferences(tmp_path: Path) -> None
             llm_engine="api",
             transcription_engine="assemblyai",
             llm_chain=[LlmChainEntry(provider="groq", model="llama-3.3")],
+            cloud_ack=datetime.now(tz=UTC),
+            cloud_ack_audio=datetime.now(tz=UTC),
         ),
     )
 
@@ -128,6 +131,7 @@ def test_effective_settings_child_rebuilt_settings_still_read_the_file(
         preferences=UserPreferences(
             llm_engine="api",
             llm_chain=[LlmChainEntry(provider="groq", model="llama-x")],
+            cloud_ack=datetime.now(tz=UTC),
         ),
     )
     # stage_runner rebuilds Settings from a full dump: every field is "set".
@@ -145,3 +149,55 @@ def test_effective_settings_without_a_file_keeps_passed_settings(
     passed = Settings(llm_engine="api")
 
     assert effective_settings(settings=passed, config_dir=tmp_path) is passed
+
+
+def test_effective_settings_cloud_engines_without_consent_stay_local(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    save_preferences(
+        path=preferences_path(tmp_path),
+        preferences=UserPreferences(
+            llm_engine="api",
+            llm_chain=[LlmChainEntry(provider="groq", model="llama-x")],
+            transcription_engine="assemblyai",
+        ),
+    )
+
+    with caplog.at_level(logging.WARNING):
+        effective = effective_settings(settings=Settings(), config_dir=tmp_path)
+
+    assert effective.llm_engine == "local"
+    assert effective.transcription_engine == "whisper"
+    assert "consenso" in caplog.text
+
+
+def test_effective_settings_cloud_engines_with_consent_apply(tmp_path: Path) -> None:
+    now = datetime.now(tz=UTC)
+    save_preferences(
+        path=preferences_path(tmp_path),
+        preferences=UserPreferences(
+            llm_engine="api",
+            llm_chain=[LlmChainEntry(provider="groq", model="llama-x")],
+            transcription_engine="assemblyai",
+            cloud_ack=now,
+            cloud_ack_audio=now,
+        ),
+    )
+
+    effective = effective_settings(settings=Settings(), config_dir=tmp_path)
+
+    assert effective.llm_engine == "api"
+    assert effective.transcription_engine == "assemblyai"
+
+
+def test_effective_settings_engine_pinned_by_env_needs_no_saved_consent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SBOBINA_LLM_ENGINE", "api")
+    save_preferences(
+        path=preferences_path(tmp_path), preferences=UserPreferences(llm_engine="api")
+    )
+
+    effective = effective_settings(settings=Settings(), config_dir=tmp_path)
+
+    assert effective.llm_engine == "api"
