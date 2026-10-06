@@ -57,6 +57,11 @@
         li.appendChild(citationsList(sentence.citations));
       }
     });
+    // Which cloud model or local fallback answered (api engine only).
+    if (message.served_by) {
+      var models = Object.keys(message.served_by).join(", ");
+      li.appendChild(el("p", "field__helper", "Risposta da " + models));
+    }
     return li;
   }
 
