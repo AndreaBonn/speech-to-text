@@ -11,6 +11,7 @@ with ``propagate=False`` (S3, review di sicurezza del piano 003).
 
 import logging
 import re
+import threading
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
@@ -63,8 +64,9 @@ class _CachedKeyStoreSource:
         except OSError:
             mtime = None
         if mtime != self._cached_mtime:
-            resolved = resolve_keys(settings=self._settings, store=self._store)
-            self._cached_secrets = list(resolved.values())
+            env_keys = resolve_keys(settings=self._settings, store=None)
+            file_keys = self._store.peek_keys()
+            self._cached_secrets = [*env_keys.values(), *file_keys.values()]
             self._cached_mtime = mtime
         return self._cached_secrets
 
@@ -91,6 +93,7 @@ class SecretRedactionFilter(logging.Filter):
         super().__init__()
         self._known_secrets = [secret for secret in known_secrets if secret]
         self._dynamic_secrets = dynamic_secrets
+        self._busy = threading.local()
 
     def _all_secrets(self) -> list[str]:
         if self._dynamic_secrets is None:
@@ -121,13 +124,24 @@ class SecretRedactionFilter(logging.Filter):
             record.msg, record.args = self._redact(message), ()
 
     def filter(self, record: logging.LogRecord) -> bool:
+        # Defense in depth: a record logged while this filter reads the keys
+        # must not re-enter it (that recursion once stopped the app at start).
+        if getattr(self._busy, "active", False):
+            return True
+        self._busy.active = True
+        try:
+            self._redact_and_format(record=record)
+        finally:
+            self._busy.active = False
+        return True
+
+    def _redact_and_format(self, record: logging.LogRecord) -> None:
         self._redact_message(record=record)
         if record.exc_info and not record.exc_text:
             formatted = logging.Formatter().formatException(record.exc_info)
             record.exc_text = self._redact(formatted)
         elif record.exc_text:
             record.exc_text = self._redact(record.exc_text)
-        return True
 
 
 def _secret_values(settings: Settings) -> list[str | None]:

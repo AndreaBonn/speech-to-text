@@ -203,3 +203,16 @@ def test_filter_redacts_a_key_inside_a_string_arg_keeping_the_tuple() -> None:
 
     assert SENTINEL not in output
     assert output.startswith("127.0.0.1:41336 GET /x?key=")
+
+
+def test_install_redaction_with_a_corrupted_credentials_file_logs_without_recursion(
+    tmp_path: Path,
+    captured_root: tuple[logging.Logger, io.StringIO, logging.Handler],
+) -> None:
+    _root, stream, _handler = captured_root
+    (tmp_path / "credentials.json").write_text("{broken", encoding="utf-8")
+    install_redaction(settings=Settings(config_dir=tmp_path))
+
+    logging.getLogger("sbobina.test").warning("avvio con chiavi illeggibili")
+
+    assert "avvio con chiavi illeggibili" in stream.getvalue()

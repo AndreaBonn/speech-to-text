@@ -97,6 +97,22 @@ class CredentialStore:
         """Provider -> key, from the file only (no env override)."""
         return _read_raw(self.path)
 
+    def peek_keys(self) -> dict[str, str]:
+        """The keys without logging, chmod or symlink handling.
+
+        For the log redaction filter: a warning logged while reading would
+        pass through that same filter and read the file again, forever.
+        """
+        if self.path.is_symlink() or not self.path.exists():
+            return {}
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+            return {}
+        if not isinstance(raw, dict):
+            return {}
+        return {key: value for key, value in raw.items() if isinstance(value, str)}
+
     def is_unreadable(self) -> bool:
         """True when a file exists but its keys cannot be read (A5).
 
