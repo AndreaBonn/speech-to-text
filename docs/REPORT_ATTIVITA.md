@@ -643,6 +643,17 @@ su `main`.
   delle virgolette e il JSON si rompe nella quarta sezione, identico a
   entrambi i tentativi; ora si tengono 3 sezioni su 4. Specifiche
   corrette in d90dc42.
+- Commit fc8b99e: `chat_json` ripara le virgolette non escapate dentro i
+  testi JSON quando una risposta non si legge, e tiene la riparazione
+  solo se la risposta diventa leggibile, quindi una risposta valida non
+  viene mai toccata. Sulla risposta reale della pagina 4 il riassunto si
+  legge intero (4 sezioni su 4); la quarta sezione perde comunque le
+  frasi perché le citazioni riscrivono la formula, causa già nota di V9.
+  Il `code-reviewer` ha trovato un caso silenzioso (un elemento di lista
+  con `", "` all'interno veniva diviso in due, per esempio un punto
+  mancante del giudice): ora la riparazione rinuncia quando in una
+  stringa resta un numero dispari di virgolette corrette. Test con il
+  caso del reviewer.
 
 ### Verifiche
 
@@ -665,9 +676,9 @@ su `main`.
 
 - Non misurato: una scansione vera (V10 usa il PDF nativo come scansione
   simulata).
-- Le virgolette non escapate nelle citazioni fanno ancora perdere la
-  sezione in cui compaiono; la correzione possibile è una riparazione
-  del JSON in `chat_json`, non ancora fatta.
+- La riparazione delle virgolette non copre una virgoletta seguita da
+  due punti dentro un testo (sembra la fine di una chiave): quel caso
+  resta illeggibile.
 - Nessun push: i commit restano locali su `main`.
 
 ### Note per il Cliente
