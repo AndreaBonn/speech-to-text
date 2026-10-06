@@ -94,6 +94,21 @@ def label_transcript(json_path: Path, source_name: str, config: Settings) -> Non
     write_markdown(transcript, json_path=json_path, config=config)
 
 
+def _transcribe(
+    audio_path: Path, config: Settings, on_progress: ProgressCallback | None
+) -> Transcript:
+    """Dispatch to the engine chosen in Settings; no fallback between them."""
+    if config.transcription_engine == "assemblyai":
+        from sbobina import assemblyai_transcriber
+
+        return assemblyai_transcriber.transcribe_file(
+            audio_path, config=config, on_progress=on_progress
+        )
+    from sbobina.transcriber import transcribe_file
+
+    return transcribe_file(audio_path, config=config, on_progress=on_progress)
+
+
 def transcribe_to_dir(
     audio_path: Path,
     output_dir: Path,
@@ -111,10 +126,10 @@ def transcribe_to_dir(
     on_progress : ProgressCallback | None
         Receives processed audio seconds and total duration per segment.
     """
-    from sbobina.transcriber import transcribe_file
-
     output_dir.mkdir(parents=True, exist_ok=True)
-    transcript = transcribe_file(audio_path, config=config, on_progress=on_progress)
+    transcript = _transcribe(
+        audio_path=audio_path, config=config, on_progress=on_progress
+    )
     json_path = output_dir / f"{audio_path.stem}.json"
     save_transcript(transcript, json_path)
     write_markdown(transcript, json_path=json_path, config=config)
