@@ -30,13 +30,7 @@ def generate_study_files(
             config=config,
             recorder=recorder,
         ),
-        options=StudyOptions(
-            model=llm_factory.effective_model_label(settings=config),
-            block_words=config.study_block_words,
-            num_predict=config.study_num_predict,
-            source_variant=paths.variant,
-            source_revision=source_revision(content=content),
-        ),
+        options=_study_options(config=config, paths=paths, content=content),
         on_progress=on_progress,
     )
     result = replace(result, served_by=recorder.snapshot() or None)
@@ -47,6 +41,18 @@ def generate_study_files(
         options=_render_options(config=config),
     )
     return paths.output
+
+
+def _study_options(
+    config: Settings, paths: study_command.StudyPaths, content: str
+) -> StudyOptions:
+    return StudyOptions(
+        model=llm_factory.effective_model_label(settings=config),
+        block_words=config.study_block_words,
+        num_predict=config.study_num_predict,
+        source_variant=paths.variant,
+        source_revision=source_revision(content=content),
+    )
 
 
 def _render_options(config: Settings) -> RenderOptions:

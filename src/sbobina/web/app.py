@@ -202,10 +202,14 @@ def _add_middleware(app: FastAPI, settings: Settings) -> None:
     )
 
 
-def _register_routes(app: FastAPI, settings: Settings) -> None:
+def _add_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, request_validation_handler)
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(HTTPException, http_error_handler)
+
+
+def _register_routes(app: FastAPI, settings: Settings) -> None:
+    _add_exception_handlers(app=app)
     app.include_router(create_system_router(settings=settings))
     app.include_router(create_models_router(settings=settings))
     app.include_router(settings_router)

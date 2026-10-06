@@ -8,6 +8,7 @@ deletion is a user-visible warning, never silent.
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from sbobina.assemblyai_client import (
     AssemblyAIClient,
@@ -76,6 +77,15 @@ def _submit(client: AssemblyAIClient, upload_url: str, config: Settings) -> str:
         raise
 
 
+def _meta(reply: dict[str, Any], audio_path: Path, config: Settings) -> TranscriptMeta:
+    return TranscriptMeta(
+        source=str(audio_path),
+        speech_model=str(reply.get("speech_model_used") or "universal"),
+        language=config.language,
+        duration=float(reply.get("audio_duration") or 0.0),
+    )
+
+
 def _run_remote(
     client: AssemblyAIClient,
     audio_path: Path,
@@ -98,14 +108,9 @@ def _run_remote(
             ),
         )
         _report(on_progress=on_progress, fraction=_REMOTE_DONE)
-        meta = TranscriptMeta(
-            source=str(audio_path),
-            speech_model=str(reply.get("speech_model_used") or "universal"),
-            language=config.language,
-            duration=float(reply.get("audio_duration") or 0.0),
-        )
         transcript = to_transcript(
-            payload=client.sentences(transcript_id=transcript_id), meta=meta
+            payload=client.sentences(transcript_id=transcript_id),
+            meta=_meta(reply=reply, audio_path=audio_path, config=config),
         )
     finally:
         _delete_quietly(client=client, transcript_id=transcript_id)

@@ -64,6 +64,15 @@ def render_corrections_report(
     lines = [
         *_header(result, model, suggestions=len(suggestions), removed=len(removed)),
         *_served_by_line(served_by),
+        *_sections(result=result, suggestions=suggestions, removed=removed),
+    ]
+    return "\n".join(lines)
+
+
+def _sections(
+    result: CorrectionResult, suggestions: list[RejectedEdit], removed: list[Segment]
+) -> list[str]:
+    return [
         *_section(
             "Correzioni applicate",
             [
@@ -90,4 +99,3 @@ def render_corrections_report(
             [f"- [{format_timestamp(s.start)}] {s.text}" for s in removed],
         ),
     ]
-    return "\n".join(lines)

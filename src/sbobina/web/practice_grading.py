@@ -1,5 +1,5 @@
 import logging
-from contextlib import nullcontext
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, replace
 from typing import Literal
 
@@ -47,6 +47,13 @@ class PracticeServices:
     guard_whole_client: bool = True
 
 
+def _judge_guard(services: PracticeServices) -> AbstractContextManager[None]:
+    """The GPU guard for the whole judge call (local), or none (api: link-level)."""
+    if services.guard_whole_client:
+        return services.arbiter.chat_turn()
+    return nullcontext()
+
+
 def grade_answer(
     attempt: PracticeAttempt,
     answer: OpenAnswer | OralAnswer,
@@ -59,11 +66,8 @@ def grade_answer(
         format=attempt.format,
         answer=answer.text,
     )
-    guard = (
-        services.arbiter.chat_turn() if services.guard_whole_client else nullcontext()
-    )
     try:
-        with guard:
+        with _judge_guard(services=services):
             result = grade(
                 request=request,
                 chat=services.chat,
