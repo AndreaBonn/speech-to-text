@@ -390,3 +390,28 @@ def test_list_models_does_not_raise_on_200() -> None:
         timeout_s=5,
         transport=httpx.MockTransport(handler),
     )
+
+
+@pytest.mark.parametrize(
+    ("provider_name", "expected"),
+    [("gemini", "minimal"), ("openai", None), ("groq", None)],
+)
+def test_make_openai_compat_client_limits_reasoning_only_for_gemini(
+    provider_name: str, expected: str | None
+) -> None:
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(200, json=_ok_body())
+
+    client = make_openai_compat_client(
+        profile=PROFILES[provider_name],
+        api_key=SENTINEL_KEY,
+        timeout_s=5,
+        transport=httpx.MockTransport(handler),
+    )
+
+    client(_request())
+
+    assert json.loads(captured[0].content).get("reasoning_effort") == expected

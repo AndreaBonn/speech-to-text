@@ -46,17 +46,24 @@ class ProviderProfile:
     base_url : str
         API root, without a trailing slash.
     token_param : str
-        Request field for the output-token limit: UNVERIFIED for Groq and
-        Gemini (adr.md), confirmed for OpenAI.
+        Request field for the output-token limit. Verified for OpenAI and
+        Groq (``max_tokens`` is deprecated there). Gemini gets the standard
+        ``max_tokens``: its compatibility page does not list the field
+        (UNVERIFIED, adr.md); a rejection falls back like a schema 400.
     send_temperature : bool
         Whether ``temperature: 0`` is sent. False for OpenAI: its reasoning
         models reject the field with a 400.
+    reasoning_effort : str | None
+        Sent when set. Gemini 3 cannot turn thinking off and its thoughts
+        count against the output budget, so ``"minimal"`` keeps the T036
+        budgets usable; the docs list it for every current Gemini model.
     """
 
     name: str
     base_url: str
     token_param: str
     send_temperature: bool
+    reasoning_effort: str | None = None
 
 
 PROFILES: dict[str, ProviderProfile] = {
@@ -69,14 +76,15 @@ PROFILES: dict[str, ProviderProfile] = {
     "groq": ProviderProfile(
         name="groq",
         base_url="https://api.groq.com/openai/v1",
-        token_param="max_completion_tokens",  # UNVERIFIED (adr.md)
+        token_param="max_completion_tokens",
         send_temperature=True,
     ),
     "gemini": ProviderProfile(
         name="gemini",
         base_url="https://generativelanguage.googleapis.com/v1beta/openai",
-        token_param="max_tokens",  # UNVERIFIED (adr.md)
+        token_param="max_tokens",
         send_temperature=True,
+        reasoning_effort="minimal",
     ),
 }
 
@@ -139,6 +147,8 @@ def _build_body(
         body["temperature"] = 0
     if request.num_predict is not None:
         body[profile.token_param] = request.num_predict
+    if profile.reasoning_effort is not None:
+        body["reasoning_effort"] = profile.reasoning_effort
     return body
 
 

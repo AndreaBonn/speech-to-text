@@ -711,3 +711,15 @@ Scelte prese in implementazione, oltre al piano:
 - Le preferenze si leggono a ogni ingresso (`runtime_config.py`: CLI, richieste web, figli). Supervisor e figlio leggono il motore di trascrizione separatamente: se l'utente cambia motore nell'istante fra le due letture, il figlio può usare Whisper senza lease GPU. Finestra di millisecondi, accettata.
 - L'id remoto AssemblyAI non viene salvato nel job: la cancellazione avviene nel `finally` del figlio. Un crash del processo fra submit e cancellazione lascia la trascrizione sul servizio (parcheggiato).
 - Parcheggiati dalla security review di F1: S5 (TOCTOU fra controllo symlink e chmod di `credentials.json`, richiede lo stesso utente) e S6 (anello Ollama senza timeout, come il percorso locale preesistente).
+
+## Verifiche A8 (2026-10-06, context7)
+
+| Voce | Esito | Fonte |
+|---|---|---|
+| Groq limite in uscita | `max_completion_tokens`; `max_tokens` deprecato | https://console.groq.com/docs/api-reference |
+| Groq schema | `strict: false` è il default, disponibile su tutti i modelli con structured output; `strict: true` solo su alcuni | https://console.groq.com/docs/structured-outputs |
+| OpenAI | `max_completion_tokens`; `strict` facoltativo; `reasoning_effort` vale solo per i modelli di ragionamento, quindi non viene inviato | https://developers.openai.com/api/reference/resources/responses/methods/create |
+| Gemini ragionamento | `reasoning_effort` accetta `minimal`/`low`/`medium`/`high` per tutti i modelli elencati, `none` solo sui 2.5; sui modelli 3 il ragionamento non si spegne: l'adapter invia `minimal` | https://ai.google.dev/gemini-api/docs/openai |
+| Gemini schema | sottoinsieme di JSON Schema non elencato; schemi grandi o profondi possono essere rifiutati: coperto dal ripiego su `json_object` dopo un 400 | https://ai.google.dev/gemini-api/docs/generate-content/structured-output |
+
+Resta UNVERIFIED solo `max_tokens` sull'endpoint compatibile di Gemini (non elencato nella pagina); un rifiuto produce un 400 e segue lo stesso ripiego.
