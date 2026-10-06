@@ -432,6 +432,8 @@ Premesse che il piano non prevedeva, scoperte con generazioni reali e corrette n
   intero, anche meno di quelle chieste. Senza nessuna domanda completa il compito fallisce.
 - **Citazioni lunghe** (4e61247). Sulle lezioni il modello copia 50-70 parole: una citazione esatta
   oltre 40 parole viene accorciata alle prime 40, che restano un match contiguo esatto.
+  Nei materiali di studio no: su una lezione reale 0 citazioni oltre 40 parole (scarti: 13 non
+  trovate, 5 senza il termine, 4 troppo corte), quindi `study_citations` resta com'è.
 - **Titoli dell'OCR** (c09973e). `ocr-v2` apre 5 pagine su 10 con `\section*{...}`: il passo OCR
   salva il testo del titolo.
 

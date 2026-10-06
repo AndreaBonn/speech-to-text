@@ -167,7 +167,8 @@ corretta, risposte a metà giudicate parziali ≥ 86% (6 su 7).
 Verdetti identici nelle tre esecuzioni. Latenza p50 8,5 s, massimo 16,8 s. I due disaccordi sono
 risposte complete giudicate parziali (domanda orale sulla misura minima del TFR e domanda orale
 sulle caratteristiche dello spoglio): con più punti il giudice è più severo sulle risposte
-complete scritte con parole diverse dalla soluzione, mentre con v1 nessuna corretta era scesa.
+complete scritte con parole diverse dalla soluzione, mentre con le soluzioni a un punto le corrette
+erano giudicate corrette 30 su 30.
 
 `SPEDITO: iter 1/1 - compito-v4 con valutazione-v2: obiettivo di F41 raggiunto (10/10 contro 5/7),
 al costo di 2 risposte complete su 10 giudicate parziali.` BASIS: measured su etichette di Claude.
