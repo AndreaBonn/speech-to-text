@@ -16,7 +16,14 @@ from pydantic import (
 from sbobina.card_models import require_uuid4
 from sbobina.courses import normalize_course_label
 from sbobina.platform_info import RuntimeChoice
-from sbobina.settings import ComputeType, Device, Settings, settings
+from sbobina.runtime_config import runtime_settings
+from sbobina.settings import (
+    ComputeType,
+    Device,
+    Settings,
+    TranscriptionEngine,
+    settings,
+)
 
 
 class JobStatus(StrEnum):
@@ -90,6 +97,11 @@ class JobConfig(BaseModel):
     )
     correct: bool = False
     ollama_model: str = Field(default_factory=lambda: settings.ollama_model)
+    # Snapshot at enqueue (K5): the job says which engine heard the audio,
+    # and supervisor and child agree even if Settings change meanwhile.
+    transcription_engine: TranscriptionEngine = Field(
+        default_factory=lambda: runtime_settings(settings=settings).transcription_engine
+    )
     subject: str | None = Field(default=None, max_length=100)
 
     @field_validator("whisper_model")

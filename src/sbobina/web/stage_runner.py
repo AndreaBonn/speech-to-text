@@ -117,8 +117,9 @@ def _find_audio(job_dir: Path) -> Path:
 
 
 def _job_settings(record: JobRecord) -> Settings:
-    merged = {**settings.model_dump(), **record.config.model_dump()}
-    return runtime_settings(settings=Settings.model_validate(merged))
+    # Saved preferences first, then the job's own snapshot (engine, models).
+    base = runtime_settings(settings=settings)
+    return Settings.model_validate({**base.model_dump(), **record.config.model_dump()})
 
 
 def _prepare_stage(

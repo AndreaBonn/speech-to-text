@@ -7,6 +7,11 @@ from pydantic import ValidationError
 
 from sbobina.platform_info import RuntimeChoice
 from sbobina.settings import Settings
+from sbobina.user_preferences import (
+    UserPreferences,
+    preferences_path,
+    save_preferences,
+)
 from sbobina.web.job_models import (
     JobConfig,
     JobRecord,
@@ -172,3 +177,25 @@ def test_job_record_import_id_that_could_be_a_path_raises(import_id: str) -> Non
     # import_id is joined onto data/courses to find the import's course.
     with pytest.raises(ValidationError):
         JobRecord.model_validate({**IMPORT_RECORD, "import_id": import_id})
+
+
+def test_job_config_snapshots_the_saved_transcription_engine(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("SBOBINA_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        "sbobina.web.job_models.settings", Settings(config_dir=tmp_path)
+    )
+    save_preferences(
+        path=preferences_path(tmp_path),
+        preferences=UserPreferences(transcription_engine="assemblyai"),
+    )
+
+    assert JobConfig().transcription_engine == "assemblyai"
+
+
+def test_job_config_from_an_old_job_json_defaults_to_whisper() -> None:
+    old = JobConfig().model_dump()
+    old.pop("transcription_engine")
+
+    assert JobConfig.model_validate(old).transcription_engine == "whisper"
