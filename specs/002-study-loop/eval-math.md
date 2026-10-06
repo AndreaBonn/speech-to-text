@@ -233,10 +233,14 @@ singola generazione sposta 8 citazioni. Entrambe le esecuzioni restano sotto il 
 **T069a resta chiuso**. La causa dominante resta la riscrittura delle formule da parte del
 modello, non l'OCR.
 
-Il riassunto della pagina 4 è finito `FAILED`: tagliato dal limite di token in uscita a entrambi
-i tentativi (nella prima esecuzione era riuscito). I riassunti non hanno il recupero delle parti
-complete che hanno i compiti (F40) e lo studio. La prima volta questo caso aveva fatto cadere lo
-script con `KeyError`: era un errore introdotto in `d803e43`, corretto in `0cacd8f`.
+Il riassunto della pagina 4 è finito `FAILED` (nella prima esecuzione era riuscito). Non per il
+limite di token, come scritto in un primo momento: riprodotto con le risposte salvate
+(`data/eval/math-real/summary-p4-replies.json`), il modello copia nella citazione il testo
+`Il "miglior" stato stazionario` senza fare l'escape delle virgolette, e il JSON si rompe lì
+nella quarta sezione, identico a entrambi i tentativi. Le prime tre sezioni sono complete. La
+prima volta questo caso aveva fatto cadere lo script con `KeyError`: era un errore introdotto in
+`d803e43`, corretto in `0cacd8f`. Ora il riassunto tiene le sezioni complete, come i compiti
+(F40) e lo studio: su questa risposta 3 sezioni su 4.
 
 ## Non misurato
 
