@@ -173,14 +173,15 @@ def complete_questions(content: str) -> list[Any]:
 def _salvage(
     content: str, schema_model: type[BaseModel], wanted: int | None
 ) -> BaseModel | None:
-    """Keep the requested questions of an unreadable reply that holds them all.
+    """Keep the questions an unreadable reply wrote in full, up to the request.
 
-    Measured (F40): asked for 1 oral question, qwen wrote more and hit
-    num_predict inside the second, the same at every attempt. A reply missing
-    some requested question is still discarded.
+    Measured (F40): qwen writes longer than num_predict allows on dense
+    material and stops inside a question, the same at every attempt, so a
+    retry never helps. The complete questions are kept, even fewer than asked:
+    the page shows "2 su 3 richieste". A reply with none still fails.
     """
     items = complete_questions(content=content) if wanted else []
-    if not wanted or len(items) < wanted:
+    if not wanted or not items:
         return None
     try:
         return schema_model.model_validate({"domande": items[:wanted]})

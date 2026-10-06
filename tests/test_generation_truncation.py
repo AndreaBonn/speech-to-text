@@ -66,9 +66,26 @@ def test_generate_keeps_the_requested_questions_of_a_reply_cut_after_them() -> N
     assert len(chat.requests) == 1
 
 
-def test_generate_still_fails_when_the_cut_reply_lacks_requested_questions() -> None:
+def test_generate_keeps_fewer_questions_than_asked_from_a_cut_reply() -> None:
+    # Measured on "possesso" (3 open questions, 856 tokens): the cut fell in
+    # the third question with v3 and v4 alike, and the retry was identical.
+    request = GenerationRequest.model_validate({"format": "open", "count": 3})
+    chat = FakeChat(responses=[_cut_reply(complete=2)])
+
+    result = generate(
+        request=request,
+        passages=[_passage()],
+        chat=chat,
+        options=GenerationOptions(model="test"),
+    )
+
+    assert result.outcome is GenerationOutcome.DONE
+    assert len(result.questions) == 2
+
+
+def test_generate_still_fails_when_the_cut_reply_has_no_complete_question() -> None:
     request = GenerationRequest.model_validate({"format": "oral", "count": 3})
-    chat = FakeChat(responses=[_cut_reply(complete=1)])
+    chat = FakeChat(responses=[_cut_reply(complete=0)])
 
     result = generate(
         request=request,
