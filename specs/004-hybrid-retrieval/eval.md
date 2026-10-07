@@ -554,3 +554,43 @@ BASIS: measured per la ricerca, inferred per la causa nella fase di risposta.
 **Decisione dell'utente (2026-10-07, "D6"):** si resta su `qwen3-embedding:8b`; si accettano
 3-4 s di embedding della domanda (p95) quando il 9B sta generando. Il tetto di T032 (2,5 s) vale
 quindi solo col 9B fermo; a 9B occupato il riferimento è la misura sopra.
+
+## Prova reale su `data/` (T044, 2026-10-08)
+
+Condizioni: RTX 4060 8 GB senza altri processi GPU all'avvio (`/api/ps` vuoto, 15 MiB usati),
+`qwen3-embedding:8b` installato, `vectors.sqlite3` assente (indice da zero), `sbobina web` sulla
+porta 8765, campioni `nvidia-smi` ogni 2 s (100 campioni, 01:11:46-01:15:06). Per "lezione e PDF
+nuovi" si è usato un corso separato, "Prova T044", così il corso Diritto ha ricevuto solo il
+backfill: uno spezzone di 5 minuti di un audio già presente (ffmpeg, da 600 s) e il riassunto
+di Economia aziendale da `data/prove/`.
+
+| Passo | Ora | Esito |
+|---|---|---|
+| `sbobina indicizza-semantico --backfill` | prima dell'avvio (non registrato) | "1 corso in coda" (Diritto, mai indicizzato) |
+| Avvio di `sbobina web` | 01:11:44 | azione `embed` ripresa dal disco e avviata |
+| Lezione nuova accodata (corso "Prova T044") | 01:11:48 | `queued` dietro l'indicizzazione |
+| Chat su Diritto durante l'indicizzazione | 01:11:55 | `GPU_BUSY`, stage `embedding`, stima 57 s |
+| Indicizzazione Diritto finita | 01:12:23 | 97/97, 0 troncati |
+| Trascrizione della lezione nuova | 01:12:23-01:12:50 | partita 35 s dopo l'accodamento, alla fine dell'indicizzazione |
+| Indicizzazione automatica "Prova T044" | 01:12:52 | 3/3, senza comandi |
+| PDF caricato in "Prova T044" | 01:13:57 | estrazione `READY`, poi azione `embed` automatica |
+| Indicizzazione dopo il PDF | 01:14:33 | 85/85, 0 troncati |
+| Chat su Diritto a indice completo | dopo 01:14:33 | `DONE`, `retrieval_mode` denso, copertura 97/97, 24 s il turno intero |
+
+Tempi: Diritto 97 unità in 38 s dall'avvio del figlio (2,6 unità/s), di cui circa 15 s per caricare
+il modello sulla GPU (primo `/api/embed` alle 01:12:00); a modello caricato i tre batch sono
+durati 9-11 s ciascuno. "Prova T044" 85 unità in 36 s dal caricamento del PDF, estrazione
+compresa. `vectors.sqlite3`: 1,7 MB dopo Diritto, 3,1 MB dopo i due corsi (182 unità, 4096
+dimensioni float32).
+
+GPU: campioni con più di un processo GPU = 0 su 100. La sequenza osservata è Ollama
+(embedding, 5,1 GB) fino alle 01:12:20, nessun processo alle 01:12:21, il figlio di trascrizione
+(Whisper, 4,1 GB) dalle 01:12:23 alle 01:12:50, di nuovo Ollama dalle 01:12:52.
+
+Lettura: il lease GPU serializza indicizzazione e trascrizione come previsto; la chat durante
+l'indicizzazione risponde `GPU_BUSY` invece di contendere la VRAM; la copertura arriva al 100%
+su lezione e PDF nuovi senza comandi manuali. Il backfill da CLI serve un riavvio di `sbobina web`
+se è già aperto (le azioni accodate si riprendono all'avvio). BASIS: measured.
+
+Il corso "Prova T044" (lezione e PDF) e la chat di prova su Diritto restano in `data/`: si
+cancellano dall'interfaccia.
