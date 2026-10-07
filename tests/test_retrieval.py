@@ -5,12 +5,12 @@ from pathlib import Path
 import pytest
 
 from sbobina.document_passages import DocumentPassage
+from sbobina.rank_fusion import fuse_by_rank
 from sbobina.retrieval import (
     DocumentSource,
     LectureSource,
     RetrievalScope,
     RetrievedPassage,
-    fuse_by_rank,
     question_to_fts,
     retrieve,
 )

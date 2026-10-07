@@ -9,6 +9,7 @@ the gate.
 import re
 from dataclasses import dataclass
 
+from sbobina.rank_fusion import fuse_by_rank
 from sbobina.search_text import FINAL_VOWELS, MIN_STEM_LENGTH, MIN_WORD_LENGTH
 from sbobina.web.document_index import DocumentScope
 from sbobina.web.search_index import SearchIndex
@@ -19,7 +20,6 @@ WORD_RE = re.compile(r"\w+", re.UNICODE)
 # that a realistic budget (a few thousand words) is never starved by a source
 # that ranked worse on average, without scanning the whole course.
 CANDIDATE_LIMIT = 50
-RRF_K = 60
 
 ITALIAN_STOPWORDS = frozenset(
     {
@@ -226,28 +226,6 @@ def _ranked_document_passages(
         )
         for row in rows
     ]
-
-
-def fuse_by_rank(
-    rankings: list[list[tuple[float, RetrievedPassage]]],
-) -> list[RetrievedPassage]:
-    """Merge per-source rankings by reciprocal rank fusion.
-
-    bm25() scores of the lecture and document tables come from different
-    corpus statistics, so only positions are comparable across them.
-    See https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf (k = 60).
-    """
-    fused: dict[str, float] = {}
-    passages: dict[str, RetrievedPassage] = {}
-    for ranking in rankings:
-        ordered = sorted(ranking, key=lambda item: item[0])
-        for position, (_score, passage) in enumerate(ordered, start=1):
-            fused[passage.passage_id] = fused.get(passage.passage_id, 0.0) + 1 / (
-                RRF_K + position
-            )
-            passages[passage.passage_id] = passage
-    order = sorted(fused, key=lambda passage_id: -fused[passage_id])
-    return [passages[passage_id] for passage_id in order]
 
 
 def cut_to_budget(
