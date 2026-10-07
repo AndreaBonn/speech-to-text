@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+from datetime import UTC, datetime
 
 import pytest
 from embedding_fixtures import EmbeddingHarness, embedding_harness
@@ -132,3 +133,24 @@ def test_maybe_enqueue_embed_unexpected_error_is_logged_not_raised(
     _available(monkeypatch=monkeypatch)
     _enqueue(harness=harness)
     assert len(harness.supervisor._queue) == 1
+
+
+def test_unavailable_enqueue_preserves_last_successful_indexing(
+    embedding_harness: EmbeddingHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness = embedding_harness
+    _available(monkeypatch=monkeypatch)
+    _enqueue(harness=harness)
+    timestamp = datetime(2026, 10, 8, tzinfo=UTC)
+    record = replace(
+        harness.record(), status=EmbeddingStatus.DONE, last_indexed_at=timestamp
+    )
+    save_embed(course_dir=harness.course_dir, record=record)
+
+    def unavailable(**kwargs: object) -> ModelStatus:
+        raise EmbeddingUnavailableError(reason="unreachable")
+
+    monkeypatch.setattr(ollama_embed, "model_status", unavailable)
+    _enqueue(harness=harness)
+    assert harness.record().status is EmbeddingStatus.FAILED
+    assert harness.record().last_indexed_at == timestamp

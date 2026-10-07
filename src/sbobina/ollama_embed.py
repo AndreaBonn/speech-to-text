@@ -37,6 +37,7 @@ class EmbeddedText:
 class ModelStatus:
     digest: str
     dimensions: int
+    model: str | None = None
 
 
 class EmbeddingClient(Protocol):
@@ -209,7 +210,9 @@ def _read_model_status(
         raise EmbeddingUnavailableError(reason=MODEL_MISSING)
     if not entry.digest:
         raise EmbeddingUnavailableError(reason=BAD_RESPONSE)
-    return ModelStatus(digest=entry.digest, dimensions=_dimensions(info=info.modelinfo))
+    return ModelStatus(
+        digest=entry.digest, dimensions=_dimensions(info=info.modelinfo), model=model
+    )
 
 
 def _dimensions(info: Mapping[str, Any] | None) -> int:
@@ -225,3 +228,16 @@ def validate_dimensions(
     """Reject vectors that differ from dimensions recorded in model_status."""
     if any(len(item.vector) != expected_dimensions for item in embedded):
         raise EmbeddingUnavailableError(reason=BAD_RESPONSE)
+
+
+def list_embedding_models(*, host: str, timeout_s: float) -> list[str]:
+    try:
+        client = Client(host=host, timeout=timeout_s)
+        names = [entry.model for entry in client.list().models if entry.model]
+        return [
+            name
+            for name in names
+            if "embedding" in (client.show(model=name).capabilities or [])
+        ]
+    except (*BOUNDARY_ERRORS, ValueError) as error:
+        raise _unavailable(error=error) from error

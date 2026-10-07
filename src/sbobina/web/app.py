@@ -33,6 +33,7 @@ from sbobina.web.api_practice_grading import router as practice_grading_router
 from sbobina.web.api_practice_mistakes import router as practice_mistakes_router
 from sbobina.web.api_review import router as review_router
 from sbobina.web.api_search import router as search_router
+from sbobina.web.api_semantic_index import router as semantic_index_router
 from sbobina.web.api_settings import router as settings_router
 from sbobina.web.api_study import router as study_router
 from sbobina.web.api_system import create_system_router
@@ -217,7 +218,7 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     _add_exception_handlers(app=app)
     app.include_router(create_system_router(settings=settings))
     app.include_router(create_models_router(settings=settings))
-    app.include_router(settings_router)
+    _register_settings_routes(app=app)
     app.include_router(jobs_router)
     app.include_router(package_import_router)
     app.include_router(courses_router)
@@ -243,6 +244,11 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
     for page_router in (pages_router, practice_pages_router, generation_pages_router):
         app.include_router(page_router)
     _mount_static(app=app)
+
+
+def _register_settings_routes(app: FastAPI) -> None:
+    app.include_router(settings_router)
+    app.include_router(semantic_index_router)
 
 
 def _mount_static(app: FastAPI) -> None:

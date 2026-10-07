@@ -1,5 +1,6 @@
 import json
 from dataclasses import asdict, dataclass, replace
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 
@@ -22,6 +23,7 @@ class EmbeddingRun:
     processed: int
     total: int
     error: str | None
+    last_indexed_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if (self.error is not None) != (self.status is EmbeddingStatus.FAILED):
@@ -33,7 +35,9 @@ class EmbeddingRun:
 def save_embed(course_dir: Path, record: EmbeddingRun) -> None:
     course_dir.mkdir(parents=True, exist_ok=True)
     atomic_write_pair(
-        contents={course_dir / EMBEDDING_FILENAME: json.dumps(asdict(record))}
+        contents={
+            course_dir / EMBEDDING_FILENAME: json.dumps(asdict(record), default=str)
+        }
     )
 
 
@@ -47,12 +51,20 @@ def load_embed(course_dir: Path) -> EmbeddingRun | None:
         processed=int(raw["processed"]),
         total=int(raw["total"]),
         error=None if raw["error"] is None else str(raw["error"]),
+        last_indexed_at=datetime.fromisoformat(raw["last_indexed_at"])
+        if raw.get("last_indexed_at")
+        else None,
     )
 
 
 def create_embed(course_dir: Path) -> EmbeddingRun:
+    previous = load_embed(course_dir=course_dir)
     record = EmbeddingRun(
-        status=EmbeddingStatus.QUEUED, processed=0, total=0, error=None
+        status=EmbeddingStatus.QUEUED,
+        processed=0,
+        total=0,
+        error=None,
+        last_indexed_at=previous.last_indexed_at if previous else None,
     )
     save_embed(course_dir=course_dir, record=record)
     return record
@@ -64,5 +76,13 @@ def finish_embed(
     record = load_embed(course_dir=course_dir)
     if record is not None and record.status == EmbeddingStatus.RUNNING:
         save_embed(
-            course_dir=course_dir, record=replace(record, status=status, error=error)
+            course_dir=course_dir,
+            record=replace(
+                record,
+                status=status,
+                error=error,
+                last_indexed_at=datetime.now(tz=UTC)
+                if status is EmbeddingStatus.DONE
+                else record.last_indexed_at,
+            ),
         )

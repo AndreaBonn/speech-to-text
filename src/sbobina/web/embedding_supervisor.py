@@ -4,12 +4,13 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from sbobina import ollama_embed
 from sbobina.course_registry import find_by_key, get_or_create
 from sbobina.courses import MAX_COURSE_LABEL_LENGTH, course_key, effective_course
 from sbobina.ollama_embed import EmbeddingUnavailableError
+from sbobina.runtime_config import runtime_settings
 from sbobina.settings import settings
 from sbobina.web import gpu_release
+from sbobina.web.embedding_availability import embedding_unavailable_reason
 from sbobina.web.embedding_runner import estimate_embed_seconds
 from sbobina.web.embedding_store import (
     EmbeddingRun,
@@ -32,8 +33,7 @@ logger = logging.getLogger(__name__)
 EMBED_COMMAND = "embed"
 EMBEDDING_STAGE = "embedding"
 CHILD_LOG_NAME = "embedding_child.log"
-# Enqueue probes run on serial queue workers: a hung Ollama must not stall them
-# for the full embedding timeout. A refused local connection fails at once anyway.
+# Queue workers must not wait for the full document embedding timeout.
 ENQUEUE_PROBE_TIMEOUT_S = 2.0
 
 
@@ -81,19 +81,6 @@ def _lecture_course_id(store: JobStore, record: JobRecord) -> str | None:
     ).id
 
 
-def _embedding_unavailable_reason() -> str | None:
-    try:
-        ollama_embed.model_status(
-            host=settings.ollama_host,
-            model=settings.embedding_model,
-            timeout_s=ENQUEUE_PROBE_TIMEOUT_S,
-        )
-    except EmbeddingUnavailableError as error:
-        logger.warning("Automatic embedding unavailable: %s", error.reason)
-        return error.reason
-    return None
-
-
 def _enqueue_checked_embed(
     supervisor: "Supervisor", course_id: str, reason: str | None
 ) -> None:
@@ -108,7 +95,11 @@ def _enqueue_checked_embed(
         save_embed(
             course_dir=directory,
             record=EmbeddingRun(
-                status=EmbeddingStatus.FAILED, processed=0, total=0, error=reason
+                status=EmbeddingStatus.FAILED,
+                processed=0,
+                total=0,
+                error=reason,
+                last_indexed_at=record.last_indexed_at if record else None,
             ),
         )
         return
@@ -147,7 +138,8 @@ def _enqueue_after_change(
     record: JobRecord | None,
     item: WorkItem | None,
 ) -> None:
-    if not settings.semantic_search:
+    running = runtime_settings(settings=settings)
+    if not running.semantic_search:
         return
     if item is not None:
         record = supervisor._store.get(job_id=item.job_id)
@@ -157,7 +149,9 @@ def _enqueue_after_change(
         course_id = _lecture_course_id(store=supervisor._store, record=record)
     if course_id is None:
         return
-    reason = _embedding_unavailable_reason()
+    reason = embedding_unavailable_reason(
+        settings=running, timeout_s=ENQUEUE_PROBE_TIMEOUT_S
+    )
     with supervisor._condition:
         _enqueue_checked_embed(
             supervisor=supervisor, course_id=course_id, reason=reason

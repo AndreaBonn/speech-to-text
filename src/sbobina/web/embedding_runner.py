@@ -7,7 +7,8 @@ from pathlib import Path
 from ollama import Client
 
 from sbobina.ollama_embed import embed_texts, model_status
-from sbobina.settings import settings
+from sbobina.runtime_config import runtime_settings
+from sbobina.settings import Settings, settings
 from sbobina.web import dense_factory
 from sbobina.web.embedding_store import (
     EmbeddingStatus,
@@ -67,22 +68,22 @@ def run_embed(course_dir: Path, embed: Callable[..., EmbeddingProgress]) -> None
 
 def estimate_embed_seconds(course_dir: Path) -> float:
     data_dir = course_dir.parent.parent
+    running = runtime_settings(settings=settings)
     status = model_status(
-        host=settings.ollama_host,
-        model=settings.embedding_model,
-        timeout_s=settings.embedding_timeout_s,
+        host=running.ollama_host,
+        model=running.embedding_model,
+        timeout_s=running.embedding_timeout_s,
     )
     missing = count_missing_units(
         store=JobStore(data_dir=data_dir),
         vectors=dense_factory.vector_store_for_process(data_dir=data_dir),
-        model_key=embedding_model_key(model=settings.embedding_model, status=status),
+        model_key=embedding_model_key(model=running.embedding_model, status=status),
         course_key=_course_key(course_dir=course_dir),
     )
     return missing / EMBEDDING_UNITS_PER_SECOND
 
 
-def run_embed_stage(course_dir: Path) -> None:
-    data_dir = course_dir.parent.parent
+def _embedding_config(settings: Settings) -> EmbeddingConfig:
     client = Client(
         host=settings.ollama_host,
         timeout=max(settings.embedding_timeout_s, EMBEDDING_BATCH_TIMEOUT_S),
@@ -92,18 +93,24 @@ def run_embed_stage(course_dir: Path) -> None:
         model=settings.embedding_model,
         timeout_s=settings.embedding_timeout_s,
     )
+    return EmbeddingConfig(
+        model=settings.embedding_model,
+        status=status,
+        embedder=lambda texts: embed_texts(
+            client=client,
+            model=settings.embedding_model,
+            texts=texts,
+            mode="document",
+        ),
+    )
+
+
+def run_embed_stage(course_dir: Path) -> None:
+    data_dir = course_dir.parent.parent
+    embedding = _embedding_config(settings=runtime_settings(settings=settings))
     context = CourseEmbedding(
         store=JobStore(data_dir=data_dir),
         vectors=dense_factory.vector_store_for_process(data_dir=data_dir),
-        embedding=EmbeddingConfig(
-            model=settings.embedding_model,
-            status=status,
-            embedder=lambda texts: embed_texts(
-                client=client,
-                model=settings.embedding_model,
-                texts=texts,
-                mode="document",
-            ),
-        ),
+        embedding=embedding,
     )
     run_embed(course_dir=course_dir, embed=partial(embed_course, context=context))

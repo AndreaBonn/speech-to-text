@@ -10,7 +10,7 @@ from collections.abc import Callable
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Request, Response, status
-from pydantic import BaseModel, Field, JsonValue
+from pydantic import BaseModel, Field, JsonValue, StringConstraints
 
 from sbobina import key_check, settings_service
 from sbobina.config_dir import ConfigDirUnsafeError
@@ -38,6 +38,13 @@ class TranscriptionSettingsBody(BaseModel):
 
 class KeyBody(BaseModel):
     key: str = Field(max_length=MAX_KEY_LENGTH)
+
+
+class SemanticIndexSettingsBody(BaseModel):
+    embedding_model: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1)
+    ]
+    semantic_search: bool
 
 
 def _settings(request: Request) -> Settings:
@@ -124,6 +131,17 @@ def put_key(
     except InvalidKeyError as error:
         raise AppValidationError(message=str(error)) from error
     return {"data": view}
+
+
+@router.put("/semantic-index")
+def put_semantic_index(
+    body: SemanticIndexSettingsBody, settings: SettingsDep
+) -> dict[str, JsonValue]:
+    update = settings_service.SemanticIndexUpdate(**body.model_dump())
+    _save(
+        lambda: settings_service.update_semantic_index(settings=settings, update=update)
+    )
+    return {"data": settings_service.settings_view(settings=settings)}
 
 
 @router.delete("/keys/{provider}", status_code=status.HTTP_204_NO_CONTENT)

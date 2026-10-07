@@ -175,6 +175,7 @@ def test_model_status_selects_requested_digest_and_family_dimensions(
     )
     status = model_status(host=HOST, model=MODEL, timeout_s=TIMEOUT_S)
     assert (status.digest, status.dimensions) == ("abc", 4096)
+    assert status.model == MODEL
     assert set(client.probes) == {"list", f"show:{MODEL}"}
 
 

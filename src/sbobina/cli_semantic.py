@@ -8,6 +8,7 @@ from ollama import Client
 
 from sbobina.course_registry import find_by_key, iter_courses
 from sbobina.ollama_embed import EmbeddingUnavailableError, embed_texts, model_status
+from sbobina.runtime_config import runtime_settings
 from sbobina.settings import settings
 from sbobina.web.job_store import JobStore
 from sbobina.web.vector_reconcile import (
@@ -56,13 +57,14 @@ def _course_keys(args: argparse.Namespace) -> list[str]:
 
 
 def _prepare_embedding() -> EmbeddingConfig:
+    running = runtime_settings(settings=settings)
     status = model_status(
-        host=settings.ollama_host,
-        model=settings.embedding_model,
-        timeout_s=settings.embedding_timeout_s,
+        host=running.ollama_host,
+        model=running.embedding_model,
+        timeout_s=running.embedding_timeout_s,
     )
-    client = Client(host=settings.ollama_host)
-    model = settings.embedding_model
+    client = Client(host=running.ollama_host)
+    model = running.embedding_model
     return EmbeddingConfig(
         model=model,
         status=status,
@@ -104,7 +106,8 @@ def cmd_indicizza_semantico(
     args: argparse.Namespace, embedding: EmbeddingConfig | None = None
 ) -> int:
     """Index selected courses; injected embedding bypasses Ollama preparation."""
-    model = embedding.model if embedding is not None else settings.embedding_model
+    running = runtime_settings(settings=settings)
+    model = embedding.model if embedding is not None else running.embedding_model
     try:
         if getattr(args, "backfill", False):
             return _queue_backfill(confirm_model_change=args.conferma_cambio_modello)
@@ -130,10 +133,11 @@ def _queue_backfill(*, confirm_model_change: bool) -> int:
     # Lazy: the queue modules pull in the web layer, which other commands skip.
     from sbobina.web.embedding_backfill import enqueue_backfill
 
+    running = runtime_settings(settings=settings)
     status = model_status(
-        host=settings.ollama_host,
-        model=settings.embedding_model,
-        timeout_s=settings.embedding_timeout_s,
+        host=running.ollama_host,
+        model=running.embedding_model,
+        timeout_s=running.embedding_timeout_s,
     )
     vectors = VectorStore(path=settings.data_dir / "vectors.sqlite3")
     try:
@@ -145,13 +149,18 @@ def _queue_backfill(*, confirm_model_change: bool) -> int:
         )
     finally:
         vectors.close()
-    if result.model_change_pending:
+    return _report_backfill(
+        pending=result.model_change_pending, count=len(result.items)
+    )
+
+
+def _report_backfill(*, pending: bool, count: int) -> int:
+    if pending:
         logger.error(
             "Il modello di embedding è cambiato e l'indice va ricostruito: "
             "rilancia con --conferma-cambio-modello"
         )
         return MODEL_CHANGE_EXIT
-    count = len(result.items)
     noun = "corso" if count == 1 else "corsi"
     print(
         f"{count} {noun} in coda: l'indicizzazione parte all'avvio di sbobina web "

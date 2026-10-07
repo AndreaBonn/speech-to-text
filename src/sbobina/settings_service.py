@@ -54,6 +54,12 @@ class TranscriptionUpdate:
     cloud_ack_audio: bool
 
 
+@dataclass(frozen=True, kw_only=True)
+class SemanticIndexUpdate:
+    embedding_model: str
+    semantic_search: bool
+
+
 def _paths(settings: Settings) -> tuple[Path, CredentialStore]:
     config_dir = resolve_config_dir(settings=settings)
     return preferences_path(config_dir), CredentialStore(config_dir=config_dir)
@@ -91,6 +97,8 @@ def _unsafe_view(settings: Settings) -> dict[str, JsonValue]:
         llm_chain=settings.llm_chain,
         llm_ollama_fallback=settings.llm_ollama_fallback,
         transcription_engine=settings.transcription_engine,
+        embedding_model=settings.embedding_model,
+        semantic_search=settings.semantic_search,
     )
     keys: dict[str, JsonValue] = {}
     for provider, entry in masked_view(settings=settings, store=None).items():
@@ -175,6 +183,16 @@ def update_transcription(settings: Settings, update: TranscriptionUpdate) -> Non
 
 def is_known_provider(provider: str) -> bool:
     return provider in SECRET_PROVIDERS
+
+
+def update_semantic_index(settings: Settings, update: SemanticIndexUpdate) -> None:
+    _save(
+        settings=settings,
+        changes={
+            "embedding_model": update.embedding_model,
+            "semantic_search": update.semantic_search,
+        },
+    )
 
 
 def set_key(settings: Settings, provider: str, key: str) -> dict[str, JsonValue]:

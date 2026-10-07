@@ -7,8 +7,9 @@ from typing import cast
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from ollama_embed_fixtures import FakeClient
 
-from sbobina import key_check
+from sbobina import key_check, ollama_embed
 from sbobina.settings import Settings
 from sbobina.web.app import create_app
 
@@ -170,7 +171,10 @@ def test_test_key_reports_the_check_result(
     assert seen == [SENTINEL_KEY]
 
 
-def test_no_get_route_ever_returns_a_saved_key(client: TestClient) -> None:
+def test_no_get_route_ever_returns_a_saved_key(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(ollama_embed, "Client", lambda **kwargs: FakeClient())
     client.put(f"{SETTINGS_URL}/keys/groq", json={"key": SENTINEL_KEY})
     spec = cast(FastAPI, client.app).openapi()
     paths = [

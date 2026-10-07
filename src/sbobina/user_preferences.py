@@ -33,6 +33,8 @@ _ENV_LOCKABLE_FIELDS = (
     "llm_chain",
     "llm_ollama_fallback",
     "transcription_engine",
+    "embedding_model",
+    "semantic_search",
 )
 
 
@@ -45,6 +47,8 @@ class UserPreferences(BaseModel):
     llm_chain: list[LlmChainEntry] = Field(default_factory=list)
     llm_ollama_fallback: bool = True
     transcription_engine: TranscriptionEngine = "whisper"
+    embedding_model: str = "qwen3-embedding:8b"
+    semantic_search: bool = True
     cloud_ack: datetime | None = None
     cloud_ack_audio: datetime | None = None
 
@@ -122,6 +126,8 @@ def effective_settings(settings: Settings, config_dir: Path) -> Settings:
             "llm_chain": preferences.llm_chain,
             "llm_ollama_fallback": preferences.llm_ollama_fallback,
             "transcription_engine": preferences.transcription_engine,
+            "embedding_model": preferences.embedding_model,
+            "semantic_search": preferences.semantic_search,
         }
     )
 
