@@ -10,14 +10,16 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-from sbobina.hybrid_eval import (
+from sbobina.embedding_units import (
     DocUnit,
     EvalUnit,
     LectureUnit,
-    RankedUnits,
     aggregate_lecture_hits_to_windows,
     build_lecture_units,
     segment_positions,
+)
+from sbobina.hybrid_eval import (
+    RankedUnits,
 )
 from sbobina.models import load_transcript
 from sbobina.retrieval import RetrievalScope, scoped_job_ids
@@ -89,7 +91,7 @@ def lecture_segments_and_ends(
 
     Mirrors search_text.passages_from_transcript's filter so position i in
     both the returned Passage list and the end-time list refers to the same
-    segment; Passage itself has no end field (see hybrid_eval.build_lecture_units).
+    segment; Passage itself has no end field (see embedding_units.build_lecture_units).
     """
     directory = store.jobs_dir / job_id
     for variant in PREFERRED_VARIANTS:

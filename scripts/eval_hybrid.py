@@ -7,6 +7,8 @@ Usage::
         --out out/dense.json
     uv run python scripts/eval_hybrid.py --system hybrid --model qwen3-embedding:0.6b \\
         --query-instruction on --out out/hybrid.json
+    uv run python scripts/eval_hybrid.py --system production --index --k 50 \\
+        --out out/production.json
     uv run python scripts/eval_hybrid.py --pool out/bm25.json out/dense.json \\
         out/hybrid.json --out out/pool.json
 
@@ -16,6 +18,8 @@ corpus once per model, cached on disk by content hash under
 second variant of the same model, never re-embeds unchanged text), and embed
 the query fresh every call with ``options.num_gpu=0`` (plan.md Dis.5 option
 A: the query runs on CPU so the resident chat model is never swapped out).
+``production`` uses the application's runtime and optional corpus-local vector
+indexing; it does not read or populate this harness's embedding cache.
 All logic that does not need the index, the job store or Ollama lives in
 ``sbobina.hybrid_eval`` (pure, unit-tested); the course corpus and Ollama/
 cache/ranking I/O live in ``eval_hybrid_corpus.py`` and ``eval_hybrid_io.py``
@@ -55,11 +59,15 @@ from eval_hybrid_io import (
     rank_question,
     save_cache,
 )
+from eval_hybrid_production import print_modes
+from eval_hybrid_production import rank_gold as rank_production_gold
 from ollama import Client
 
 from sbobina.embedding_prompts import apply_query_instruction
-from sbobina.hybrid_eval import (
+from sbobina.embedding_units import (
     EvalUnit,
+)
+from sbobina.hybrid_eval import (
     cache_file_name,
     pool_top_n,
     pooling_unit,
@@ -84,7 +92,10 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--gold", type=Path, default=DEFAULT_GOLD)
-    parser.add_argument("--system", choices=["bm25", "dense", "hybrid"])
+    parser.add_argument("--system", choices=["bm25", "dense", "hybrid", "production"])
+    parser.add_argument(
+        "--index", action="store_true", help="Indicizza il corpus per production"
+    )
     parser.add_argument("--model")
     parser.add_argument("--query-instruction", choices=["on", "off"], default="off")
     parser.add_argument("--k", type=int, default=10)
@@ -96,8 +107,10 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     if args.pool is None:
         if args.system is None:
             parser.error("--system e' richiesto senza --pool")
-        if args.system != "bm25" and not args.model:
+        if args.system in {"dense", "hybrid"} and not args.model:
             parser.error(f"--model e' richiesto per --system {args.system}")
+    if args.index and (args.system != "production" or args.pool is not None):
+        parser.error("--index richiede --system production senza --pool")
     return args
 
 
@@ -229,6 +242,8 @@ def write_records(args: argparse.Namespace, records: list[dict[str, Any]]) -> No
 
 
 def run_system(args: argparse.Namespace) -> int:
+    if args.system == "production":
+        return run_production(args=args)
     corpus_embed, query_embed = build_embedders(args=args)
     cache_path = (
         DEFAULT_CACHE_DIR / cache_file_name(model=args.model) if args.model else None
@@ -249,6 +264,22 @@ def run_system(args: argparse.Namespace) -> int:
         save_cache(path=cache_path, cache=cache)
     write_records(args=args, records=records)
     print_summary(records=records)
+    return 0
+
+
+def run_production(args: argparse.Namespace) -> int:
+    gold = load_gold(path=args.gold)
+    model, records = rank_production_gold(args=args, gold=gold)
+    if args.judgments is not None:
+        records = apply_judgments(
+            records=records,
+            gold_by_id={item["id"]: item for item in gold},
+            votes=load_verdicts(judging_dir=args.judgments),
+        )
+    output_args = argparse.Namespace(**{**vars(args), "model": model})
+    write_records(args=output_args, records=records)
+    print_summary(records=records)
+    print_modes(records=records)
     return 0
 
 

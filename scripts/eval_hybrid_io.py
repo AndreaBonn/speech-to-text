@@ -20,10 +20,12 @@ from eval_hybrid_corpus import CourseContext, doc_bm25, lecture_bm25
 from ollama import Client, ResponseError
 
 from sbobina.embedding_prompts import format_document
-from sbobina.hybrid_eval import (
+from sbobina.embedding_units import (
     EvalUnit,
-    RankedUnits,
     content_hash,
+)
+from sbobina.hybrid_eval import (
+    RankedUnits,
     dense_candidates,
     fuse_rankings,
     gold_ref,

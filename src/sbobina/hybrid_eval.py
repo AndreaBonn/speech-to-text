@@ -15,137 +15,55 @@ window containing it before the lists are fused by passage_id. This lets
 fuse_by_rank (production) merge BM25 and dense lists unchanged.
 """
 
-import hashlib
 import random
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 
+from sbobina.dense_math import dense_scores
 from sbobina.embedding_prompts import format_document
-from sbobina.lecture_windows import partition_lecture_segments
+from sbobina.embedding_units import (
+    DocUnit,
+    EvalUnit,
+    LectureUnit,
+    aggregate_lecture_hits_to_windows,
+    build_lecture_units,
+    content_hash,
+    segment_positions,
+)
 from sbobina.rank_fusion import fuse_by_rank
 from sbobina.retrieval_metrics import DocumentRef, LectureRef, PassageRef
-from sbobina.search_text import Passage
+
+__all__ = [
+    "DocUnit",
+    "EvalUnit",
+    "LectureUnit",
+    "RankedUnits",
+    "aggregate_lecture_hits_to_windows",
+    "build_lecture_units",
+    "cache_file_name",
+    "content_hash",
+    "dense_candidates",
+    "dense_scores",
+    "document_ref",
+    "fuse_rankings",
+    "gold_ref",
+    "lecture_ref",
+    "lecture_window_ref",
+    "pool_top_n",
+    "pooling_unit",
+    "ref_to_dict",
+    "safe_model_name",
+    "score_lookup",
+    "segment_positions",
+]
 
 PROMPT_PROBE = "{text}"
 PROMPT_TAG_LENGTH = 8
 
 
-@dataclass(frozen=True)
-class DocUnit:
-    passage_id: str
-    text: str
-    ref: DocumentRef
-
-
-@dataclass(frozen=True)
-class LectureUnit:
-    passage_id: str
-    text: str
-    ref: LectureRef
-
-
-EvalUnit = DocUnit | LectureUnit
 RankedUnits = Sequence[tuple[float, EvalUnit]]
-
-
-def content_hash(text: str) -> str:
-    """Stable cache key for one unit's text, independent of its passage_id."""
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def segment_positions(segments: Sequence[Passage]) -> dict[int, int]:
-    """Map each Passage.segment_index to its position in `segments`.
-
-    passages_from_transcript drops empty-text segments, so segment_index (the
-    original transcript position) and the list position diverge once a gap
-    happened upstream: this is the join key a raw BM25 hit needs to find the
-    window that contains it.
-    """
-    return {
-        passage.segment_index: position for position, passage in enumerate(segments)
-    }
-
-
-def build_lecture_units(
-    *,
-    job_id: str,
-    segments: Sequence[Passage],
-    segment_ends: Sequence[float],
-    window_words: int,
-) -> tuple[list[tuple[int, int]], list[LectureUnit]]:
-    """Whole-transcript ~window_words windows: the lecture candidate universe.
-
-    Reuses production's partition_lecture_segments. Passage has no end field,
-    so segment_ends[i] must come from the same filtered pass as `segments`.
-    """
-    spans = partition_lecture_segments(
-        segments=list(segments), window_words=window_words
-    )
-    units = [
-        LectureUnit(
-            passage_id=f"L{job_id}-W{position}",
-            text=" ".join(segment.text for segment in segments[first : last + 1]),
-            ref=LectureRef(
-                job_id=job_id,
-                start_s=segments[first].start,
-                end_s=segment_ends[last],
-            ),
-        )
-        for position, (first, last) in enumerate(spans)
-    ]
-    return spans, units
-
-
-def _window_containing(
-    *, spans: Sequence[tuple[int, int]], position: int
-) -> int | None:
-    for index, (first, last) in enumerate(spans):
-        if first <= position <= last:
-            return index
-    return None
-
-
-def aggregate_lecture_hits_to_windows(
-    *,
-    hits: Sequence[tuple[float, int]],
-    segment_positions: Mapping[int, int],
-    spans: Sequence[tuple[int, int]],
-    units: Sequence[LectureUnit],
-) -> list[tuple[float, LectureUnit]]:
-    """Project raw-segment BM25 hits onto the window units they fall inside.
-
-    A window hit by more than one matched segment keeps the best (lowest,
-    ascending-better like bm25()) score. A hit whose segment_index has no
-    known position, or whose position falls in no span, is dropped: both are
-    data the eval harness could not resolve, not a candidate.
-    """
-    best: dict[int, float] = {}
-    for score, segment_index in hits:
-        position = segment_positions.get(segment_index)
-        if position is None:
-            continue
-        window_index = _window_containing(spans=spans, position=position)
-        if window_index is None:
-            continue
-        if window_index not in best or score < best[window_index]:
-            best[window_index] = score
-    return [(score, units[window_index]) for window_index, score in best.items()]
-
-
-def dense_scores(
-    *, query_vector: Sequence[float], unit_vectors: np.ndarray
-) -> np.ndarray:
-    """Cosine similarity of query_vector against each row of unit_vectors.
-
-    Ollama embeddings are L2-normalized (eval.md § Verifiche su Ollama), so
-    cosine reduces to a dot product: no renormalization here.
-    """
-    if unit_vectors.shape[0] == 0:
-        return np.zeros(0)
-    return unit_vectors @ np.asarray(query_vector, dtype=np.float64)
 
 
 def fuse_rankings(*, rankings: Sequence[RankedUnits]) -> list[EvalUnit]:
@@ -209,6 +127,35 @@ def ref_to_dict(ref: PassageRef) -> dict[str, Any]:
         "start_s": ref.start_s,
         "end_s": ref.end_s,
     }
+
+
+def lecture_window_ref(
+    *,
+    segment_index: int,
+    positions: Mapping[int, int],
+    spans: Sequence[tuple[int, int]],
+    units: Sequence[LectureUnit],
+) -> LectureRef:
+    """Harness LectureRef of the window containing a production segment.
+
+    Production and this harness partition the same filtered segments with
+    the same partition_lecture_segments(window_words=250), so their windows
+    coincide positionally: a production LectureSource.segment_index maps to
+    the harness LectureUnit.ref of the span containing its position.
+
+    Parameters
+    ----------
+    segment_index : int
+        Production's anchor segment index (transcript position).
+    positions, spans, units
+        segment_index -> position map, (first, last) window spans and one
+        LectureUnit per span, all from the same build_lecture_index call.
+    """
+    position = positions[segment_index]
+    window = next(
+        index for index, (first, last) in enumerate(spans) if first <= position <= last
+    )
+    return units[window].ref
 
 
 def pooling_unit(entry: dict[str, Any]) -> EvalUnit:
