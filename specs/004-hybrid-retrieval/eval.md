@@ -512,3 +512,41 @@ Recall entro ±1 domanda dalla verifica del piano. Divergenze spiegate:
 
 Restano da misurare in T032 i turni di chat reali (10 col 9B residente, 10 con una generazione in
 corso) e la latenza della query in quelle condizioni.
+
+### Turni di chat reali e latenza della query (2026-10-07)
+
+App avviata sul corpus di misura (`SBOBINA_DATA_DIR=data/eval/retrieval-hybrid/corpus`, motore
+`local`, porta 8799), corso "economia aziendale" indicizzato al 100% (458 unità, 3 troncate).
+10 turni consecutivi: 10 risposte 200, tutte `mode=dense`, `qwen3.5:9b` residente per tutta la
+serie (`size_vram` 6 445 453 312 invariata) con `qwen3-embedding:8b` su CPU (`size_vram` 0). Durata
+di un turno 6,8-27,2 s. 7 turni `DONE`, 3 `NOT_FOUND` (vedi F21 sotto). BASIS: measured.
+
+Latenza dell'embedding della domanda su CPU, 10 campioni per riga, macchina con carico medio mai
+sotto 11 su 16 thread durante la misura (lavoro in background non legato a sbobina): numeri
+rumorosi.
+
+| `num_thread` | 9B fermo p50 / p95 | 9B che genera p50 / p95 |
+| --- | --- | --- |
+| automatico | 2,34 / 2,49 s | 3,55 / 4,11 s |
+| 4 | 2,66 / 2,76 s | 3,88 / 4,27 s |
+| 8 | 2,25 / 2,30 s | 3,29 / 3,33 s |
+| 12 | 2,18 / 2,60 s | 3,26 / 4,17 s |
+
+Una serie precedente nella stessa sessione, a carico più alto, dava p95 2,98 s a 9B fermo e
+8,69 s a 9B che genera.
+
+Lettura: col 9B fermo la soglia di T032 (p95 <= 2,5 s) regge appena; mentre il 9B genera non
+regge con nessun valore di `num_thread` (3,3-4,3 s). La differenza fra 8 thread e l'automatico non
+si separa dal rumore con una serie per valore: `num_thread` resta automatico (performance.md,
+"neutro è un revert"). La scelta di accettare 3-4 s di query a 9B occupato torna all'utente.
+BASIS: measured, rumore alto.
+
+**F21, tre `NOT_FOUND` nei turni reali: non è la ricerca.** Rieseguita la ricerca di produzione sulle
+tre domande: per "principi di redazione del bilancio" arrivano in cima le pagine 41-42 del
+riassunto (rappresentazione veritiera e corretta, principi elencati); per "soggetto economico e
+soggetto giuridico" il capitolo inglese p. 5 ("The economic subject and the legal subject"); per
+"budget operativo" il capitolo inglese p. 9 ("Budgeting as a planning and control tool"). Il
+`NOT_FOUND` nasce nella fase di risposta (`chat_pipeline`, frasi citate alla lettera): per le due
+domande con risposta solo in inglese l'ipotesi è che la citazione letterale di un passaggio inglese
+in una risposta italiana non superi la validazione. Fuori dal perimetro di 004; da trattare a parte.
+BASIS: measured per la ricerca, inferred per la causa nella fase di risposta.
