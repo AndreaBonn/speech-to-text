@@ -17,6 +17,7 @@ dependencies = [
     "httpx>=0.28.1",
     "jinja2>=3.1.6",
     "jiwer>=4.0.0",
+    "numpy>=2.5.3",
     "ollama>=0.6.3",
     "pillow>=12.3.0",
     "pydantic-settings>=2.15.0",
