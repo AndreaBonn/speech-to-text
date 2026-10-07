@@ -64,7 +64,7 @@ class LectureResults:
     total: int
 
 
-def _preferred_transcript(directory: Path) -> tuple[Path, LectureState] | None:
+def preferred_transcript(directory: Path) -> tuple[Path, LectureState] | None:
     for variant in PREFERRED_VARIANTS:
         path = directory / TRANSCRIPT_FILES[variant]
         try:
@@ -106,7 +106,7 @@ def _reconcile_lectures(store: JobStore, index: SearchIndex) -> int:
     for directory in store.jobs_dir.glob("*"):
         if not directory.is_dir() or directory.name in hidden:
             continue
-        preferred = _preferred_transcript(directory=directory)
+        preferred = preferred_transcript(directory=directory)
         if preferred is None:
             continue
         path, state = preferred
@@ -124,7 +124,7 @@ def _reconcile_lectures(store: JobStore, index: SearchIndex) -> int:
     return replaced
 
 
-def _read_document_passages(doc_dir: Path, doc_id: str) -> list[DocumentPassage] | None:
+def read_document_passages(doc_dir: Path, doc_id: str) -> list[DocumentPassage] | None:
     """Passages of one document's extracted text, or None when unreadable now.
 
     A document mid-write (extraction still in progress) must not break the
@@ -138,7 +138,7 @@ def _read_document_passages(doc_dir: Path, doc_id: str) -> list[DocumentPassage]
     return chunk_document_pages(doc_id=doc_id, pages=stored.pages)
 
 
-def _ready_document_state(document_path: Path) -> DocumentState | None:
+def ready_document_state(document_path: Path) -> DocumentState | None:
     """State of a READY document's text, or None when it must not be indexed."""
     doc_dir = document_path.parent
     try:
@@ -164,14 +164,14 @@ def _reconcile_documents(courses_dir: Path, index: SearchIndex) -> int:
     present: set[str] = set()
     replaced = 0
     for document_path in courses_dir.glob(f"*/documents/*/{DOCUMENT_FILENAME}"):
-        state = _ready_document_state(document_path=document_path)
+        state = ready_document_state(document_path=document_path)
         if state is None:
             continue
         doc_dir = document_path.parent
         present.add(doc_dir.name)
         if indexed.get(doc_dir.name) == state:
             continue
-        passages = _read_document_passages(doc_dir=doc_dir, doc_id=doc_dir.name)
+        passages = read_document_passages(doc_dir=doc_dir, doc_id=doc_dir.name)
         if passages is None:
             continue
         index.replace_document(doc_id=doc_dir.name, state=state, passages=passages)

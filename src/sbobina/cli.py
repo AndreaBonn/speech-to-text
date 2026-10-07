@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from sbobina import pipeline
+from sbobina.cli_semantic import add_semantic_parser
 from sbobina.log_redaction import install_redaction
 from sbobina.models import load_transcript
 from sbobina.render import format_timestamp
@@ -146,14 +147,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="sbobina", description="Sbobinature di lezioni"
     )
     commands = parser.add_subparsers(dest="command", required=True)
-
-    trascrivi = commands.add_parser("trascrivi", help="Trascrive un file audio")
-    trascrivi.add_argument("audio", type=Path)
-    trascrivi.add_argument("-o", "--output-dir", type=Path, default=None)
-    trascrivi.add_argument(
-        "--soglia", type=parse_threshold, default=None, help="Soglia parole incerte"
-    )
-    trascrivi.set_defaults(handler=cmd_trascrivi)
+    _add_trascrivi_parser(commands)
 
     rendi = commands.add_parser(
         "rendi", help="Rigenera il .md da un .json senza ritrascrivere"
@@ -172,8 +166,21 @@ def build_parser() -> argparse.ArgumentParser:
     wer.set_defaults(handler=cmd_wer)
     _add_correggi_parser(commands)
     _add_studio_parser(commands)
+    add_semantic_parser(commands=commands)
     _add_web_parser(commands)
     return parser
+
+
+def _add_trascrivi_parser(
+    commands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    trascrivi = commands.add_parser("trascrivi", help="Trascrive un file audio")
+    trascrivi.add_argument("audio", type=Path)
+    trascrivi.add_argument("-o", "--output-dir", type=Path, default=None)
+    trascrivi.add_argument(
+        "--soglia", type=parse_threshold, default=None, help="Soglia parole incerte"
+    )
+    trascrivi.set_defaults(handler=cmd_trascrivi)
 
 
 def _add_studio_parser(
