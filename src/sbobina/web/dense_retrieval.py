@@ -20,6 +20,7 @@ from sbobina.ollama_embed import (
 )
 from sbobina.rank_fusion import fuse_by_rank
 from sbobina.retrieval import CANDIDATE_LIMIT, DocumentSource, RetrievedPassage
+from sbobina.web.gpu_lock import GpuArbiter, GpuBusyError
 from sbobina.web.vector_store import Coverage, StoredVector, VectorStore
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ NOT_INDEXED = "not_indexed"
 PARTIAL = "partial"
 STALE_VECTORS = "stale_vectors"
 REBUILD_NEEDED = "rebuild_needed"
+GPU_BUSY = "gpu_busy"
 
 
 @dataclass(frozen=True)
@@ -85,15 +87,18 @@ class DenseRanker:
         self._matrices: tuple[_DenseList, _DenseList] | None = None
 
     def rank(
-        self, *, course: str, passages: list[RetrievedPassage], question: str
+        self, *, course: str, passages: list[RetrievedPassage], question: str,
+        arbiter: GpuArbiter | None = None,
     ) -> tuple[list[RetrievedPassage], RetrievalReport]:
-        """Rank current, already partitioned passages under whole-course coverage.
-
-        ``course`` is reconciliation's normalized key, not the registry UUID;
+        """Rank under whole-course coverage using reconciliation's normalized key.
         ``passages`` are selected document units and complete lecture partitions.
         """
+        from sbobina.web.embedding_supervisor import EMBEDDING_STAGE
+
         version = self._vectors.data_version()
         coverage = self._vectors.coverage(course=course, model_key=self._model_key)
+        if arbiter is not None and arbiter.status()[0] == EMBEDDING_STAGE:
+            return [], _bm25(reason=GPU_BUSY, coverage=coverage)
         reason = _coverage_reason(
             rebuild_needed=self._vectors.rebuild_needed, coverage=coverage
         )
@@ -101,19 +106,20 @@ class DenseRanker:
             return [], _bm25(reason=reason, coverage=coverage)
         matrices = self._load_matrices(passages=passages)
         if matrices is None:
-            # Full manifest, but a passage's current text hash has no vector
-            # (edited since the last reindex): not PARTIAL, which means the
-            # course manifest itself is incomplete.
+            # A complete manifest can still contain text edited since reindexing.
             return [], _bm25(reason=STALE_VECTORS, coverage=coverage)
         if version != self._vectors.data_version():
             coverage = self._vectors.coverage(course=course, model_key=self._model_key)
             return [], _bm25(reason=PARTIAL, coverage=coverage)
-        return self._rank_query(matrices=matrices, question=question, coverage=coverage)
+        return self._rank_query(
+            matrices=matrices, question=question, coverage=coverage, arbiter=arbiter
+        )
 
     def _rank_query(
-        self, matrices: tuple[_DenseList, _DenseList], question: str, coverage: Coverage
+        self, matrices: tuple[_DenseList, _DenseList], question: str,
+        coverage: Coverage, arbiter: GpuArbiter | None,
     ) -> tuple[list[RetrievedPassage], RetrievalReport]:
-        query, reason = self._safe_query_vector(question=question)
+        query, reason = self._safe_query_vector(question=question, arbiter=arbiter)
         if query is None:
             return [], _bm25(reason=reason or UNREACHABLE, coverage=coverage)
         floor = embedding_threshold(model=self._model)
@@ -125,11 +131,13 @@ class DenseRanker:
         )
 
     def _safe_query_vector(
-        self, question: str
+        self, question: str, arbiter: GpuArbiter | None
     ) -> tuple[NDArray[np.float64] | None, str | None]:
         """The query vector, or None with the reason the chat falls back to BM25."""
         try:
-            return self._query_vector(question=question), None
+            return self._leased_query_vector(question=question, arbiter=arbiter), None
+        except GpuBusyError:
+            return None, GPU_BUSY
         except (EmbeddingUnavailableError, OSError, httpx.HTTPError) as error:
             reason = (
                 error.reason
@@ -144,13 +152,32 @@ class DenseRanker:
             )
             return None, reason
         except Exception:
-            # Any unforeseen embedding failure must degrade to BM25, not raise
-            # into the chat turn as a 500 (contract T026); logged with the stack
-            # because this path was not anticipated by name.
+            # T026 requires BM25 instead of a 500; preserve the unexpected stack.
             logger.exception(
                 "Dense query embedding failed unexpectedly: model=%s", self._model
             )
             return None, UNREACHABLE
+
+    def _leased_query_vector(
+        self, question: str, arbiter: GpuArbiter | None
+    ) -> NDArray[np.float64]:
+        from sbobina.web.embedding_supervisor import EMBEDDING_STAGE
+
+        if arbiter is None:
+            return self._query_vector(question=question)
+        stage, _ = arbiter.status()
+        if stage is not None and stage != EMBEDDING_STAGE:
+            return self._query_vector(question=question)
+        try:
+            # T033/R12: a CPU query reloads the GPU instance of the same model.
+            # A shared lease prevents indexing from starting during the query.
+            with arbiter.chat_turn():
+                return self._query_vector(question=question)
+        except GpuBusyError as error:
+            if error.stage == EMBEDDING_STAGE:
+                raise
+        # T031: transcription does not contend with the CPU embedding query.
+        return self._query_vector(question=question)
 
     def _query_vector(self, question: str) -> NDArray[np.float64]:
         embedded = embed_texts(

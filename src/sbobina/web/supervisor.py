@@ -4,7 +4,7 @@ import sys
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
-from threading import Condition, Thread
+from threading import Condition, Event, Thread
 
 from sbobina.generation_models import GenerationRecord, GenerationRequest
 from sbobina.web import course_actions
@@ -13,11 +13,9 @@ from sbobina.web.course_actions import (
     EXECUTE_ACTIONS,
     FINISH_FAILED_ACTIONS,
 )
-from sbobina.web.generation_queue import recover_generations
 from sbobina.web.gpu_lock import GpuArbiter
 from sbobina.web.job_models import JobRecord, JobStage, JobStatus, WorkItem
 from sbobina.web.job_store import JobStore
-from sbobina.web.ocr_queue import recover_ocr_runs
 from sbobina.web.ocr_store import OcrRun
 from sbobina.web.processes import _child_env, _reap, _spawn
 from sbobina.web.transcription_gate import execute_pipeline_action
@@ -70,6 +68,7 @@ class Supervisor:
         self._process: subprocess.Popen[bytes] | None = None
         self._active: WorkItem | None = None
         self._stopping = False
+        self._action_cancelled = Event()
 
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -88,13 +87,9 @@ class Supervisor:
             if self.is_running():
                 raise RuntimeError("Cannot recover while the worker is running")
             self._queue = recover_queue(store=self._store, page_size=RECOVERY_PAGE_SIZE)
-            for recovered in (
-                recover_generations(courses_dir=self._store.courses_dir),
-                recover_ocr_runs(courses_dir=self._store.courses_dir),
-            ):
-                self._queue.extend(
-                    item for _, item in sorted(recovered, key=lambda entry: entry[0])
-                )
+            self._queue.extend(
+                course_actions.recover_course_actions(courses_dir=self._store.courses_dir)
+            )
 
     def submit(self, job_id: str) -> None:
         with self._condition:
@@ -152,12 +147,11 @@ class Supervisor:
     def stop(self) -> None:
         with self._condition:
             self._stopping = True
+            self._action_cancelled.set()
             self._gpu_arbiter.cancel_wait()
             self._stop_process(graceful=True)
             if (item := self._active) is not None:
-                finish_action(
-                    store=self._store, item=item, status=JobStatus.INTERRUPTED
-                )
+                course_actions.interrupt_action(supervisor=self, item=item)
             self._condition.notify_all()
             thread = self._thread
         if thread is not None:
@@ -201,6 +195,7 @@ class Supervisor:
             logger.exception("Job %s non leggibile, saltato", item.job_id)
             return False
         if claimed:
+            self._action_cancelled.clear()
             self._active = item
         return claimed
 

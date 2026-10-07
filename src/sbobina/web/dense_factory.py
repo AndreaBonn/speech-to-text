@@ -26,6 +26,15 @@ VECTOR_FILENAME = "vectors.sqlite3"
 RECHECK_INTERVAL_S = 60.0
 
 
+def vector_store_for_process(*, data_dir: Path) -> VectorStore:
+    """Reuse the process's vector store independently of semantic search settings."""
+    path = data_dir.resolve() / VECTOR_FILENAME
+    with _BUILD_LOCK:
+        if path not in _VECTORS:
+            _VECTORS[path] = VectorStore(path=path)
+        return _VECTORS[path]
+
+
 def _first_warning(reason: str) -> bool:
     with _WARNING_LOCK:
         if reason in _WARNED:

@@ -16,6 +16,7 @@ from sbobina.web.chat_records import ChatAnswerRecord
 from sbobina.web.chat_store import create_chat, load_records
 from sbobina.web.chat_turn import ChatLocation, ChatServices, ask
 from sbobina.web.dense_factory import DenseRuntime
+from sbobina.web.embedding_supervisor import EMBEDDING_STAGE
 from sbobina.web.gpu_lock import GpuArbiter
 from sbobina.web.job_store import JobStore
 
@@ -103,7 +104,9 @@ def test_local_turn_queries_before_chat_lease(
         with original():
             yield
 
-    monkeypatch.setattr(services.arbiter, "chat_turn", guarded)
+    monkeypatch.setattr(
+        services.arbiter, "chat_turn", Mock(side_effect=[original(), guarded()])
+    )
     result = ask(
         services=replace(services, dense=dense),
         where=where,
@@ -138,3 +141,19 @@ def test_ranker_query_failure_warns_once_across_turns(
             assert len(result.sentences) == 1
     assert len(client.calls) == 3
     assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 1
+
+
+def test_api_turn_during_indexing_returns_bm25_without_embedding(
+    turn: tuple[ChatServices, ChatLocation],
+) -> None:
+    services, where = turn
+    dense, client = indexed_runtime(store=services.store)
+    services = replace(services, dense=dense, guard_whole_client=False)
+    with services.arbiter.transcription_lease(stage=EMBEDDING_STAGE):
+        result = ask(
+            services=services, where=where, records=[], question="causa contratto"
+        )
+    assert result.retrieval_mode is not None and result.retrieval_mode["mode"] == "bm25"
+    assert result.retrieval_mode["reason"] == "gpu_busy"
+    assert len(result.sentences) == 1
+    assert client.calls == []

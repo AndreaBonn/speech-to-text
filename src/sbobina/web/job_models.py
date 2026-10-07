@@ -43,15 +43,15 @@ class JobStage(StrEnum):
     STUDY = "study"
 
 
-COURSE_SCOPED_ACTIONS = frozenset({"generation", "ocr"})
+COURSE_SCOPED_ACTIONS = frozenset({"generation", "ocr", "embed"})
 
 
 class WorkItem(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     job_id: str
-    action: Literal["pipeline", "study", "generation", "ocr"]
-    # Set only for course-scoped actions ("generation", "ocr"): both live
+    action: Literal["pipeline", "study", "generation", "ocr", "embed"]
+    # Set only for course-scoped actions: these live
     # under courses/<course_id> rather than under a job directory, so the
     # course id travels with the item.
     course_id: str | None = None
@@ -60,7 +60,7 @@ class WorkItem(BaseModel):
     def _validate_course_id(self) -> "WorkItem":
         if (self.action in COURSE_SCOPED_ACTIONS) != (self.course_id is not None):
             raise ValueError(
-                "course_id is set only for a course-scoped action (generation, ocr)"
+                "course_id is set only for a course-scoped action (generation, ocr, embed)"
             )
         return self
 

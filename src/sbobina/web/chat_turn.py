@@ -1,8 +1,8 @@
 """One chat turn on a course: persist, retrieve, ask Ollama, persist (T042).
 
 The question is appended before the Ollama call, so it survives a 409, 503
-or 504; the answer only on success. The GPU arbiter's shared lease covers
-the Ollama call alone, never the retrieval before it (ADR D3).
+or 504; the answer only on success. Query embedding and local chat each
+hold a shared GPU lease for their own Ollama call (T033/R12).
 """
 
 import math
@@ -150,6 +150,9 @@ def _ollama_error(error: Exception, arbiter: GpuArbiter) -> AppError:
 def _passages(
     services: ChatServices, key: str, question: str
 ) -> tuple[list[RetrievedPassage], dict[str, object]]:
+    stage, estimate_s = services.arbiter.status()
+    if services.guard_whole_client and stage is not None:
+        raise GpuBusyError(stage=stage, estimate_s=estimate_s)
     with search_session(store=services.store, path=services.index_path) as index:
         passages, report = retrieve_windows_with_report(
             store=services.store,
@@ -158,6 +161,7 @@ def _passages(
                 scope=course_scope(store=services.store, key=key),
                 question=question,
                 budget_words=budget_words(num_predict=CHAT_NUM_PREDICT),
+                arbiter=services.arbiter,
             ),
             dense=services.dense.ranker,
         )

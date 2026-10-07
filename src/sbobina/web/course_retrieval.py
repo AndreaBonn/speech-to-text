@@ -36,6 +36,7 @@ from sbobina.source_sampling import sample_across_sources
 from sbobina.web.api_files import TRANSCRIPT_FILES, transcript_revision
 from sbobina.web.dense_retrieval import DenseRanker, RetrievalReport
 from sbobina.web.document_index import DocumentScope
+from sbobina.web.gpu_lock import GpuArbiter
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import SearchIndex
 from sbobina.web.search_service import PREFERRED_VARIANTS
@@ -120,6 +121,7 @@ class WindowedQuery:
     scope: RetrievalScope
     question: str
     budget_words: int
+    arbiter: GpuArbiter | None = None
 
 
 def retrieve_windows(
@@ -154,6 +156,7 @@ def retrieve_windows_with_report(
             course=_dense_course_key(store=store, scope=query.scope),
             passages=[passage for group in groups for passage in group],
             question=query.question,
+            arbiter=query.arbiter,
         )
         if report.mode == "dense":
             return cut_to_budget(ranked=ranked, budget_words=query.budget_words), report

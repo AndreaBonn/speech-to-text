@@ -12,6 +12,7 @@ from sbobina.correction import CorrectorUnavailableError
 from sbobina.llm_errors import ChainExhaustedError
 from sbobina.log_redaction import install_redaction
 from sbobina.notices import USER_NOTICE
+from sbobina.ollama_embed import EmbeddingUnavailableError
 from sbobina.pipeline import (
     CorrectionOutcome,
     correct_to_dir,
@@ -20,6 +21,7 @@ from sbobina.pipeline import (
 )
 from sbobina.runtime_config import runtime_settings
 from sbobina.settings import Settings, settings
+from sbobina.web.embedding_runner import run_embed_stage
 from sbobina.web.generation_runner import run_generation_stage
 from sbobina.web.job_models import JobRecord, JobStage
 from sbobina.web.job_store import JobStore
@@ -32,6 +34,7 @@ PROGRESS_INTERVAL_S = 1.0
 NON_AUDIO_SUFFIXES = frozenset({".part", ".json", ".md", ".tmp"})
 GENERATION_STAGE = "generation"
 OCR_STAGE = "ocr"
+EMBED_STAGE = "embed"
 STAGES = {
     "transcribe": JobStage.TRANSCRIBING,
     "correct": JobStage.CORRECTING,
@@ -225,13 +228,7 @@ def run_stage(
     pipeline: StagePipeline | None = None,
     now: Callable[[], float] = time.monotonic,
 ) -> int:
-    """Run a stage and write progress; job state belongs to the supervisor.
-
-    For "generation" job_dir is actually courses/<course_id>, and for "ocr"
-    it is courses/<course_id>/documents/<doc_id>: neither has per-job
-    progress to write (a single blocking call, no JobRecord), so both bypass
-    _Progress entirely and persist their own result.
-    """
+    """Run a job stage, or a course action that persists its own progress."""
     try:
         if stage == GENERATION_STAGE:
             run_generation_stage(course_dir=job_dir)
@@ -239,11 +236,14 @@ def run_stage(
         if stage == OCR_STAGE:
             run_ocr_stage(document_dir=job_dir)
             return 0
+        if stage == EMBED_STAGE:
+            run_embed_stage(course_dir=job_dir)
+            return 0
         _run_job_stage(stage=stage, job_dir=job_dir, pipeline=pipeline, now=now)
         return 0
-    except CorrectorUnavailableError:
+    except (CorrectorUnavailableError, EmbeddingUnavailableError):
         logger.exception("Stage %s fallito per il job %s", stage, job_dir)
-        ollama_stages = ("correct", "study", GENERATION_STAGE, OCR_STAGE)
+        ollama_stages = ("correct", "study", GENERATION_STAGE, OCR_STAGE, EMBED_STAGE)
         return OLLAMA_UNAVAILABLE_EXIT if stage in ollama_stages else 1
     except Exception:
         logger.exception("Stage %s fallito per il job %s", stage, job_dir)
@@ -275,7 +275,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     install_redaction(settings=settings)
     parser = argparse.ArgumentParser(description="Esegue uno stage di un job locale")
-    parser.add_argument("stage", choices=(*STAGES, GENERATION_STAGE, OCR_STAGE))
+    parser.add_argument("stage", choices=(*STAGES, GENERATION_STAGE, OCR_STAGE, EMBED_STAGE))
     parser.add_argument("job_dir", type=Path)
     try:
         args = parser.parse_args(args=argv)

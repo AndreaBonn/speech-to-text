@@ -11,6 +11,7 @@ from hybrid_runtime_fixtures import enable_factory, indexed_runtime
 
 from sbobina.ollama_embed import EmbeddingUnavailableError
 from sbobina.web import dense_factory
+from sbobina.web.embedding_supervisor import EMBEDDING_STAGE
 
 pytest_plugins = ["chat_api_fixtures"]
 
@@ -99,7 +100,9 @@ def test_local_dense_query_finishes_before_chat_lease(
         with original():
             yield
 
-    monkeypatch.setattr(chat_app.arbiter, "chat_turn", guarded)
+    monkeypatch.setattr(
+        chat_app.arbiter, "chat_turn", Mock(side_effect=[original(), guarded()])
+    )
     response = chat_app.ask(chat_id=chat_app.new_chat())
     assert response.status_code == 200
     assert response.json()["data"]["retrieval_mode"]["mode"] == "dense"
@@ -122,3 +125,22 @@ def test_query_failure_warning_is_shared_with_reporter(
             assert response.json()["data"]["retrieval_mode"]["reason"] == "unreachable"
     assert len(client.calls) == 3
     assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 1
+
+
+def test_api_dense_query_during_indexing_returns_bm25_without_embedding(
+    chat_app: ChatApp,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, client = indexed_runtime(store=chat_app.store)
+    enable_factory(monkeypatch=monkeypatch, client=client)
+    monkeypatch.setenv("SBOBINA_LLM_ENGINE", "api")
+    app = cast(FastAPI, chat_app.client.app)
+    monkeypatch.setattr(app.state.settings, "llm_engine", "api")
+    chat_id = chat_app.new_chat()
+    with chat_app.arbiter.transcription_lease(stage=EMBEDDING_STAGE):
+        response = chat_app.ask(chat_id=chat_id)
+    assert response.status_code == 200
+    assert response.json()["data"]["outcome"] == "DONE"
+    assert response.json()["data"]["retrieval_mode"]["mode"] == "bm25"
+    assert response.json()["data"]["retrieval_mode"]["reason"] == "gpu_busy"
+    assert client.calls == []

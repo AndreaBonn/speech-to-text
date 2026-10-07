@@ -17,17 +17,23 @@ are already serialized by the supervisor's FIFO.
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from threading import Condition
+from threading import Condition, Event
 
 from sbobina.web.errors import ConflictError
 
+STAGE_LABELS = {
+    "transcribing": "una trascrizione",
+    "embedding": "un'indicizzazione semantica",
+}
+
 
 class GpuBusyError(ConflictError):
-    """Raised by `chat_turn` while the GPU is reserved for transcription."""
+    """Raised by `chat_turn` while the GPU is reserved by a writer."""
 
     def __init__(self, stage: str, estimate_s: float | None) -> None:
         super().__init__(
-            message=f"GPU occupata da una trascrizione ({stage})", code="GPU_BUSY"
+            message=f"GPU occupata da {STAGE_LABELS.get(stage, stage)} ({stage})",
+            code="GPU_BUSY",
         )
         self.stage = stage
         self.estimate_s = estimate_s
@@ -74,26 +80,17 @@ class GpuArbiter:
 
     @contextmanager
     def transcription_lease(
-        self, stage: str, estimate_s: float | None = None
+        self,
+        stage: str,
+        estimate_s: float | None = None,
+        *,
+        cancellation: Event | None = None,
     ) -> Iterator[None]:
         """Wait for readers and hold the GPU with priority over interactive calls.
         Raise `LeaseCancelledError` if `cancel_wait` interrupts the wait."""
-        with self._condition:
-            self._writer_waiting = True
-            self._stage = stage
-            self._estimate_s = estimate_s
-            self._condition.wait_for(
-                predicate=lambda: self._reader_count == 0 or self._cancelled
-            )
-            if self._cancelled:
-                self._cancelled = False
-                self._writer_waiting = False
-                self._stage = None
-                self._estimate_s = None
-                self._condition.notify_all()
-                raise LeaseCancelledError(stage)
-            self._writer_waiting = False
-            self._writer_active = True
+        self._acquire_writer(
+            stage=stage, estimate_s=estimate_s, cancellation=cancellation
+        )
         try:
             yield
         finally:
@@ -102,6 +99,35 @@ class GpuArbiter:
                 self._stage = None
                 self._estimate_s = None
                 self._condition.notify_all()
+
+    def _acquire_writer(
+        self,
+        stage: str,
+        estimate_s: float | None,
+        cancellation: Event | None,
+    ) -> None:
+        with self._condition:
+            if cancellation is not None and cancellation.is_set():
+                raise LeaseCancelledError(stage)
+            self._writer_waiting = True
+            self._stage = stage
+            self._estimate_s = estimate_s
+            self._condition.wait_for(
+                predicate=lambda: (
+                    self._reader_count == 0
+                    or self._cancelled
+                    or (cancellation is not None and cancellation.is_set())
+                )
+            )
+            if self._cancelled or (cancellation is not None and cancellation.is_set()):
+                self._cancelled = False
+                self._writer_waiting = False
+                self._stage = None
+                self._estimate_s = None
+                self._condition.notify_all()
+                raise LeaseCancelledError(stage)
+            self._writer_waiting = False
+            self._writer_active = True
 
     def cancel_wait(self) -> None:
         """Interrupt a pending `transcription_lease` wait, if any is in

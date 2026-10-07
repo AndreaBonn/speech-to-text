@@ -154,6 +154,16 @@ def _sync_pending(context: CourseEmbedding, course_key: str) -> list[EmbeddingIn
     return list(pending.values())
 
 
+def count_missing_units(
+    store: JobStore, vectors: VectorStore, model_key: str, course_key: str
+) -> int:
+    """Count current uncached units, without altering manifests or embedding text."""
+    units = _course_inputs(store=store, course_key=course_key)
+    hashes = [content_hash(item.text) for item in units]
+    missing = vectors.missing_hashes(model_key=model_key, hashes=set(hashes))
+    return sum(text_hash in missing for text_hash in hashes)
+
+
 def embed_course(
     context: CourseEmbedding,
     course_key: str,
