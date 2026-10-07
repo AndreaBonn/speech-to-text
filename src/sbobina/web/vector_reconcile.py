@@ -1,3 +1,5 @@
+import logging
+import sqlite3
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from time import monotonic
@@ -27,6 +29,8 @@ from sbobina.web.search_service import (
     ready_document_state,
 )
 from sbobina.web.vector_store import Coverage, StoredVector, VectorStore
+
+logger = logging.getLogger(__name__)
 
 
 def embedding_model_key(model: str, status: ModelStatus) -> str:
@@ -192,4 +196,14 @@ def embed_course(
         coverage = context.vectors.coverage(course=course_key, model_key=key)
         update = _progress(coverage=coverage, initial=initial, started=started)
         progress(update)
+    _purge_old_models(vectors=context.vectors, model_key=key)
     return update
+
+
+def _purge_old_models(*, vectors: VectorStore, model_key: str) -> None:
+    # The new vectors are already committed: a busy VACUUM must not fail the run,
+    # and the next completed run retries the purge.
+    try:
+        vectors.purge_obsolete_models(model_key=model_key)
+    except sqlite3.Error:
+        logger.warning("Old embedding models not purged", exc_info=True)

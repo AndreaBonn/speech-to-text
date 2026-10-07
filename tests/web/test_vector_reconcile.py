@@ -1,3 +1,4 @@
+import sqlite3
 from dataclasses import replace
 from pathlib import Path
 
@@ -213,3 +214,28 @@ def test_embedding_model_key_changes_with_model_identity() -> None:
     assert key != embedding_model_key(
         model="model", status=replace(status, dimensions=3)
     )
+
+
+def test_embed_course_succeeds_when_old_model_purge_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    fake = FakeEmbedder()
+    context = make_context(tmp_path=tmp_path, fake=fake)
+    course = write_course(store=context.store)
+    write_pages(store=context.store, course=course, texts=["Uno", "Due"])
+
+    def busy(*, model_key: str) -> int:
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(context.vectors, "purge_obsolete_models", busy)
+
+    result = embed_course(
+        context=context, course_key=course.key, progress=lambda update: None
+    )
+
+    assert (result.processed, result.total) == (2, 2)
+    assert "Old embedding models not purged" in caplog.text
+    coverage = context.vectors.coverage(
+        course=course.key, model_key=context.embedding.model_key
+    )
+    assert coverage.embedded == 2
