@@ -550,3 +550,7 @@ soggetto giuridico" il capitolo inglese p. 5 ("The economic subject and the lega
 domande con risposta solo in inglese l'ipotesi è che la citazione letterale di un passaggio inglese
 in una risposta italiana non superi la validazione. Fuori dal perimetro di 004; da trattare a parte.
 BASIS: measured per la ricerca, inferred per la causa nella fase di risposta.
+
+**Decisione dell'utente (2026-10-07, "D6"):** si resta su `qwen3-embedding:8b`; si accettano
+3-4 s di embedding della domanda (p95) quando il 9B sta generando. Il tetto di T032 (2,5 s) vale
+quindi solo col 9B fermo; a 9B occupato il riferimento è la misura sopra.
