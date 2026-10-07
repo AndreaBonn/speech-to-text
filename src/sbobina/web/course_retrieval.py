@@ -13,7 +13,7 @@ import logging
 from dataclasses import dataclass
 from itertools import groupby
 
-from sbobina.course_registry import find_by_key
+from sbobina.course_registry import find_by_key, iter_courses
 from sbobina.courses import course_key, effective_course
 from sbobina.file_cache import read_parsed
 from sbobina.lecture_windows import (
@@ -34,6 +34,7 @@ from sbobina.retrieval import (
 from sbobina.search_text import Passage, passages_from_transcript
 from sbobina.source_sampling import sample_across_sources
 from sbobina.web.api_files import TRANSCRIPT_FILES, transcript_revision
+from sbobina.web.dense_retrieval import DenseRanker, RetrievalReport
 from sbobina.web.document_index import DocumentScope
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import SearchIndex
@@ -122,19 +123,62 @@ class WindowedQuery:
 
 
 def retrieve_windows(
-    store: JobStore, index: SearchIndex, query: WindowedQuery
+    store: JobStore,
+    index: SearchIndex,
+    query: WindowedQuery,
+    *,
+    dense: DenseRanker | None = None,
 ) -> list[RetrievedPassage]:
     """Course passages for a question, lecture hits expanded to ~250-word windows.
 
     Windows are built before the word budget is applied: the budget counts
     window words, not the raw 10-30 word Whisper segment that matched.
     """
+    return retrieve_windows_with_report(store, index, query, dense=dense)[0]
+
+
+def retrieve_windows_with_report(
+    store: JobStore,
+    index: SearchIndex,
+    query: WindowedQuery,
+    *,
+    dense: DenseRanker | None = None,
+) -> tuple[list[RetrievedPassage], RetrievalReport]:
+    """Use dense partitions at full coverage, otherwise preserve the BM25 path."""
+    report = RetrievalReport(mode="bm25", reason=None, coverage=None)
+    if dense is not None:
+        groups = _document_groups(index=index, scope=query.scope) + _lecture_groups(
+            store=store, job_ids=scoped_job_ids(scope=query.scope)
+        )
+        ranked, report = dense.rank(
+            course=_dense_course_key(store=store, scope=query.scope),
+            passages=[passage for group in groups for passage in group],
+            question=query.question,
+        )
+        if report.mode == "dense":
+            return cut_to_budget(ranked=ranked, budget_words=query.budget_words), report
     fused = fuse_candidates(index=index, scope=query.scope, question=query.question)
     segments_by_job = _segments_by_job(store=store, hits=fused)
     windows = expand_lecture_windows(
         hits=fused, segments_by_job=segments_by_job, window_words=WINDOW_WORDS
     )
-    return cut_to_budget(ranked=windows, budget_words=query.budget_words)
+    return cut_to_budget(ranked=windows, budget_words=query.budget_words), report
+
+
+def _dense_course_key(store: JobStore, scope: RetrievalScope) -> str:
+    for course in iter_courses(courses_dir=store.courses_dir):
+        if course.id == scope.course_id:
+            return course.key
+    records = {str(record.id): record for record in store.iter_records()}
+    for job_id in sorted(scope.job_ids):
+        if job_id in records:
+            return course_key(
+                label=effective_course(
+                    course=store.read_meta(job_id=job_id).course,
+                    subject=records[job_id].config.subject,
+                )
+            )
+    return scope.course_id
 
 
 def _document_groups(
