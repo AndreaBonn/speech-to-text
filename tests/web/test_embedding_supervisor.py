@@ -94,7 +94,13 @@ def test_recover_queued_and_preserve_terminal(
 
 
 @pytest.mark.parametrize(
-    ("exit_code", "error"), [(1, "STAGE_FAILED"), (2, "OLLAMA_UNAVAILABLE")]
+    ("exit_code", "error"),
+    [
+        (1, "STAGE_FAILED (exit=1)"),
+        (137, "STAGE_FAILED (exit=137)"),
+        (-9, "STAGE_FAILED (signal=9)"),
+        (2, "OLLAMA_UNAVAILABLE"),
+    ],
 )
 def test_failed_child_records_error_and_releases_models(
     embedding_harness: EmbeddingHarness,

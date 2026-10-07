@@ -4,7 +4,9 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from sbobina.course_registry import find_by_key
+from sbobina import ollama_embed
+from sbobina.course_registry import find_by_key, get_or_create
+from sbobina.courses import MAX_COURSE_LABEL_LENGTH, course_key, effective_course
 from sbobina.ollama_embed import EmbeddingUnavailableError
 from sbobina.settings import settings
 from sbobina.web import gpu_release
@@ -18,9 +20,10 @@ from sbobina.web.embedding_store import (
 )
 from sbobina.web.errors import ConflictError, JobNotCancellableError, NotFoundError
 from sbobina.web.gpu_lock import LeaseCancelledError
-from sbobina.web.job_models import WorkItem
+from sbobina.web.job_models import JobRecord, JobStatus, WorkItem
 from sbobina.web.job_store import JobStore
 from sbobina.web.processes import _spawn
+from sbobina.web.work_items import action_status
 
 if TYPE_CHECKING:
     from sbobina.web.supervisor import Supervisor
@@ -29,6 +32,9 @@ logger = logging.getLogger(__name__)
 EMBED_COMMAND = "embed"
 EMBEDDING_STAGE = "embedding"
 CHILD_LOG_NAME = "embedding_child.log"
+# Enqueue probes run on serial queue workers: a hung Ollama must not stall them
+# for the full embedding timeout. A refused local connection fails at once anyway.
+ENQUEUE_PROBE_TIMEOUT_S = 2.0
 
 
 def _require_course_id(store: JobStore, course_key: str) -> str:
@@ -44,9 +50,10 @@ def _course_dir(store: JobStore, item: WorkItem) -> Path:
 
 
 def submit_embed_item(
-    store: JobStore, course_key: str
+    store: JobStore, course_key: str = "", *, course_id: str | None = None
 ) -> tuple[EmbeddingRun, WorkItem]:
-    course_id = _require_course_id(store=store, course_key=course_key)
+    if course_id is None:
+        course_id = _require_course_id(store=store, course_key=course_key)
     directory = store.courses_dir / course_id
     record = load_embed(course_dir=directory)
     if record is not None and record.status in (
@@ -59,6 +66,84 @@ def submit_embed_item(
         )
     record = create_embed(course_dir=directory)
     return record, WorkItem(job_id=course_id, action="embed", course_id=course_id)
+
+
+def _lecture_course_id(store: JobStore, record: JobRecord) -> str | None:
+    meta = store.read_meta(job_id=str(record.id))
+    label = effective_course(course=meta.course, subject=record.config.subject)
+    if label is None:
+        return None
+    if len(label) > MAX_COURSE_LABEL_LENGTH:
+        logger.warning("Course label exceeds registry limit for job %s", record.id)
+        return None
+    return get_or_create(
+        courses_dir=store.courses_dir, key=course_key(label=label), label=label
+    ).id
+
+
+def _embedding_unavailable_reason() -> str | None:
+    try:
+        ollama_embed.model_status(
+            host=settings.ollama_host,
+            model=settings.embedding_model,
+            timeout_s=ENQUEUE_PROBE_TIMEOUT_S,
+        )
+    except EmbeddingUnavailableError as error:
+        logger.warning("Automatic embedding unavailable: %s", error.reason)
+        return error.reason
+    return None
+
+
+def _enqueue_checked_embed(
+    supervisor: "Supervisor", course_id: str, reason: str | None
+) -> None:
+    directory = supervisor._store.courses_dir / course_id
+    record = load_embed(course_dir=directory)
+    if record is not None and record.status in (
+        EmbeddingStatus.QUEUED,
+        EmbeddingStatus.RUNNING,
+    ):
+        return
+    if reason is not None:
+        save_embed(
+            course_dir=directory,
+            record=EmbeddingRun(
+                status=EmbeddingStatus.FAILED, processed=0, total=0, error=reason
+            ),
+        )
+        return
+    try:
+        _, item = submit_embed_item(store=supervisor._store, course_id=course_id)
+    except ConflictError as error:
+        if error.code != "EMBED_ALREADY_QUEUED":
+            raise
+        return
+    supervisor._queue.append(item)
+    supervisor._condition.notify()
+
+
+def maybe_enqueue_embed(
+    supervisor: "Supervisor",
+    course_id: str | None = None,
+    record: JobRecord | None = None,
+    item: WorkItem | None = None,
+) -> None:
+    """Queue one course after a text change, or persist model unavailability."""
+    if not settings.semantic_search:
+        return
+    if item is not None:
+        record = supervisor._store.get(job_id=item.job_id)
+        if action_status(record=record, item=item) != JobStatus.DONE:
+            return
+    if course_id is None and record is not None:
+        course_id = _lecture_course_id(store=supervisor._store, record=record)
+    if course_id is None:
+        return
+    reason = _embedding_unavailable_reason()
+    with supervisor._condition:
+        _enqueue_checked_embed(
+            supervisor=supervisor, course_id=course_id, reason=reason
+        )
 
 
 def cancel_embed_item(store: JobStore, course_key: str) -> WorkItem:
@@ -134,10 +219,16 @@ def _run_embed_process(
     with supervisor._condition:
         supervisor._release_process(process=process)
         if return_code != 0:
+            detail = (
+                f"exit={return_code}" if return_code > 0 else f"signal={-return_code}"
+            )
             code = (
                 "OLLAMA_UNAVAILABLE"
                 if return_code == ollama_unavailable_exit
-                else "STAGE_FAILED"
+                else f"STAGE_FAILED ({detail})"
+            )
+            logger.error(
+                "Embedding child failed for course %s: %s", item.course_id, code
             )
             supervisor._finish_failed(item=item, code=code)
 

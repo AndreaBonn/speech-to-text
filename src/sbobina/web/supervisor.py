@@ -13,6 +13,7 @@ from sbobina.web.course_actions import (
     EXECUTE_ACTIONS,
     FINISH_FAILED_ACTIONS,
 )
+from sbobina.web.embedding_supervisor import maybe_enqueue_embed
 from sbobina.web.gpu_lock import GpuArbiter
 from sbobina.web.job_models import JobRecord, JobStage, JobStatus, WorkItem
 from sbobina.web.job_store import JobStore
@@ -88,7 +89,9 @@ class Supervisor:
                 raise RuntimeError("Cannot recover while the worker is running")
             self._queue = recover_queue(store=self._store, page_size=RECOVERY_PAGE_SIZE)
             self._queue.extend(
-                course_actions.recover_course_actions(courses_dir=self._store.courses_dir)
+                course_actions.recover_course_actions(
+                    courses_dir=self._store.courses_dir
+                )
             )
 
     def submit(self, job_id: str) -> None:
@@ -251,6 +254,7 @@ class Supervisor:
             return
         with self._condition:
             finish_action(store=self._store, item=item, status=JobStatus.DONE)
+        maybe_enqueue_embed(supervisor=self, item=item)
 
     def _run_stage(self, item: WorkItem, stage: JobStage) -> bool:
         with self._condition:

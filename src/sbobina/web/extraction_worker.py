@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import Condition, Thread
@@ -52,9 +53,13 @@ class ExtractionItem:
 
 class ExtractionWorker:
     def __init__(
-        self, courses_dir: Path, options: ExtractionWorkerOptions | None = None
+        self,
+        courses_dir: Path,
+        options: ExtractionWorkerOptions | None = None,
+        on_document_ready: Callable[[str], None] | None = None,
     ) -> None:
         self._courses_dir = courses_dir
+        self._on_document_ready = on_document_ready
         self._options = options if options is not None else ExtractionWorkerOptions()
         self._condition = Condition()
         self._queue: deque[ExtractionItem] = deque()
@@ -185,12 +190,17 @@ class ExtractionWorker:
                 code="EXTRACTION_FAILED",
             )
             return
-        mark_extracted(
+        document = mark_extracted(
             courses_dir=self._courses_dir,
             course_id=item.course_id,
             doc_id=item.doc_id,
             result=read_text(doc_dir=doc_dir),
         )
+        if (
+            document.status is DocumentStatus.READY
+            and self._on_document_ready is not None
+        ):
+            self._on_document_ready(item.course_id)
 
     def _run_child(self, item: ExtractionItem, doc_dir: Path) -> int | None:
         process = _spawn(

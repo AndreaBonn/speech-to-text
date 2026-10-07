@@ -155,6 +155,8 @@ def _initialize_services(
     supervisor_options: SupervisorOptions | None,
     extraction_worker_options: ExtractionWorkerOptions | None,
 ) -> None:
+    from sbobina.web.embedding_supervisor import maybe_enqueue_embed
+
     settings: Settings = app.state.settings
     app.state.supervisor = Supervisor(
         job_store=app.state.job_store,
@@ -164,6 +166,9 @@ def _initialize_services(
     )
     app.state.extraction_worker = ExtractionWorker(
         courses_dir=app.state.job_store.courses_dir,
+        on_document_ready=lambda course_id: maybe_enqueue_embed(
+            supervisor=app.state.supervisor, course_id=course_id
+        ),
         options=extraction_worker_options
         if extraction_worker_options is not None
         else ExtractionWorkerOptions(

@@ -28,7 +28,11 @@ path = Path(directory)
 (path / (stage + '.started')).touch()
 exit_path = path / 'embed.exit'
 if exit_path.exists():
-    sys.exit(int(exit_path.read_text()))
+    exit_code = int(exit_path.read_text())
+    if exit_code < 0:
+        import os
+        os.kill(os.getpid(), -exit_code)
+    sys.exit(exit_code)
 calls = 0
 def embedder(texts):
     global calls

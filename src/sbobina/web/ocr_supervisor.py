@@ -13,6 +13,7 @@ from sbobina.course_registry import find_by_key
 from sbobina.document_models import DocumentKind, DocumentStatus
 from sbobina.settings import settings
 from sbobina.web.document_store import document_dir, read_document
+from sbobina.web.embedding_supervisor import maybe_enqueue_embed
 from sbobina.web.errors import ConflictError, NotFoundError
 from sbobina.web.job_models import WorkItem
 from sbobina.web.job_store import JobStore
@@ -145,10 +146,7 @@ def _finish_timed_out_ocr(
 def execute_ocr_action(
     supervisor: "Supervisor", item: WorkItem, ollama_unavailable_exit: int
 ) -> None:
-    """The child persists its own ocr.json/text.json/document.json on success;
-    a crash (non-zero exit) or a timeout (A4, security: the single queue
-    worker must not block forever behind a hung or looping child) are the
-    only cases the supervisor finalizes here."""
+    """Finalize child failures; index READY text persisted by a successful child."""
     with supervisor._condition:
         if supervisor._stopping:
             return
@@ -166,3 +164,12 @@ def execute_ocr_action(
                 else "STAGE_FAILED"
             )
             supervisor._finish_failed(item=item, code=code)
+            return
+    assert item.course_id is not None
+    document = read_document(
+        courses_dir=supervisor._store.courses_dir,
+        course_id=item.course_id,
+        doc_id=item.job_id,
+    )
+    if document.status is DocumentStatus.READY:
+        maybe_enqueue_embed(supervisor=supervisor, course_id=item.course_id)
