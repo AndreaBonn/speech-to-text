@@ -1,0 +1,453 @@
+# Misure: recupero ibrido BM25 + embedding densi
+
+Piano: `plan.md` § C1. Corpus e gold set in `data/eval/retrieval-hybrid/` (fuori da git).
+
+## Regola di scelta (scritta il 2026-10-06, prima di qualunque misura)
+
+BUDGET: 5 candidati (qwen3-embedding 0.6b/4b/8b, bge-m3, embeddinggemma), varianti di T016 solo sui
+2 migliori, un solo rigiudizio se il controllo a campione fallisce | ranking: gate Q > gate L >
+recall@8 ibrido > MRR@10 > recall@8 `crosslingual` > tempo di indicizzazione > disco.
+
+- **Gate Q**: ibrido contro BM25 con vittorie - sconfitte >= +4 domande (hit@8, appaiato), al
+  massimo 1 domanda persa sul sottoinsieme `exam`, MRR@10 non inferiore a BM25.
+- **Gate L**: embedding della query p95 <= 1,0 s sul percorso scelto, e `qwen3.5:9b` ancora in
+  `/api/ps` con `size_vram` invariata dopo 20 query.
+- Nessun candidato passa il gate Q: F2 non parte, i numeri tornano all'utente. Il migliore per
+  qualità fallisce solo il gate L: si misura il percorso della query su GPU e la scelta torna
+  all'utente.
+
+## Verifiche su Ollama (T010)
+
+Misurate il 2026-10-06 su Ollama 0.18.0 con `qwen3-embedding:0.6b` (639 MB, Q8_0, 1024 dimensioni,
+contesto 32768). Script: chiamate HTTP dirette a `/api/embed`, `/api/ps`, `/api/show`, `/api/generate`.
+Tutte le righe: BASIS: measured.
+
+| Voce | Osservato |
+| --- | --- |
+| Batch su `/api/embed` | 3 input, 3 vettori da 1024; norma L2 = 1,0 |
+| `dimensions=256` | 200, vettore da 256 (troncamento Matryoshka rispettato) |
+| `truncate=false` oltre il contesto (`num_ctx` 2048) | 400 "the input length exceeds the context length" |
+| `truncate` di default oltre il contesto | 200, `prompt_eval_count` 2047: tronca in silenzio |
+| Template | `TEMPLATE {{ .Prompt }}`: Ollama non aggiunge istruzioni, il prefisso `Instruct:...\nQuery:` va messo dal codice |
+| `/api/show` capabilities | `["embedding"]` |
+| `num_gpu=0` | `size_vram` 0 per l'embedding (log: "offloaded 0/29 layers to GPU") |
+| Coseno GPU contro CPU, stesso testo | 0,999572 (soglia 0,99: Dis.5 regge) |
+| Latenza query su CPU, 20 query | p50 0,358 s, p95 0,437 s; prima query 1,233 s (caricamento) |
+| `generate(keep_alive=0)` sul modello di embedding | 200, `done_reason: "unload"`; `/api/ps` vuoto dopo |
+| `qwen3.5:9b` residente dopo le 20 query su CPU | **No**: scaricato al caricamento dell'embedding |
+
+**Misura contaminata, da ripetere.** Durante la misura ComfyUI (`foocus-personal`) occupava 4,6 GB
+di VRAM: Ollama vedeva 3,1 GiB liberi e ha caricato `qwen3.5:9b` con 12/33 layer su GPU. Lo scarico
+del 9B è avvenuto in questa condizione di offload parziale; se si ripete con la GPU libera, il gate L
+è valutabile.
+
+**Ripetuta il 2026-10-07 con la GPU libera** (nessun altro processo CUDA): `qwen3.5:9b` caricato
+con 32/33 layer su GPU, `size_vram` 6 278 025 216 prima e dopo 20 query su CPU, ancora in `/api/ps`
+alla fine. Latenza query su CPU p50 0,306 s, p95 0,404 s, prima query 0,922 s. Coseno GPU/CPU
+invariato (0,999572). Gate L per `qwen3-embedding:0.6b`: **passa**. Lo scarico del giorno prima
+era dovuto all'offload parziale causato da ComfyUI. BASIS: measured.
+
+## Corpus (T011)
+
+Costruito il 2026-10-06 da `scripts/build_hybrid_eval_corpus.py` (non in git, come il
+resto della cartella) in `data/eval/retrieval-hybrid/corpus/`: un data dir completo,
+usabile dal codice di produzione (`JobStore`, `document_store`, `search_session`), non
+una copia a parte.
+
+- **Corso "economia aziendale"**: 5 PDF di `data/prove/` caricati ed estratti con la
+  pipeline di produzione (`document_sniff`, `document_store`, `extraction_runner`),
+  escluso `EcAziendale2017_domande_esame_*.pdf` (fornisce solo le domande `exam` del
+  gold set, come T024), più i 2 capitoli in inglese di
+  `data/eval/retrieval-hybrid/english-staging/` (vedi nota sotto). Tutti e 7 `ready`:
+
+  | File | Pagine |
+  | --- | --- |
+  | `EcAziendale2017_mappa_concettuale_20251030_135016.pdf` | 3 |
+  | `EcAziendale2017_riassunto_20251030_134914.pdf` | 82 |
+  | `Esercitazione_2_2023.pdf` | 3 |
+  | `Lezioni 11 29 Ottobre.pdf` | 24 |
+  | `librib_685541.pdf` | 246 |
+  | `chapter-firm-and-accounting.md` | 14 |
+  | `chapter-costs-and-decisions.md` | 12 |
+
+  `librib_685541.pdf` non è materiale del corso: è il "Manuale di Statistica" di Felice
+  Vinci (1934), un trattato di statistica generale senza relazione con economia
+  aziendale. Resta nel corpus (era già nel corso in `data/prove/`, nota di Research nel
+  piano) come materiale voluminoso e topicamente estraneo: utile per i `negative` e per
+  misurare se il denso si fa distrarre dal volume di BM25.
+
+  **Materiale inglese (crosslingual).** I due capitoli `.md` sono testo **sintetico**,
+  scritto da un LLM sugli argomenti del corso su indicazione dell'utente, non un
+  estratto da un libro di testo reale: coprono la rappresentazione contabile
+  dell'impresa (patrimonio netto, reddito, stato patrimoniale, conto economico,
+  avviamento) e la contabilità gestionale (costi fissi/variabili, margine di
+  contribuzione, break-even, make-or-buy, budgeting). Questo può rendere il task
+  cross-lingua **più facile** del previsto per il recupero denso rispetto a un libro
+  reale: un capitolo scritto da un LLM tende a una terminologia più uniforme e a frasi
+  più prevedibili di un testo accademico vero, il che riduce il divario lessicale che
+  il cross-lingua dovrebbe misurare.
+
+  **Pagina per i `.md`.** `document_extract._sections_to_pages` (usata anche per i
+  `.docx`) tratta ogni intestazione Markdown (riga che inizia per `#`, a qualunque
+  livello) come l'inizio di una nuova "pagina logica", ulteriormente spezzata ogni 500
+  parole se la sezione è lunga; è la stessa convenzione già in uso per i `.docx`, non
+  una nuova regola introdotta per questo corpus. Il numero di pagina risultante non
+  corrisponde a una pagina fisica ma è stabile al reindex (funzione pura del testo
+  sorgente) ed è compatibile senza adattamenti con `DocumentRef(filename, page)` di
+  `src/sbobina/retrieval_metrics.py`, che è già agnostico rispetto al tipo di
+  documento. Verificato leggendo l'estrazione reale: `chapter-firm-and-accounting.md`
+  produce 14 pagine (il titolo da solo è la pagina 1; due sezioni lunghe, "The
+  entrepreneur..." e "Income...", superano le 500 parole e si spezzano su due pagine
+  consecutive), `chapter-costs-and-decisions.md` ne produce 12.
+
+  Nota sul conteggio: il piano (DoD C1 e T011) parla di "6 PDF di `data/prove/`". I file
+  nella cartella sono 6 includendo l'esame; il corpus ne usa 5, l'esame resta escluso
+  perché la stessa DoD lo richiede come sorgente delle domande `exam`, non come corpus.
+
+- **Corso "diritto"**: copia di 3 lezioni di `data/jobs/` (job.json, progress.json,
+  transcript; esclusi `audio.m4a` e `child.log`, non necessari al recupero e grandi
+  30-40 MB l'uno). Un quarto job dello stesso corso, `77593c93-...`, è rimasto in stage
+  `transcribing` senza transcript: non è una lezione completa e non è stato copiato.
+  Dei 3 copiati, due (`82144973-...` e `7aef7b66-...`) sono la **stessa registrazione**
+  trascritta due volte: una interrotta durante la correzione (transcript originale), una
+  completata (transcript corretto). È lo stato reale di produzione, non un artefatto
+  della copia: la nota di Research nel piano misura infatti "3 lezioni, 4156 segmenti"
+  sullo stesso contenuto.
+
+Verifica: `uv run python scripts/eval_retrieval.py data/eval/retrieval-hybrid/corpus
+<eval.json>` gira sul nuovo data dir senza modifiche al codice (query di prova su
+"avviamento" ed "possesso", hit a rank 1 su entrambe). Conteggi dall'indice FTS
+ricostruito da `search_session` (`data/eval/retrieval-hybrid/corpus/search.sqlite3`),
+prima e dopo l'aggiunta dei 2 capitoli inglesi:
+
+| Voce | Prima (5 documenti) | Dopo (7 documenti) |
+| --- | --- | --- |
+| Documenti `ready` | 5 / 5 | 7 / 7 |
+| Passaggi FTS documento (`doc_passages`) | 426 | 458 |
+| Lezioni indicizzate | 3 | 3 (invariato) |
+| Passaggi FTS lezione (`passages`, segmenti Whisper) | 4156 | 4156 (invariato) |
+
+BASIS: measured (comandi sopra, eseguiti su questo corpus prima e dopo la ricostruzione
+con `scripts/build_hybrid_eval_corpus.py`).
+
+## Gold set (T012)
+
+`data/eval/retrieval-hybrid/gold.json`, 81 domande in italiano. Riferimenti stabili al
+reindex:
+
+- documento: `{"kind": "document", "filename": "<file>", "page": <1-based>}`
+- lezione: `{"kind": "lecture", "job_id": "<uuid>", "start_s": <float>, "end_s": <float>}`
+
+Una domanda può avere più riferimenti (più pagine, o più job_id quando la stessa
+registrazione è indicizzata due volte, vedi `dir-lec-01` sotto).
+
+| Tipo | Conteggio | Corso |
+| --- | --- | --- |
+| `exam` | 12 | economia aziendale |
+| `paraphrase` | 26 | economia aziendale |
+| `lecture` | 16 | diritto |
+| `negative` | 11 (6 economia aziendale, 5 diritto) | entrambi |
+| `crosslingual` | 16 | economia aziendale |
+| **Totale** | **81** | |
+
+Le 16 domande `crosslingual` (`eco-xl-01`...`eco-xl-16`) sono in italiano naturale, ma
+la risposta esiste solo nei due capitoli inglesi, mai nei 5 PDF italiani: coprono
+margine di contribuzione, break-even (anche multiprodotto con mix di vendita), costi
+diretti/indiretti, costi fissi/variabili (comportamento per unità, semi-variabili, a
+gradino), make-or-buy con costi sommersi e costo opportunità, sotto-budget e scostamenti
+di budget, e la distinzione soggetto giuridico/soggetto economico. Argomenti scelti
+perché verificati assenti dal testo italiano estratto (grep mirato su "margine di
+contribuzione", "break-even"/"punto di pareggio", "mix di vendita", "costi
+diretti"/"indiretti", "scostamento favorevole/sfavorevole", "budget operativo",
+"soggetto economico"/"giuridico": 0 occorrenze in tutte); la vicina "competenza
+economica" (principio di accrual) è invece già coperta in italiano ed è stata esclusa
+per non introdurre un falso crosslingual. Esempio:
+
+```json
+{
+  "id": "eco-xl-08",
+  "type": "crosslingual",
+  "course": "economia aziendale",
+  "question": "In un mix di vendita con un prodotto che ha margine di contribuzione 30 al 60% dei volumi e un altro con margine 10 al 40%, quanto vale il margine di contribuzione medio ponderato?",
+  "references": [
+    {"kind": "document", "filename": "chapter-costs-and-decisions.md", "page": 7}
+  ]
+}
+```
+
+Un esempio per tipo:
+
+```json
+{
+  "id": "eco-exam-04",
+  "type": "exam",
+  "course": "economia aziendale",
+  "question": "Qual è il concetto di avviamento?",
+  "references": [
+    {"kind": "document",
+     "filename": "EcAziendale2017_mappa_concettuale_20251030_135016.pdf", "page": 2}
+  ]
+}
+```
+
+```json
+{
+  "id": "eco-par-04",
+  "type": "paraphrase",
+  "course": "economia aziendale",
+  "question": "Perché un'organizzazione può valere, per chi la rileva, più della semplice somma di ciò che possiede materialmente?",
+  "references": [
+    {"kind": "document",
+     "filename": "EcAziendale2017_mappa_concettuale_20251030_135016.pdf", "page": 2}
+  ]
+}
+```
+
+```json
+{
+  "id": "dir-lec-01",
+  "type": "lecture",
+  "course": "diritto",
+  "question": "Il possesso è un diritto?",
+  "references": [
+    {"kind": "lecture", "job_id": "82144973-acfa-4b8b-ab8b-90c8ef51e85e",
+     "start_s": 16.5, "end_s": 29.3},
+    {"kind": "lecture", "job_id": "7aef7b66-2f4c-4f4c-9cb8-4848faa0bbaf",
+     "start_s": 16.5, "end_s": 29.3}
+  ]
+}
+```
+
+```json
+{
+  "id": "eco-neg-01",
+  "type": "negative",
+  "course": "economia aziendale",
+  "question": "Come si contabilizza un leasing secondo il principio contabile IFRS 16?",
+  "references": []
+}
+```
+
+Le domande `exam` vengono dal PDF d'esame escluso dal corpus
+(`EcAziendale2017_domande_esame_20251030_135219.pdf`), ma i riferimenti sono stati
+verificati sul testo reale del corpus, non sulle citazioni interne del PDF d'esame:
+quel PDF cita come fonte "File: 20171204 EcAziendale 2017-18 Savino.pdf", un file che
+non esiste in `data/prove/` (è materiale della generazione automatica dell'esame, non
+del corso). Un riferimento del genere non sarebbe stato verificabile; ogni domanda
+`exam` nel gold è ancorata invece a una pagina del corpus dove lo stesso concetto è
+effettivamente presente.
+
+Le domande `negative` sono state verificate assenti dal materiale scopato (grep su
+tutte le pagine/segmenti del corso), non solo assunte plausibili.
+
+Scostamento dall'esempio illustrativo del piano (DoD C1): l'esempio del piano marca
+come riferimento "`librib_685541.pdf` pagina con la definizione di avviamento" per una
+domanda sull'avviamento. `librib_685541.pdf` è il manuale di statistica del 1934 (vedi
+§ Corpus): non contiene la parola "avviamento" né alcuna definizione di economia
+aziendale. Quell'esempio è stato trattato come illustrativo del meccanismo del gold
+(non serve overlap lessicale per essere rilevante), non come riferimento letterale da
+riprodurre: `eco-par-04` copre lo stesso concetto con un riferimento verificato
+(`EcAziendale2017_mappa_concettuale...pdf`, pagina 2).
+
+Verifica: `scripts/check_gold.py` (T012), verifica che ogni riferimento esista nel
+corpus (pagina presente nel documento, intervallo dentro la durata della lezione), che
+nessuna domanda `paraphrase` condivida una parola di contenuto (non-stopword) con il
+testo del proprio riferimento, e che ogni domanda `crosslingual` punti solo ai 2 file
+inglesi (mai a un PDF italiano o a una lezione di diritto).
+
+```
+$ uv run python scripts/check_gold.py
+81 domande, 0 errori
+```
+
+BASIS: measured (comando sopra, eseguito su questo gold set e questo corpus).
+
+## Baseline BM25 (T014)
+
+### Primo run, gold preliminare (2026-10-07, prima del pooling)
+
+Riferimenti del gold così come annotati in T012, **senza** giudizi alla cieca sul pool: un
+passaggio rilevante che nessuno ha annotato conta come mancato, quindi i numeri sottostimano
+tutti i sistemi e soprattutto BM25 sulle domande che non sono `paraphrase`. Le `paraphrase`
+sono costruite senza parole in comune col riferimento, quindi BM25 a 0 è atteso per
+costruzione. `qwen3-embedding:0.6b`, istruzione sulla query attiva, ibrido = RRF su 4 liste
+(BM25 e denso, documenti e lezioni). Output in `data/eval/retrieval-hybrid/out/q06-*.json`.
+
+| Tipo (n) | BM25 r@8 / MRR@10 | Denso r@8 / MRR@10 | Ibrido r@8 / MRR@10 |
+| --- | --- | --- | --- |
+| exam (12) | 0,83 / 0,653 | 1,00 / 0,581 | 0,92 / 0,729 |
+| paraphrase (26) | 0,00 / 0,000 | 0,65 / 0,495 | 0,23 / 0,059 |
+| lecture (16) | 0,81 / 0,601 | 1,00 / 0,844 | 1,00 / 0,811 |
+| crosslingual (16) | 0,50 / 0,273 | 0,94 / 0,938 | 0,88 / 0,645 |
+| tutte (81, 11 negative incluse) | 0,38 / 0,269 | 0,74 / 0,597 | 0,58 / 0,415 |
+
+Tempi: BM25 3,3 s; denso 1140 s, quasi tutto il calcolo dei vettori del corpus su GPU con
+ComfyUI che occupava 4,6 GB (da rimisurare); ibrido 55 s con la cache dei vettori.
+
+Lettura: l'ibrido batte BM25 su ogni tipo, ma perde contro il denso da solo su `paraphrase`
+e `crosslingual`. Con pesi uguali, le due liste BM25 spingono in alto passaggi lessicalmente
+vicini e non pertinenti. Il confronto definitivo aspetta i giudizi alla cieca sul pool.
+BASIS: measured (gold preliminare).
+
+### Giudizi alla cieca sul pool (2026-10-07)
+
+Pool: unione deduplicata e mescolata dei top-10 di BM25, denso e ibrido (`out/pool-q06.json`),
+1565 passaggi su 81 domande, 5 lotti in `judging/batch-*.json`. Giudici: 5 subagent Sonnet a
+contesto pulito, ognuno con la sola domanda e il testo del passaggio, senza sapere quale
+sistema l'ha prodotto. Scala: 2 risponde, 1 parziale, 0 no. Voti in `judging/verdicts-*.json`,
+controllati contro i lotti: 1565 voti, nessun mancante, nessun valore fuori scala.
+Distribuzione: 0 = 1338, 1 = 90, 2 = 137.
+
+Rilevante = voto 2 **oppure** riferimento del gold T012. Metriche sulle 70 domande con
+risposta (le 11 `negative` escluse, servono alla soglia di T016). Riproducibile con
+`scripts/eval_hybrid.py --system <s> --judgments data/eval/retrieval-hybrid/judging` (T009).
+
+| Tipo (n) | BM25 r@8 / MRR@10 | Denso r@8 / MRR@10 | Ibrido 4 liste r@8 / MRR@10 |
+| --- | --- | --- | --- |
+| exam (12) | 0,83 / 0,653 | 1,00 / 0,581 | 0,92 / 0,729 |
+| paraphrase (26) | 0,04 / 0,027 | 0,73 / 0,522 | 0,38 / 0,154 |
+| lecture (16) | 0,94 / 0,757 | 1,00 / 1,000 | 1,00 / 1,000 |
+| crosslingual (16) | 0,50 / 0,319 | 0,94 / 0,938 | 0,88 / 0,645 |
+| tutte (70) | 0,49 / 0,368 | 0,89 / 0,737 | 0,73 / 0,558 |
+
+Confronto appaiato hit@8 contro BM25: denso +28 (30 vinte, 2 perse, 0 perse su `exam`);
+ibrido +17 (18 vinte, 1 persa, 0 su `exam`). Con soglia larga (voto >= 1) l'ordine non cambia:
+denso 0,93, ibrido 0,81, BM25 0,63.
+
+Gate Q per l'ibrido O1 di `qwen3-embedding:0.6b`: **passa** (+17 >= +4, 0 perdite `exam`,
+MRR@10 0,558 > 0,368). Il denso da solo però è migliore su ogni aggregato.
+
+**RRF pesata, stima offline.** Fusione di 2 liste (BM25 e denso, ciascuna già unita fra
+documenti e lezioni) con peso `w` sul denso, ricostruita dai top-10 salvati: approssimazione,
+perché le liste sono troncate a 10 invece dei 50 candidati della produzione. Riproducibile con
+`scripts/eval_hybrid_analysis.py weighted --bm25 out/q06-bm25.json --dense out/<modello>-dense.json
+--weight <w> --judgments judging`.
+
+| w denso | r@8 tutte | MRR@10 tutte | MRR@10 exam | netto vs BM25 |
+| --- | --- | --- | --- | --- |
+| 1 | 0,87 | 0,581 | 0,718 | +27 |
+| 2 | 0,89 | 0,652 | 0,733 | +28 |
+| 3 | 0,89 | 0,650 | 0,719 | +28 |
+| 5 | 0,89 | 0,640 | 0,622 | +28 |
+
+Lettura: gran parte della perdita dell'ibrido viene dalla fusione a 4 liste, dove ogni sorgente
+BM25 mette comunque un suo primo classificato in cima. Con 2 liste e peso 2 sul denso la
+recall eguaglia il denso (0,89), l'MRR resta sotto (0,652 contro 0,737) tranne che sulle
+domande `exam` (0,733 contro 0,581). Limiti: un solo modello misurato; le `paraphrase` sono
+costruite contro BM25; le `crosslingual` usano materiale sintetico.
+BASIS: measured (giudizi sul pool), inferred per la RRF pesata (ricostruzione da top-10).
+
+## Candidati (T015)
+
+Misurati il 2026-10-07 con la GPU libera (salvo il denso di 0.6b, calcolato il 6 con ComfyUI
+attivo). Giudizi alla cieca estesi ai passaggi nuovi dei 4 candidati: altri 1083 passaggi in
+`judging/batch-6..10.json`, 2648 voti in tutto, nessuno mancante. Rilevante = voto 2 oppure
+riferimento del gold; 70 domande con risposta. `w2` = RRF a 2 liste (BM25 e denso, ciascuna già
+unita fra documenti e lezioni) con peso 2 sul denso, ricostruita dai top-10 salvati (BASIS:
+inferred, approssimazione; `scripts/eval_hybrid_analysis.py weighted`); le altre colonne sono
+output dell'harness (BASIS: measured).
+`embeddinggemma`: 3 passaggi (tavole numeriche di `librib_685541.pdf`) oltre il contesto di 2048
+token, troncati e contati dall'harness.
+
+| Modello | Denso r@8 / MRR | O1 4 liste r@8 / MRR | w2 r@8 / MRR | MRR exam denso | Vettori corpus | Query CPU p95 | Gate L |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| BM25 (riferimento) | 0,49 / 0,368 | | | 0,653 | | | |
+| qwen3-embedding:0.6b | 0,89 / 0,737 | 0,73 / 0,558 | 0,89 / 0,652 | 0,581 | 1140 s (GPU occupata) | 0,404 s | passa |
+| qwen3-embedding:4b | 0,99 / 0,849 | 0,76 / 0,559 | 0,99 / 0,749 | 0,776 | 2043 s | 1,188 s | no |
+| qwen3-embedding:8b | **1,00 / 0,892** | 0,76 / 0,577 | 1,00 / 0,768 | **0,917** | 3156 s | 2,046 s | no |
+| bge-m3 | 0,93 / 0,716 | 0,74 / 0,531 | 0,93 / 0,702 | 0,597 | 259 s | 0,284 s | passa |
+| embeddinggemma | 0,91 / 0,742 | 0,74 / 0,541 | 0,91 / 0,652 | 0,806 | 148 s | 0,261 s | passa |
+
+Confronto appaiato hit@8 contro BM25, denso: 0.6b +28, 4b +35, 8b +36, bge-m3 +31,
+embeddinggemma +30; nessuna domanda `exam` persa da nessun denso. Gate Q dell'ibrido O1:
+passa per tutti (+17..+19, 0 perdite `exam`, MRR sopra BM25).
+
+**Percorso della query su GPU** (piano C1: il migliore per qualità fallisce solo il gate L).
+5 ripetizioni con `qwen3.5:9b` residente: l'embedding della domanda su GPU scarica il 9B.
+
+| Modello | Embedding query su GPU | Ricarica del 9B per la risposta |
+| --- | --- | --- |
+| qwen3-embedding:8b | 4,0-8,2 s | 7,2-8,0 s |
+| qwen3-embedding:4b | 2,7-7,3 s | 7,2-13,6 s |
+
+Il percorso GPU costa 10-20 s a domanda: per 8b e 4b la query su CPU (p95 2,0 s e 1,2 s, 9B
+residente) è il percorso migliore. BASIS: measured.
+
+Lettura: il denso da solo vince su ogni modello; il BM25 in fusione abbassa l'MRR senza
+aggiungere recall su questo gold. Limiti: 42 domande su 70 (`paraphrase`, `crosslingual`) sono
+costruite in modo sfavorevole al BM25; mancano domande su termini esatti (sigle, numeri di
+articolo, nomi propri), dove il BM25 dovrebbe aiutare; il materiale inglese è sintetico.
+
+## Varianti (T016)
+
+In v1.1 resta solo la soglia minima di coseno per `qwen3-embedding:8b`. Sweep offline sulle liste
+top-50 di `--system dense --k 50 --judgments` (stessi giudizi alla cieca di § Scelta, nessun nuovo
+embedding): un passaggio sotto soglia è tolto prima del taglio a 8. Regola (piano C1, Dis.4 B):
+perdere al massimo 1 domanda di hit@8 rispetto a nessuna soglia, minimizzando i passaggi sopra
+soglia delle 11 domande `negative`. Riproducibile con `scripts/eval_hybrid_analysis.py sweep
+--dense out/x8b-dense.json --judgments judging` (verificato: stessa tabella).
+
+| Soglia | hit@8 su 82 | Perse | Passaggi `negative` sopra soglia (top-8) | Domande `negative` con almeno un passaggio |
+| --- | --- | --- | --- | --- |
+| nessuna | 82 | 0 | 88 | 11 |
+| 0,35 | 82 | 0 | 70 | 9 |
+| 0,40 | 81 | 1 | 44 | 6 |
+| 0,44 | 81 | 1 | 27 | 6 |
+| 0,45 | 81 | 1 | 24 | 5 |
+| **0,46** | **81** | **1** | **20** | **3** |
+| 0,465 | 80 | 2 | 20 | 3 |
+| 0,48 | 77 | 5 | 20 | 3 |
+| 0,50 | 75 | 7 | 17 | 3 |
+
+Coseni del primo passaggio delle 11 `negative`: 0,280-0,639; dei top-8 di tutte le domande:
+0,252-0,893.
+
+**Soglia scelta: 0,46** per la regola scritta prima della misura (1 domanda persa, passaggi
+`negative` da 88 a 20, domande `negative` con almeno un passaggio da 11 a 3). È sul bordo di un
+gradino: a 0,465 si perde una seconda domanda, a 0,48 cinque. Con 82 domande la posizione esatta
+del gradino è poco stabile; 0,44 dà margine (stessa perdita, 27 passaggi e 6 domande `negative`)
+ed è il ripiego se la misura su un corso reale (F2) perde più di quanto qui previsto.
+BASIS: measured su questo gold; la stabilità della soglia su altri corsi è unknown.
+
+## Cache di misura (T019)
+
+Il 2026-10-07 restano in `data/eval/retrieval-hybrid/cache/` solo i vettori del modello scelto,
+`qwen3-embedding_8b-ada0db1b.npz` (il suffisso è l'impronta del prompt dei documenti). Rimosse le
+cache di 0.6b, 4b, bge-m3 ed embeddinggemma, insieme ai modelli in Ollama: rimisurarli richiede
+di riscaricarli e ricalcolare i vettori.
+
+## Scelta (T018)
+
+**Modello** (decisione dell'utente, 2026-10-07, "D1a"): `qwen3-embedding:8b`, embedding della
+query su CPU (`num_gpu=0`), istruzione Qwen sulla query, documenti senza prefisso. Il gate L
+(p95 <= 1,0 s) non è soddisfatto (p95 2,05 s): l'utente accetta circa 2 s in più a domanda in
+cambio della qualità massima. Il 9B resta residente su questo percorso; il percorso GPU costa
+10-20 s a domanda ed è scartato.
+
+**Fusione** (decisione dell'utente, "D2a"): prima si aggiungono 12 domande `exact` (termini
+letterali rari: articoli, sigle, nomi propri, cifre) e si confronta il denso da solo con la RRF a
+2 liste pesata 2:1, ricostruita da liste top-50. Se la pesata vince sulle `exact` senza perdere
+sul resto, resta l'ibrido pesato; altrimenti denso da solo con BM25 come fallback quando il
+modello manca.
+
+Esito (2026-10-07): 12 domande `exact` aggiunte (`check_gold.py`: 93 domande, 0 errori), BM25 e
+`qwen3-embedding:8b` rieseguiti con top-50 (`out/x8b-*.json`), pesata ricostruita da quelle liste
+(`scripts/eval_hybrid_analysis.py weighted`, verificato: stessa tabella),
+209 passaggi nuovi giudicati alla cieca (`judging/batch-11..12.json`, nessun voto mancante).
+
+| Tipo (n) | BM25 r@8 / MRR | Denso 8b r@8 / MRR | Pesata 2:1 r@8 / MRR |
+| --- | --- | --- | --- |
+| exact (12) | 1,00 / 0,892 | 1,00 / 1,000 | 1,00 / 1,000 |
+| exam (12) | 0,83 / 0,653 | 1,00 / 0,917 | 1,00 / 0,861 |
+| paraphrase (26) | 0,04 / 0,027 | 1,00 / 0,776 | 0,65 / 0,299 |
+| lecture (16) | 0,94 / 0,757 | 1,00 / 0,953 | 1,00 / 0,969 |
+| crosslingual (16) | 0,50 / 0,319 | 1,00 / 1,000 | 0,94 / 0,708 |
+| tutte (82) | 0,56 / 0,445 | 1,00 / 0,908 | 0,88 / 0,694 |
+
+La pesata pareggia sulle `exact` e perde sul resto: con liste da 50 il BM25 porta più rumore che
+con liste da 10. Per la regola D2a la fusione è scartata.
+
+SPEDITO: iter 5/5 candidati + 1 variante di fusione - `qwen3-embedding:8b`, query su CPU con
+istruzione Qwen, ricerca solo densa, BM25 come fallback quando il modello manca o Ollama non
+risponde. Gate L non rispettato per scelta dell'utente (p95 2,05 s). BASIS: measured, tranne la
+pesata (inferred, ricostruzione offline).
