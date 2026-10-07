@@ -47,3 +47,32 @@ def format_document(*, text: str, model: str) -> str:
     if model_family(model) == GEMMA_FAMILY:
         return GEMMA_DOCUMENT_TEMPLATE.format(text=text)
     return text
+
+
+EMBEDDING_PROMPT_VERSION = 1  # Bump when a template or threshold changes.
+EMBEDDING_THRESHOLDS: dict[str, float | None] = {
+    "qwen3-embedding:8b": 0.46,
+}
+
+
+def format_query(model: str, text: str) -> str:
+    """Apply known query instructions; preserve text for unknown model families."""
+    if not model.startswith(KNOWN_FAMILIES):
+        return text
+    return apply_query_instruction(question=text, enabled=True, model=model)
+
+
+def embedding_threshold(model: str) -> float | None:
+    """Return the measured cosine floor, or None for an unmeasured model."""
+    return EMBEDDING_THRESHOLDS.get(model)
+
+
+def format_document_for_production(*, model: str, text: str) -> str:
+    """Apply the known document prompt; preserve text for unknown model families.
+
+    Mirrors format_query: a model the harness measured gets the same document
+    prompt it was measured with, so production vectors match eval.md.
+    """
+    if not model.startswith(KNOWN_FAMILIES):
+        return text
+    return format_document(text=text, model=model)
