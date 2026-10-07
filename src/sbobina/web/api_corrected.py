@@ -1,4 +1,3 @@
-import logging
 import threading
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -44,7 +43,6 @@ MAX_EXPECTED_CHARS = 20000
 # Edits are read-modify-write on one JSON file; the threadpool would
 # otherwise let two saves interleave and drop one of them.
 _EDIT_LOCK = threading.Lock()
-logger = logging.getLogger(__name__)
 
 
 class JobInProgressError(ConflictError):
@@ -176,17 +174,9 @@ def edit_corrected(request: Request, job_id: str, edit: SpanEdit) -> dict[str, A
         except EditConflictError as err:
             raise ConflictError(message=str(err), code="EDIT_CONFLICT") from err
         _save_corrected(request=request, record=record, path=path, transcript=edited)
-    _enqueue_embedding(request=request, record=record)
+    maybe_enqueue_embed(supervisor=request.app.state.supervisor, record=record)
     return reader_payload(
         transcript=edited,
         options=job_render_options(request=request, record=record),
         revision=transcript_revision(transcript_to_json(edited)),
     )
-
-
-def _enqueue_embedding(*, request: Request, record: JobRecord) -> None:
-    # The edit is already saved: an indexing failure must not turn it into a 500.
-    try:
-        maybe_enqueue_embed(supervisor=request.app.state.supervisor, record=record)
-    except Exception:
-        logger.exception("Automatic embedding enqueue failed for job %s", record.id)

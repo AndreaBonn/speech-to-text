@@ -128,7 +128,25 @@ def maybe_enqueue_embed(
     record: JobRecord | None = None,
     item: WorkItem | None = None,
 ) -> None:
-    """Queue one course after a text change, or persist model unavailability."""
+    """Queue one course after a text change; log failures, the change itself stands."""
+    try:
+        _enqueue_after_change(
+            supervisor=supervisor, course_id=course_id, record=record, item=item
+        )
+    except Exception:
+        logger.exception(
+            "Automatic embedding enqueue failed (course %s, job %s)",
+            course_id,
+            getattr(item, "job_id", None) or getattr(record, "id", None),
+        )
+
+
+def _enqueue_after_change(
+    supervisor: "Supervisor",
+    course_id: str | None,
+    record: JobRecord | None,
+    item: WorkItem | None,
+) -> None:
     if not settings.semantic_search:
         return
     if item is not None:

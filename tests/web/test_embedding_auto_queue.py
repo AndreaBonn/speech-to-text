@@ -110,3 +110,25 @@ def test_maybe_enqueue_embed_concurrent_submissions_queue_one(
     _enqueue(harness=harness)
     assert harness.record().status is EmbeddingStatus.QUEUED
     assert len(harness.supervisor._queue) == 1
+
+
+def test_maybe_enqueue_embed_unexpected_error_is_logged_not_raised(
+    embedding_harness: EmbeddingHarness,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    harness = embedding_harness
+    monkeypatch.setattr(settings, "semantic_search", True)
+
+    def broken(**kwargs: object) -> ModelStatus:
+        raise RuntimeError("unexpected client failure")
+
+    monkeypatch.setattr(ollama_embed, "model_status", broken)
+    _enqueue(harness=harness)
+
+    assert "Automatic embedding enqueue failed" in caplog.text
+    assert caplog.records[-1].exc_info is not None
+    assert list(harness.supervisor._queue) == []
+    _available(monkeypatch=monkeypatch)
+    _enqueue(harness=harness)
+    assert len(harness.supervisor._queue) == 1
