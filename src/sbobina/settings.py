@@ -80,6 +80,10 @@ class Settings(BaseSettings):
     vad_filter: bool = False
     ollama_model: str = "qwen3.5:9b"
     ollama_host: str = "http://localhost:11434"
+    semantic_search: bool = True
+    embedding_model: str = "qwen3-embedding:8b"
+    # CPU queries: p95 2.05 s, estimated cold start 4-5 s; 30 s leaves headroom.
+    embedding_timeout_s: float = Field(default=30.0, gt=0.0)
     correction_chunk_words: int = Field(default=200, ge=20)
     study_block_words: int = Field(default=1200, gt=0)
     study_num_predict: int = Field(default=2048, gt=0)

@@ -8,6 +8,38 @@ from sbobina.web.job_models import JobConfig
 SENTINEL = "sk-SENTINEL-do-not-leak"
 
 
+def test_settings_semantic_search_defaults_to_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(name="SBOBINA_SEMANTIC_SEARCH", raising=False)
+
+    assert Settings().semantic_search is True
+
+
+def test_settings_semantic_search_can_be_disabled_from_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(name="SBOBINA_SEMANTIC_SEARCH", value="false")
+
+    assert Settings().semantic_search is False
+
+
+def test_settings_embedding_model_defaults_to_evaluated_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(name="SBOBINA_EMBEDDING_MODEL", raising=False)
+
+    assert Settings().embedding_model == "qwen3-embedding:8b"
+
+
+def test_settings_embedding_model_accepts_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(name="SBOBINA_EMBEDDING_MODEL", value="x")
+
+    assert Settings().embedding_model == "x"
+
+
 def test_settings_course_doc_max_mb_accepts_the_package_member_cap() -> None:
     assert Settings(course_doc_max_mb=200).course_doc_max_mb == 200
 
