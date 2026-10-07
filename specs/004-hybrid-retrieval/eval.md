@@ -409,6 +409,35 @@ del gradino è poco stabile; 0,44 dà margine (stessa perdita, 27 passaggi e 6 d
 ed è il ripiego se la misura su un corso reale (F2) perde più di quanto qui previsto.
 BASIS: measured su questo gold; la stabilità della soglia su altri corsi è unknown.
 
+## Indicizzazione (T033)
+
+Misurata il 2026-10-07 con `qwen3-embedding:8b`, Ollama 0.18, 100 passaggi del corpus di misura
+(`judging/batch-1.json`), `num_ctx` 2048, `/api/ps` vuoto prima di ogni serie, un embedding di
+riscaldamento escluso dal tempo. Script: `scratchpad/t033.py` (misura una tantum, [M]).
+
+**Condizione non pulita:** il container `voicestudio` (avviato dall'utente, non legato a sbobina)
+occupava 2,7 GB di VRAM; Ollama vedeva 3,8 GiB disponibili e ha caricato l'8b con 30 layer su 37
+in GPU (`size_vram` 3,96 GB). I numeri sono quindi un limite inferiore.
+
+| Batch | Tempo per 100 unità | Unità/s | Note |
+| --- | --- | --- | --- |
+| 32 | 117,8 s | 0,85 | include un ricaricamento del modello (log: 9/37 poi 30/37 layer) |
+| 8 | 58,6 s | 1,71 | modello già caricato, 30/37 layer |
+
+Confronto con § Candidati: 3156 s per 552 unità erano circa 0,18 unità/s, ma quel tempo
+comprendeva anche le 93 query su CPU e i caricamenti alternati fra CPU e GPU dello stesso
+modello (vedi sotto). Un corso da 3.000 unità a 0,85-1,7 unità/s richiede **30-60 minuti**, non
+4-5 ore: la stima di R7 nel piano va rivista. Soglia di T045 (0,5 unità/s): superata, **T045 non
+necessario**. Da rimisurare con la GPU libera prima di T044, insieme alla scelta del batch.
+
+**Convivenza CPU/GPU (R12): l'istanza GPU non sopravvive.** Una query con `num_gpu=0` lanciata
+3 s dopo l'inizio di un batch GPU ha aspettato la fine del batch, poi Ollama ha scaricato
+l'istanza GPU e ricaricato il modello su CPU (`/api/ps` durante la query: `size_vram` 0; log:
+"offloaded 0/37 layers"). La query ha impiegato 63,8 s. Ollama tiene una sola istanza per
+modello. Conseguenza per T041: mentre gira un'indicizzazione la chat non deve chiedere
+l'embedding della domanda, ma passare al BM25 con `reason="gpu_busy"`; altrimenti aspetta
+l'intero batch e costringe a ricaricare il modello due volte. BASIS: measured.
+
 ## Cache di misura (T019)
 
 Il 2026-10-07 restano in `data/eval/retrieval-hybrid/cache/` solo i vettori del modello scelto,
@@ -451,3 +480,35 @@ SPEDITO: iter 5/5 candidati + 1 variante di fusione - `qwen3-embedding:8b`, quer
 istruzione Qwen, ricerca solo densa, BM25 come fallback quando il modello manca o Ollama non
 risponde. Gate L non rispettato per scelta dell'utente (p95 2,05 s). BASIS: measured, tranne la
 pesata (inferred, ricostruzione offline).
+
+## Produzione (T032)
+
+### Gold set attraverso il codice di produzione (2026-10-07)
+
+`scripts/eval_hybrid.py --system production --index --k 50 --judgments judging`: il corpus di
+misura viene indicizzato da `vector_reconcile.embed_course` in un `vectors.sqlite3` dedicato e ogni
+domanda passa da `course_retrieval.retrieve_windows_with_report` con il `DenseRanker` di
+produzione (soglia 0,46, query su CPU). Indicizzazione: 552 unità in 270 s (1,95-2,64 unità/s, GPU
+meno contesa che in T033). 93 domande su 93 con `mode=dense`, nessun ripiego sul BM25.
+
+| Tipo (n) | Harness § Scelta r@8 / MRR | Produzione r@8 / MRR |
+| --- | --- | --- |
+| exam (12) | 1,00 / 0,917 | 1,00 / 0,917 |
+| paraphrase (26) | 1,00 / 0,776 | 0,96 / 0,769 |
+| lecture (16) | 1,00 / 0,953 | 1,00 / 0,841 |
+| crosslingual (16) | 1,00 / 1,000 | 1,00 / 1,000 |
+| exact (12) | 1,00 / 1,000 | 1,00 / 0,944 |
+
+Recall entro ±1 domanda dalla verifica del piano. Divergenze spiegate:
+
+- `eco-par-01` senza risultati: tutti i candidati del corso stanno sotto la soglia 0,46, che la
+  produzione applica e l'harness di § Scelta no. È la domanda che lo sweep di § Varianti dava già
+  per persa a 0,46. BASIS: measured.
+- MRR più basso su `lecture` ed `exact` (`dir-lec-08`, `dir-lec-11`, `dir-ex-01` a rank 3-5): il
+  corpus di misura contiene la stessa registrazione in due job (§ Corpus), e la produzione restituisce
+  entrambe le copie delle finestre, che occupano le prime posizioni. Su un corso senza registrazioni
+  duplicate l'effetto non dovrebbe esistere. BASIS: inferred (top-5 osservati, corso senza duplicati
+  non misurato).
+
+Restano da misurare in T032 i turni di chat reali (10 col 9B residente, 10 con una generazione in
+corso) e la latenza della query in quelle condizioni.

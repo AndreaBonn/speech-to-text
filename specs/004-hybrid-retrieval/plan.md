@@ -155,16 +155,17 @@ Aperti:
 - [ ] Scelta del percorso in `course_retrieval.retrieve_windows(..., dense: DenseRanker | None =
       None)`: denso se il modello risponde e la copertura del corso è 100%; altrimenti il BM25
       di oggi, invariato. `dense=None` dà output identico a oggi (la suite esistente è il test di
-      non regressione). `RetrievalReport` con `mode: dense | lexical`, `reason` (`disabled`,
-      `model_missing`, `unreachable`, `not_indexed`, `partial`, `rebuild_needed`, `gpu_busy`) e
-      copertura.
+      non regressione). `RetrievalReport` con `mode: dense | bm25` (nome interno; l'etichetta mostrata all'utente si decide in C4), `reason` (`disabled`,
+      `model_missing`, `unreachable`, `not_indexed`, `partial`, `stale_vectors`, `rebuild_needed`,
+      `gpu_busy`) e copertura. `stale_vectors`: il manifest del corso è completo ma il testo di
+      qualche unità è cambiato dopo l'indicizzazione (finding F7 della review di T026).
       - Given un corso con copertura 118/120; When lo studente fa una domanda; Then risponde il
-        BM25, `retrieval_mode = {"mode": "lexical", "reason": "partial"}`, copertura 118/120.
+        BM25, `retrieval_mode = {"mode": "bm25", "reason": "partial"}`, copertura 118/120.
 - [ ] Chat e generazioni passano il ramo denso e registrano `retrieval_mode` (campo opzionale:
       JSONL e metadati vecchi si leggono ancora); la risposta API della chat lo espone; WARNING
       nel log a ogni degrado, una volta per processo e motivo.
       - Given il modello configurato non installato; When lo studente fa una domanda in chat;
-        Then la risposta arriva dal BM25, il record ha `retrieval_mode = {"mode": "lexical",
+        Then la risposta arriva dal BM25, il record ha `retrieval_mode = {"mode": "bm25",
         "reason": "model_missing"}` e il log ha un WARNING col nome del modello.
 - [ ] `gpu_release.unload_ollama_models` scarica ogni modello in un `try` separato.
 - [ ] Riproduzione attraverso il codice di produzione: harness `--system production` sul corpus
