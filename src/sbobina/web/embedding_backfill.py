@@ -8,7 +8,7 @@ from sbobina.web.embedding_supervisor import submit_embed_item
 from sbobina.web.errors import ConflictError
 from sbobina.web.job_models import WorkItem
 from sbobina.web.job_store import JobStore
-from sbobina.web.vector_reconcile import embedding_model_key
+from sbobina.web.vector_reconcile import count_missing_units, embedding_model_key
 from sbobina.web.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ def enqueue_backfill(
     status: ModelStatus,
     confirm_model_change: bool = False,
 ) -> BackfillResult:
-    """Persist queued runs for incomplete manifests, gating model changes.
+    """Persist queued runs for courses with unindexed units, gating model changes.
 
     Parameters
     ----------
@@ -54,7 +54,11 @@ def enqueue_backfill(
         return BackfillResult(model_change_pending=True, items=())
     items: list[WorkItem] = []
     for course in iter_courses(courses_dir=store.courses_dir):
-        coverage = vectors.coverage(course=course.key, model_key=key)
-        if coverage.embedded < coverage.total:
+        # Units on disk, not the manifest: a never-indexed course has no manifest
+        # and a stale one misses text added since the last run.
+        missing = count_missing_units(
+            store=store, vectors=vectors, model_key=key, course_key=course.key
+        )
+        if missing:
             items.extend(_enqueue_course(store=store, course_key=course.key))
     return BackfillResult(model_change_pending=False, items=tuple(items))

@@ -21,7 +21,11 @@ from sbobina.web.embedding_store import (
     save_embed,
 )
 from sbobina.web.job_store import JobStore
-from sbobina.web.vector_reconcile import embed_course, embedding_model_key
+from sbobina.web.vector_reconcile import (
+    CourseEmbedding,
+    embed_course,
+    embedding_model_key,
+)
 from sbobina.web.vector_store import Coverage, StoredVector, VectorStore
 
 STATUS = ModelStatus(digest="backfill-test", dimensions=2)
@@ -31,20 +35,22 @@ LARGE_DIMENSIONS = 4096
 VECTOR_COUNT = 128
 
 
+def _context(tmp_path: Path) -> CourseEmbedding:
+    context = make_context(tmp_path=tmp_path, fake=FakeEmbedder())
+    return replace(context, embedding=replace(context.embedding, status=STATUS))
+
+
 def test_enqueue_backfill_three_courses_queues_only_two_incomplete(
     tmp_path: Path,
 ) -> None:
-    store = JobStore(data_dir=tmp_path)
-    vectors = VectorStore(path=tmp_path / "vectors.sqlite3")
+    context = _context(tmp_path=tmp_path)
+    store, vectors = context.store, context.vectors
     courses = [
         write_course(store=store, label=label) for label in ("Uno", "Due", "Tre")
     ]
     for course in courses:
-        vectors.sync_units(course=course.key, units={"unit": course.key})
-    vectors.put_vectors(
-        model_key=MODEL_KEY,
-        vectors=[StoredVector(text_sha256="uno", vector=(1.0, 0.0), truncated=False)],
-    )
+        write_pages(store=store, course=course, texts=[f"Testo di {course.label}"])
+    embed_course(context=context, course_key=courses[0].key, progress=lambda _: None)
     version = vectors.data_version()
 
     result = enqueue_backfill(store=store, vectors=vectors, status=STATUS)
@@ -64,6 +70,7 @@ def test_enqueue_backfill_model_change_requires_confirmation(tmp_path: Path) -> 
     store = JobStore(data_dir=tmp_path)
     vectors = VectorStore(path=tmp_path / "vectors.sqlite3")
     course = write_course(store=store)
+    write_pages(store=store, course=course, texts=["Testo del corso"])
     vectors.sync_units(course=course.key, units={"unit": "hash"})
     vectors.put_vectors(
         model_key=OLD_MODEL,
@@ -106,7 +113,7 @@ def test_enqueue_backfill_active_course_does_not_block_remaining_courses(
     active = write_course(store=store, label="Attivo")
     pending = write_course(store=store, label="Incompleto")
     for course in (active, pending):
-        vectors.sync_units(course=course.key, units={"unit": course.key})
+        write_pages(store=store, course=course, texts=[f"Testo di {course.label}"])
     directory = store.courses_dir / active.id
     record = replace(create_embed(course_dir=directory), status=existing_status)
     save_embed(course_dir=directory, record=record)
