@@ -6,7 +6,7 @@ the Ollama call alone, never the retrieval before it (ADR D3).
 """
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from importlib import resources
 from pathlib import Path
 
@@ -35,7 +35,12 @@ from sbobina.web.chat_records import (
     ChatRecord,
 )
 from sbobina.web.chat_store import append_answer, append_question
-from sbobina.web.course_retrieval import WindowedQuery, course_scope, retrieve_windows
+from sbobina.web.course_retrieval import (
+    WindowedQuery,
+    course_scope,
+    retrieve_windows_with_report,
+)
+from sbobina.web.dense_factory import DenseRuntime
 from sbobina.web.errors import AppError, GatewayTimeoutError, ServiceUnavailableError
 from sbobina.web.gpu_lock import GpuArbiter, GpuBusyError
 from sbobina.web.job_store import JobStore
@@ -59,6 +64,7 @@ class ChatServices:
     # engines existed. False (api engine): the guard already sits on the
     # Ollama link alone, inside the fallback chain built by llm_factory.
     guard_whole_client: bool = True
+    dense: DenseRuntime = field(default_factory=DenseRuntime)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -143,9 +149,9 @@ def _ollama_error(error: Exception, arbiter: GpuArbiter) -> AppError:
 
 def _passages(
     services: ChatServices, key: str, question: str
-) -> list[RetrievedPassage]:
+) -> tuple[list[RetrievedPassage], dict[str, object]]:
     with search_session(store=services.store, path=services.index_path) as index:
-        return retrieve_windows(
+        passages, report = retrieve_windows_with_report(
             store=services.store,
             index=index,
             query=WindowedQuery(
@@ -153,7 +159,9 @@ def _passages(
                 question=question,
                 budget_words=budget_words(num_predict=CHAT_NUM_PREDICT),
             ),
+            dense=services.dense.ranker,
         )
+    return passages, services.dense.metadata(report=report)
 
 
 def _answer(
@@ -190,10 +198,8 @@ def _reply_to(
 
 
 def ask(
-    services: ChatServices,
-    where: ChatLocation,
-    records: list[ChatRecord],
-    question: str,
+    services: ChatServices, where: ChatLocation,
+    records: list[ChatRecord], question: str,
 ) -> ChatAnswerRecord:
     """Answer one question in an existing conversation and persist both."""
     courses_dir = services.store.courses_dir
@@ -204,7 +210,7 @@ def ask(
         chat_id=where.chat_id,
         text=question,
     )
-    passages = _passages(
+    passages, retrieval_mode = _passages(
         services=services,
         key=where.key,
         question=build_retrieval_question(question=question, history=history),
@@ -219,5 +225,5 @@ def ask(
         courses_dir=courses_dir,
         course_id=where.course_id,
         chat_id=where.chat_id,
-        reply=reply,
+        reply=replace(reply, retrieval_mode=retrieval_mode),
     )

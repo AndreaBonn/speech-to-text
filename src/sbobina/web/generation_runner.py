@@ -20,7 +20,6 @@ from sbobina.generation_models import (
     GenerationFormat,
     GenerationRecord,
     GenerationRequest,
-    GenerationSources,
     GenerationSourceUsed,
     GenerationStatus,
 )
@@ -39,23 +38,20 @@ from sbobina.ollama_chat import CONTEXT_WINDOW_TOKENS
 from sbobina.retrieval import (
     DocumentSource,
     LectureSource,
-    RetrievalScope,
     RetrievedPassage,
 )
 from sbobina.runtime_config import runtime_settings
 from sbobina.settings import settings
-from sbobina.web.course_retrieval import (
-    WindowedQuery,
-    course_scope,
-    lecture_revision,
-    retrieve_windows,
-    sample_course,
-)
+from sbobina.web.course_retrieval import lecture_revision
+from sbobina.web.dense_factory import DenseRuntime, dense_for_process
 from sbobina.web.document_store import read_document
 from sbobina.web.errors import NotFoundError
+from sbobina.web.generation_sources import (
+    GenerationRetrieval,
+    retrieve_generation_passages,
+)
 from sbobina.web.generation_store import find_running, save_generation
 from sbobina.web.job_store import JobStore
-from sbobina.web.search_index import SearchIndex
 from sbobina.web.search_service import search_session
 
 # Measured on qwen3.5:9b (T036, specs/001-course-workspace/eval-generations.md):
@@ -156,9 +152,7 @@ def build_sources(
 ) -> tuple[GenerationSourceUsed, ...]:
     """Every distinct source among the passages handed to the model (ADR D5).
 
-    All material given to the model, not only what ends up cited: simpler,
-    and sufficient to flag a changed source in generation_citations_api. A
-    lookup returning None (source gone by the time this runs) drops it.
+    Includes uncited material to detect source changes; missing sources are dropped.
     """
     doc_ids = frozenset(
         passage.source.doc_id
@@ -206,40 +200,10 @@ def _collect_sources(
     )
 
 
-def _selected_scope(
-    scope: RetrievalScope, sources: GenerationSources
-) -> RetrievalScope:
-    """Narrow scope to the user's explicit source picks; both empty means all."""
-    # One set for both kinds is safe: doc and job ids are distinct uuid4s, and
-    # each side is still filtered by its own course (course_id, scope.job_ids).
-    selected = frozenset(sources.doc_ids) | frozenset(sources.job_ids)
-    return replace(scope, selected=selected or None)
-
-
-def _retrieve(
-    job: GenerationJob,
-    index: SearchIndex,
-    request: GenerationRequest,
-    budget_words: int,
-) -> list[RetrievedPassage]:
-    scope = _selected_scope(
-        scope=course_scope(store=job.store, key=job.course_key),
-        sources=job.record.requested_sources,
-    )
-    if request.topic.strip():
-        return retrieve_windows(
-            store=job.store,
-            index=index,
-            query=WindowedQuery(
-                scope=scope, question=request.topic, budget_words=budget_words
-            ),
-        )
-    return sample_course(
-        store=job.store, index=index, scope=scope, budget_words=budget_words
-    )
-
-
-def execute_generation(job: GenerationJob, chat: GenerationChat, model: str) -> None:
+def execute_generation(
+    job: GenerationJob, chat: GenerationChat, model: str,
+    dense: DenseRuntime | None = None,
+) -> None:
     """Retrieve passages for job.record's request and persist the result."""
     request = GenerationRequest(
         format=job.record.format,
@@ -250,8 +214,9 @@ def execute_generation(job: GenerationJob, chat: GenerationChat, model: str) -> 
     options = compute_options(count=request.count, format_=request.format, model=model)
     budget_words = compute_budget_words(format_=request.format, options=options)
     with search_session(store=job.store, path=job.index_path) as index:
-        passages = _retrieve(
-            job=job, index=index, request=request, budget_words=budget_words
+        passages, retrieval_mode = retrieve_generation_passages(
+            context=GenerationRetrieval(job=job, dense=dense or DenseRuntime()),
+            index=index, request=request, budget_words=budget_words,
         )
     result = generate(request=request, passages=passages, chat=chat, options=options)
     sources = _collect_sources(job=job, passages=passages)
@@ -261,6 +226,7 @@ def execute_generation(job: GenerationJob, chat: GenerationChat, model: str) -> 
         record=replace(
             _to_record(record=job.record, result=result, sources=sources),
             served_by=(job.recorder.snapshot() or None) if job.recorder else None,
+            retrieval_mode=retrieval_mode,
         ),
     )
 
@@ -285,7 +251,10 @@ def run_generation_stage(course_dir: Path) -> None:
     config = runtime_settings(settings=settings)
     chat = llm_factory.build_from_settings(settings=config, recorder=job.recorder)
     label = llm_factory.effective_model_label(settings=config)
-    execute_generation(job=job, chat=chat, model=label)
+    execute_generation(
+        job=job, chat=chat, model=label,
+        dense=dense_for_process(settings=config, data_dir=data_dir),
+    )
 
 
 __all__ = [

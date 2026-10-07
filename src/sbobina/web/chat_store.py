@@ -95,6 +95,7 @@ def append_answer(
         error=reply.answer.error,
         created_at=_now(),
         served_by=reply.served_by,
+        retrieval_mode=reply.retrieval_mode,
     )
     _append(path=path, record=record)
     return record

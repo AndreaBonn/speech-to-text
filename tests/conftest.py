@@ -106,3 +106,20 @@ def _isolated_user_config_dir(
         "SBOBINA_TRANSCRIPTION_ENGINE",
     ):
         monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_dense_factory(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    from sbobina.ollama_embed import EmbeddingUnavailableError, ModelStatus
+    from sbobina.web import dense_factory
+
+    def unavailable(*, host: str, model: str, timeout_s: float) -> ModelStatus:
+        raise EmbeddingUnavailableError(reason="model_missing")
+
+    monkeypatch.setattr(dense_factory, "model_status", unavailable)
+    monkeypatch.setattr(dense_factory, "_VECTORS", {})
+    monkeypatch.setattr(dense_factory, "_RANKERS", {})
+    monkeypatch.setattr(dense_factory, "_WARNED", set())
+    yield
+    for vectors in dense_factory._VECTORS.values():
+        vectors.close()

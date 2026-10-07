@@ -43,6 +43,7 @@ class ChatAnswerRecord:
     created_at: str
     # Which provider/model answered (api engine); absent in older records.
     served_by: dict[str, int] | None = None
+    retrieval_mode: dict[str, object] | None = None
 
     def __post_init__(self) -> None:
         if self.discarded < 0:
@@ -60,6 +61,7 @@ class AnswerTo:
     question_id: str
     answer: ChatAnswer
     served_by: dict[str, int] | None = None
+    retrieval_mode: dict[str, object] | None = None
 
 
 def _citation_to_dict(citation: GenerationCitation) -> dict[str, object]:
@@ -110,6 +112,8 @@ def record_to_line(record: ChatRecord) -> str:
         }
         if record.served_by is not None:
             payload["served_by"] = record.served_by
+        if record.retrieval_mode is not None:
+            payload["retrieval_mode"] = record.retrieval_mode
     return json.dumps(payload, ensure_ascii=False)
 
 
@@ -135,4 +139,5 @@ def line_to_record(raw: dict[str, Any]) -> ChatRecord:
         error=None if raw["error"] is None else str(raw["error"]),
         created_at=str(raw["created_at"]),
         served_by=raw.get("served_by"),
+        retrieval_mode=raw.get("retrieval_mode"),
     )

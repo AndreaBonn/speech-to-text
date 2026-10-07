@@ -36,6 +36,7 @@ from sbobina.web.chat_store import (
     load_records,
 )
 from sbobina.web.chat_turn import ChatLocation, ChatServices, ask
+from sbobina.web.dense_factory import dense_for_process
 from sbobina.web.errors import NotFoundError
 from sbobina.web.generation_citations_api import CitationContext, resolve_citation
 
@@ -113,6 +114,9 @@ def _services(request: Request) -> ChatServices:
         chat_client=_chat_client(request=request),
         model=settings.ollama_model,
         guard_whole_client=settings.llm_engine == "local",
+        dense=dense_for_process(
+            settings=settings, data_dir=request.app.state.job_store.jobs_dir.parent
+        ),
     )
 
 
@@ -166,6 +170,7 @@ def _answer_payload(
         "error": record.error,
         "created_at": record.created_at,
         "served_by": record.served_by,
+        "retrieval_mode": record.retrieval_mode,
         "sentences": [
             {
                 "text": sentence.text,

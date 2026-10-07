@@ -183,6 +183,7 @@ class GenerationRecord:
     requested_sources: GenerationSources = field(default_factory=GenerationSources)
     # Which provider/model served how many requests (T024); absent before it.
     served_by: dict[str, int] | None = None
+    retrieval_mode: dict[str, object] | None = None
 
     def __post_init__(self) -> None:
         self._validate_status()
