@@ -126,7 +126,7 @@ body {
 }
 
 /* R6: the last-lecture entry names the lecture on a second line. */
-.rail__link--detail {
+.rail__link.rail__link--detail {
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
@@ -298,4 +298,12 @@ body {
 
 .breadcrumbs a {
   color: var(--color-ink-2);
+}
+
+/* S3: on narrow phones the brand would leave room for one destination only,
+   so the next one never showed and the row did not look scrollable. */
+@media (max-width: 480px) {
+  .rail__brand {
+    display: none;
+  }
 }
