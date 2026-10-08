@@ -21,6 +21,7 @@ from sbobina.embedding_units import (
 from sbobina.hybrid_eval import (
     RankedUnits,
 )
+from sbobina.lecture_windows import WINDOW_WORDS
 from sbobina.models import load_transcript
 from sbobina.retrieval import RetrievalScope, scoped_job_ids
 from sbobina.retrieval_metrics import DocumentRef
@@ -33,7 +34,6 @@ from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import SearchIndex
 from sbobina.web.search_service import PREFERRED_VARIANTS
 
-WINDOW_WORDS = 250
 # Universe-sized, not a word-budget cut: dense ranks the whole course, and no
 # real course has anywhere near this many passages or windows (plan.md
 # Research: 2.5-3k units for a semester course).
