@@ -1,10 +1,15 @@
 """SQLite schema, file locks and corruption recovery for the vector store."""
 
-import fcntl
 import sqlite3
+import sys
 from collections.abc import Iterator
 from contextlib import closing, contextmanager
 from pathlib import Path
+
+from filelock import FileLock
+
+if sys.platform != "win32":
+    import fcntl
 
 SCHEMA_VERSION = 1
 BUSY_TIMEOUT_PRAGMA = "PRAGMA busy_timeout = 5000"
@@ -46,6 +51,12 @@ class IntegrityError(sqlite3.DatabaseError):
 
 @contextmanager
 def file_lock(path: Path, *, is_exclusive: bool) -> Iterator[None]:
+    if sys.platform == "win32":
+        # No flock on Windows and msvcrt locks have no shared mode: readers
+        # serialize with each other too, which costs concurrency, not safety.
+        with FileLock(path.with_suffix(".lock")):
+            yield
+        return
     with path.with_suffix(".lock").open(mode="a+b") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX if is_exclusive else fcntl.LOCK_SH)
         try:

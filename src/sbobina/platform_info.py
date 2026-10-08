@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from sbobina.cuda_libs import wheel_library_modules
 from sbobina.settings import Settings
 
 SystemName = Literal["linux", "windows", "darwin", "other"]
-CUDA_LIBRARY_MODULES = ("nvidia.cublas.lib", "nvidia.cudnn.lib")
 CPUINFO_PATH = Path("/proc/cpuinfo")
 
 
@@ -93,7 +93,8 @@ def detect_platform() -> PlatformInfo:
     machine = platform.machine()
     try:
         cuda_libs_available = all(
-            importlib.util.find_spec(name) is not None for name in CUDA_LIBRARY_MODULES
+            importlib.util.find_spec(name) is not None
+            for name in wheel_library_modules(platform=sys.platform)
         )
     except ModuleNotFoundError:
         # find_spec raises when an optional NVIDIA parent package is absent.

@@ -208,6 +208,7 @@ def test_settings_unknown_runtime_value_raises(field: str, value: str) -> None:
     [
         (("linux", "x86_64", 1, True, 8), "linux"),
         (("win32", "AMD64", 0, False, 4), "windows"),
+        (("win32", "AMD64", 1, True, 4), "windows"),
         (("darwin", "arm64", 0, False, 8), "darwin"),
         (("darwin", "aarch64", 0, False, 8), "darwin"),
         (("darwin", "x86_64", 0, False, 8), "darwin"),
@@ -242,9 +243,11 @@ def test_detect_platform_reports_mocked_capabilities(
         cpu_count=cores or 1,
     )
     if wheels:
+        # Windows wheels ship only bin/ (DLLs); Linux wheels only lib/ (.so).
+        subdir = "bin" if system == "win32" else "lib"
         assert find_spec.call_count == 2
-        find_spec.assert_any_call("nvidia.cublas.lib")
-        find_spec.assert_any_call("nvidia.cudnn.lib")
+        find_spec.assert_any_call(f"nvidia.cublas.{subdir}")
+        find_spec.assert_any_call(f"nvidia.cudnn.{subdir}")
 
 
 @pytest.mark.parametrize(

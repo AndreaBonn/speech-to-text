@@ -11,13 +11,23 @@ import pytest
 from sbobina import cuda_libs
 
 
-@pytest.fixture
-def wheel_dirs(tmp_path: Path) -> tuple[Path, Path]:
-    cublas_dir = tmp_path / "nvidia" / "cublas" / "lib"
-    cudnn_dir = tmp_path / "nvidia" / "cudnn" / "lib"
+def _make_wheel_dirs(root: Path, subdir: str) -> tuple[Path, Path]:
+    cublas_dir = root / "nvidia" / "cublas" / subdir
+    cudnn_dir = root / "nvidia" / "cudnn" / subdir
     cublas_dir.mkdir(parents=True)
     cudnn_dir.mkdir(parents=True)
     return cublas_dir, cudnn_dir
+
+
+@pytest.fixture
+def wheel_dirs(tmp_path: Path) -> tuple[Path, Path]:
+    return _make_wheel_dirs(root=tmp_path, subdir="lib")
+
+
+@pytest.fixture
+def windows_wheel_dirs(tmp_path: Path) -> tuple[Path, Path]:
+    # Layout of the win_amd64 wheels: DLLs under bin/, no lib/ directory.
+    return _make_wheel_dirs(root=tmp_path, subdir="bin")
 
 
 def _fake_package(name: str, path: Path | None = None) -> ModuleType:
@@ -29,24 +39,38 @@ def _fake_package(name: str, path: Path | None = None) -> ModuleType:
 def _patch_wheels(
     cublas_dir: Path, cudnn_dir: Path
 ) -> AbstractContextManager[dict[str, ModuleType]]:
+    subdir = cublas_dir.name
     nvidia = _fake_package("nvidia")
     nvidia_cublas = _fake_package("nvidia.cublas")
     nvidia_cudnn = _fake_package("nvidia.cudnn")
-    cublas_lib = _fake_package("nvidia.cublas.lib", cublas_dir)
-    cudnn_lib = _fake_package("nvidia.cudnn.lib", cudnn_dir)
+    cublas_sub = _fake_package(f"nvidia.cublas.{subdir}", cublas_dir)
+    cudnn_sub = _fake_package(f"nvidia.cudnn.{subdir}", cudnn_dir)
     nvidia.__dict__.update(cublas=nvidia_cublas, cudnn=nvidia_cudnn)
-    nvidia_cublas.__dict__.update(lib=cublas_lib)
-    nvidia_cudnn.__dict__.update(lib=cudnn_lib)
+    nvidia_cublas.__dict__.update({subdir: cublas_sub})
+    nvidia_cudnn.__dict__.update({subdir: cudnn_sub})
     return patch.dict(
         "sys.modules",
         {
             "nvidia": nvidia,
             "nvidia.cublas": nvidia_cublas,
             "nvidia.cudnn": nvidia_cudnn,
-            "nvidia.cublas.lib": cublas_lib,
-            "nvidia.cudnn.lib": cudnn_lib,
+            f"nvidia.cublas.{subdir}": cublas_sub,
+            f"nvidia.cudnn.{subdir}": cudnn_sub,
         },
     )
+
+
+@pytest.mark.parametrize(
+    ("platform", "expected"),
+    [
+        ("linux", ("nvidia.cublas.lib", "nvidia.cudnn.lib")),
+        ("win32", ("nvidia.cublas.bin", "nvidia.cudnn.bin")),
+    ],
+)
+def test_wheel_library_modules_follows_wheel_layout(
+    platform: str, expected: tuple[str, str]
+) -> None:
+    assert cuda_libs.wheel_library_modules(platform=platform) == expected
 
 
 def test_preload_missing_wheels_warns_and_returns_empty(
@@ -54,10 +78,30 @@ def test_preload_missing_wheels_warns_and_returns_empty(
 ) -> None:
     with (
         patch.dict("sys.modules", {"nvidia.cublas.lib": None}),
+        patch.object(cuda_libs, "sys", SimpleNamespace(platform="linux")),
         caplog.at_level(logging.WARNING),
     ):
         loaded = cuda_libs.preload_cuda_libraries()
     assert loaded == []
+    assert "GPU inference unavailable" in caplog.text
+
+
+def test_preload_windows_with_linux_layout_warns_and_returns_empty(
+    wheel_dirs: tuple[Path, Path],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Only lib/ present: on Windows that is not where the DLLs live.
+    cublas_dir, cudnn_dir = wheel_dirs
+    with (
+        _patch_wheels(cublas_dir, cudnn_dir),
+        patch.dict("sys.modules", {"nvidia.cublas.bin": None}),
+        patch.object(cuda_libs, "sys", SimpleNamespace(platform="win32")),
+        patch.object(os, "add_dll_directory", create=True) as add_dir,
+        caplog.at_level(logging.WARNING),
+    ):
+        loaded = cuda_libs.preload_cuda_libraries()
+    assert loaded == []
+    add_dir.assert_not_called()
     assert "GPU inference unavailable" in caplog.text
 
 
@@ -85,51 +129,59 @@ def test_preload_linux_loads_matching_shared_objects(
     }
 
 
-def test_preload_windows_registers_bin_and_lib_directories(
-    wheel_dirs: tuple[Path, Path],
+def test_preload_windows_registers_bin_and_loads_cuda_dlls(
+    windows_wheel_dirs: tuple[Path, Path],
 ) -> None:
-    # cublas ships both bin/ (DLLs) and lib/ (the imported package dir);
-    # cudnn only ships lib/, as on Linux: both must still be registered.
-    cublas_dir, cudnn_dir = wheel_dirs
-    (cublas_dir.parent / "bin").mkdir()
+    cublas_dir, cudnn_dir = windows_wheel_dirs
+    for name in ("cublas64_12.dll", "cublasLt64_12.dll", "nvblas64_12.dll"):
+        (cublas_dir / name).touch()
+    for name in ("cudnn64_9.dll", "cudnn_ops64_9.dll"):
+        (cudnn_dir / name).touch()
+
     with (
         _patch_wheels(cublas_dir, cudnn_dir),
         patch.object(cuda_libs, "sys", SimpleNamespace(platform="win32")),
         patch.object(os, "add_dll_directory", create=True) as add_dir,
+        patch.object(ctypes, "CDLL") as cdll,
     ):
-        registered = cuda_libs.preload_cuda_libraries()
+        loaded = cuda_libs.preload_cuda_libraries()
 
-    assert add_dir.call_count == 3
-    add_dir.assert_any_call(str(cublas_dir.parent / "bin"))
-    add_dir.assert_any_call(str(cublas_dir))
-    add_dir.assert_any_call(str(cudnn_dir))
-    assert registered == [cublas_dir.parent / "bin", cublas_dir, cudnn_dir]
+    assert [call.args for call in add_dir.call_args_list] == [
+        (str(cublas_dir),),
+        (str(cudnn_dir),),
+    ]
+    # cublasLt first: cublas64_12.dll depends on it; nvblas is never needed.
+    assert [path.name for path in loaded] == [
+        "cublasLt64_12.dll",
+        "cublas64_12.dll",
+        "cudnn64_9.dll",
+        "cudnn_ops64_9.dll",
+    ]
+    assert [call.args for call in cdll.call_args_list] == [
+        (str(path),) for path in loaded
+    ]
 
 
-def test_preload_windows_no_directories_found_warns(
-    wheel_dirs: tuple[Path, Path],
-    caplog: pytest.LogCaptureFixture,
+def test_preload_windows_dll_load_failure_propagates(
+    windows_wheel_dirs: tuple[Path, Path],
 ) -> None:
-    cublas_dir, cudnn_dir = wheel_dirs
-    cublas_dir.rmdir()
-    cudnn_dir.rmdir()
+    # transcriber._preload_cuda_if_needed turns OSError into a CPU fallback.
+    cublas_dir, cudnn_dir = windows_wheel_dirs
+    (cublas_dir / "cublas64_12.dll").touch()
     with (
         _patch_wheels(cublas_dir, cudnn_dir),
         patch.object(cuda_libs, "sys", SimpleNamespace(platform="win32")),
-        patch.object(os, "add_dll_directory", create=True) as add_dir,
-        caplog.at_level(logging.WARNING),
+        patch.object(os, "add_dll_directory", create=True),
+        patch.object(ctypes, "CDLL", side_effect=OSError("missing dependency")),
+        pytest.raises(OSError, match="missing dependency"),
     ):
-        registered = cuda_libs.preload_cuda_libraries()
-
-    assert registered == []
-    add_dir.assert_not_called()
-    assert "Nessuna cartella DLL" in caplog.text
+        cuda_libs.preload_cuda_libraries()
 
 
 def test_register_windows_dll_directories_non_windows_registers_nothing(
-    wheel_dirs: tuple[Path, Path],
+    windows_wheel_dirs: tuple[Path, Path],
 ) -> None:
-    directories = list(wheel_dirs)
+    directories = list(windows_wheel_dirs)
     with (
         patch.object(cuda_libs, "sys", SimpleNamespace(platform="linux")),
         patch.object(os, "add_dll_directory", create=True) as add_dir,

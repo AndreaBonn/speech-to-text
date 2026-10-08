@@ -13,6 +13,7 @@ dependencies = [
     "av>=17,<19",
     "fastapi>=0.142.2",
     "faster-whisper>=1.2.1",
+    "filelock>=3.20",
     "fsrs>=6.3,<7",
     "httpx>=0.28.1",
     "jinja2>=3.1.6",

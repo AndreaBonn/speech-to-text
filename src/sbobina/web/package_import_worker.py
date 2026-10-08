@@ -27,7 +27,20 @@ DEFAULT_MAX_MEMORY_MB = 2048
 TERMINATE_TIMEOUT_S = 5.0
 # package_import_runner exits with this on MemoryError; -9 is the kernel's kill.
 MEMORY_EXIT_CODE = 3
-MEMORY_EXIT_CODES = frozenset({MEMORY_EXIT_CODE, -signal.SIGKILL})
+
+
+def memory_exit_codes(platform: str) -> frozenset[int]:
+    """Exit codes meaning the import child ran out of memory on ``platform``.
+
+    Windows has neither ``signal.SIGKILL`` nor RLIMIT_AS (see ``child_limits``),
+    so only the runner's own code applies there.
+    """
+    if platform == "win32":
+        return frozenset({MEMORY_EXIT_CODE})
+    return frozenset({MEMORY_EXIT_CODE, -signal.SIGKILL})
+
+
+MEMORY_EXIT_CODES = memory_exit_codes(platform=sys.platform)
 
 
 class PackageImportStatus(StrEnum):
