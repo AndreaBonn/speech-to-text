@@ -17,7 +17,7 @@ from sbobina.web.job_models import JobRecord
 from sbobina.web.job_store import JobStore
 from sbobina.web.lecture_title import reader_title as _reader_title
 from sbobina.web.model_service import list_whisper_models, ollama_status
-from sbobina.web.pages_nav import build_nav, course_breadcrumbs
+from sbobina.web.pages_nav import build_nav, course_breadcrumbs, reader_nav_id
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -185,10 +185,11 @@ def lettore(request: Request, store: JobStoreDep, job_id: str) -> HTMLResponse:
             not_found=True,
             job_id=job_id,
         )
+    course = _reader_course(store=store, record=record)
     return _render(
         request=request,
         template_name="reader.html",
-        active="lettore",
+        active=reader_nav_id(store=store, job_id=job_id),
         store=store,
         page_title="Lettore",
         not_found=False,
@@ -196,10 +197,18 @@ def lettore(request: Request, store: JobStoreDep, job_id: str) -> HTMLResponse:
         has_audio=not record.imported,
         title=_reader_title(record),
         created_at=record.created_at.strftime("%d/%m/%Y"),
-        course=_reader_course(store=store, record=record),
+        course=course,
+        breadcrumbs=_course_path(course=course),
         course_max_length=MAX_COURSE_LABEL_LENGTH,
         subject=record.config.subject or "",
     )
+
+
+def _course_path(course: str) -> list[dict[str, str]]:
+    """Corsi › <course> above a lecture page, or no path for a lecture without one."""
+    if not course:
+        return []
+    return course_breadcrumbs(key=course_key(label=course), label=course)
 
 
 def _reader_course(store: JobStore, record: JobRecord) -> str:
@@ -227,11 +236,15 @@ def studio(request: Request, store: JobStoreDep, job_id: str) -> HTMLResponse:
     return _render(
         request=request,
         template_name="studio.html",
-        active="lettore",
+        active=reader_nav_id(store=store, job_id=job_id),
         store=store,
         page_title="Materiali di studio",
         job_id=job_id,
         title=_reader_title(record),
+        breadcrumbs=[
+            *_course_path(course=_reader_course(store=store, record=record)),
+            {"label": _reader_title(record), "href": f"/lettore/{job_id}"},
+        ],
     )
 
 

@@ -105,6 +105,15 @@
     min-width: 0;
   }
 
+  /* R5: one row on a phone; the seek bar and the word click cover the jumps. */
+  .audio-bar {
+    flex-wrap: nowrap;
+  }
+
+  .audio-bar__skip {
+    display: none;
+  }
+
   .reader {
     padding-bottom: calc(var(--player-height) * 1.6);
   }

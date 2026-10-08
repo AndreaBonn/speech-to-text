@@ -52,6 +52,12 @@ def _last_done_job(store: JobStore) -> JobRecord | None:
     return None
 
 
+def reader_nav_id(store: JobStore, job_id: str) -> str:
+    """Rail entry for a lecture page: the last lecture, or Corsi for any other."""
+    last = _last_done_job(store=store)
+    return "lettore" if last is not None and str(last.id) == job_id else "corsi"
+
+
 def build_nav(active: str, store: JobStore) -> list[dict[str, Any]]:
     last = _last_done_job(store=store)
     items = []

@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% block page_heading %}{% if not_found %}<h1 class="page-title">{{ page_title }}</h1>{% endif %}{% endblock %}
+
 {% block content %}
 {% if not_found %}
 <div class="empty-state" role="alert">
@@ -12,15 +14,20 @@
 <div class="reader" data-job-id="{{ job_id }}" data-has-audio="{{ has_audio | lower }}">
   <div class="reader__toolbar">
     <div class="reader__toolbar-title">
-      <h2 class="reader__title">{{ title }}</h2>
-      <p class="reader__subtitle">Caricata il {{ created_at }}</p>
-      <form id="course-form" class="course-field" data-subject="{{ subject }}" novalidate>
+      <h1 class="page-title reader__title">{{ title }}</h1>
+      <p class="reader__subtitle">
+        Caricata il {{ created_at }} · <span aria-live="polite">Corso: <strong id="course-current">{{ course or "nessuno" }}</strong></span>
+        <button type="button" id="course-edit" class="btn btn--ghost btn--inline"
+                aria-expanded="false" aria-controls="course-form">{% if course %}Modifica{% else %}Assegna{% endif %}</button>
+      </p>
+      <form id="course-form" class="course-field" data-subject="{{ subject }}" novalidate hidden>
         <label class="field__label" for="course-input">Corso</label>
         <div class="course-field__row">
           <input id="course-input" class="text-input course-field__input" name="course" type="text"
                  value="{{ course }}" maxlength="{{ course_max_length }}" list="course-options"
                  autocomplete="off" aria-describedby="course-error course-status">
           <button type="submit" class="btn btn--secondary">Salva corso</button>
+          <button type="button" id="course-cancel" class="btn btn--ghost">Annulla</button>
         </div>
         <datalist id="course-options"></datalist>
         <p id="course-error" class="field__error" hidden></p>
@@ -34,18 +41,24 @@
       </div>
       <a class="btn btn--secondary" href="/studio/{{ job_id }}">Materiali di studio</a>
       <button type="button" id="edit-toggle" class="btn btn--secondary" aria-pressed="false" aria-controls="edit-panel">Correggi a mano</button>
-      <div class="reader__downloads">
-        <a class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/files/md" download>Scarica .md</a>
-        <a class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/files/json" download>Scarica .json</a>
-        <a id="download-corrected-md" class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/files/corrected_md" download hidden>Scarica corretta (.md)</a>
-        <a id="export-docx" class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/export/docx?variant=original" download>Scarica .docx</a>
-        <a id="export-txt" class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/export/txt?variant=original" download>Scarica .txt</a>
-        <a id="download-report" class="btn btn--ghost" href="/api/v1/jobs/{{ job_id }}/files/report" download hidden>Report correzioni</a>
-      </div>
+      <details class="download-menu reader__downloads">
+        <summary class="btn btn--ghost">Scarica</summary>
+        <ul class="download-menu__list">
+          <li><a id="export-docx" href="/api/v1/jobs/{{ job_id }}/export/docx?variant=original" download>Documento Word (.docx)</a></li>
+          <li><a id="export-txt" href="/api/v1/jobs/{{ job_id }}/export/txt?variant=original" download>Testo semplice (.txt)</a></li>
+          <li><a href="/api/v1/jobs/{{ job_id }}/files/md" download>Markdown (.md)</a></li>
+          <li><a id="download-corrected-md" href="/api/v1/jobs/{{ job_id }}/files/corrected_md" download hidden>Markdown corretto (.md)</a></li>
+          <li><a id="download-report" href="/api/v1/jobs/{{ job_id }}/files/report" download hidden>Report delle correzioni</a></li>
+          <li><a href="/api/v1/jobs/{{ job_id }}/files/json" download>Dati completi con tempi (.json)</a></li>
+        </ul>
+      </details>
     </div>
   </div>
 
   <div id="reader-status" class="reader__status" aria-live="polite"></div>
+  {% if has_audio %}
+  <p id="reader-click-hint" class="reader__hint">Clicca una parola per ascoltare l'audio da quel punto.</p>
+  {% endif %}
   {% if not has_audio %}
   <p id="reader-no-audio" class="banner banner--info">Lezione importata: l'audio non è incluso. Il testo resta leggibile, e un clic su una parola o su un minuto porta a quel punto del testo.</p>
   {% endif %}

@@ -147,7 +147,7 @@ def test_reader_page_without_source_name_falls_back_to_subject_then_date(
     with TestClient(app=app, base_url=BASE_URL) as client:
         body = client.get(f"/lettore/{record.id}").text
 
-    assert f'<h2 class="reader__title">{expected_title}</h2>' in body
+    assert f'<h1 class="page-title reader__title">{expected_title}</h1>' in body
 
 
 def test_reader_page_loads_the_deep_link_after_the_reader(tmp_path: Path) -> None:

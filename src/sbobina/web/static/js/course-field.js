@@ -24,6 +24,23 @@
   var submit = form.querySelector("button[type=submit]");
   var subject = form.getAttribute("data-subject") || "";
   var metaUrl = "/api/v1/jobs/" + root.getAttribute("data-job-id") + "/meta";
+  // R3: the course reads as a line; Modifica opens the form, a save closes it.
+  var currentEl = document.getElementById("course-current");
+  var editButton = document.getElementById("course-edit");
+  var cancelButton = document.getElementById("course-cancel");
+
+  function setOpen(open) {
+    form.hidden = !open;
+    editButton.setAttribute("aria-expanded", String(open));
+    if (open) {
+      input.focus();
+    }
+  }
+
+  function showCurrent(course) {
+    currentEl.textContent = course || "nessuno";
+    editButton.textContent = course ? "Modifica" : "Assegna";
+  }
 
   function showError(message) {
     errorEl.textContent = message;
@@ -71,6 +88,9 @@
           var course = body.data.course;
           input.value = course || subject;
           statusEl.textContent = course ? MESSAGES.saved : MESSAGES.cleared;
+          showCurrent(course || subject);
+          setOpen(false);
+          editButton.focus();
           loadOptions();
         });
       })
@@ -107,5 +127,14 @@
   // past the limit that maxlength enforces on the raw characters.
   input.addEventListener("input", clearError);
   form.addEventListener("submit", save);
+  editButton.addEventListener("click", function () {
+    setOpen(form.hidden);
+  });
+  cancelButton.addEventListener("click", function () {
+    clearError();
+    input.value = currentEl.textContent === "nessuno" ? "" : currentEl.textContent;
+    setOpen(false);
+    editButton.focus();
+  });
   loadOptions();
 })();

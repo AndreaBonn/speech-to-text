@@ -241,3 +241,19 @@
   font-weight: var(--weight-medium);
 }
 
+
+/* R3: the course form opens from the details line. */
+.course-field[hidden] {
+  display: none;
+}
+
+/* R4: say what a click on a word does; not while editing, where it selects. */
+.reader__hint {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+.reader.is-editing .reader__hint {
+  display: none;
+}
