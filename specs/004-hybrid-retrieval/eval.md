@@ -622,8 +622,10 @@ Il gate degli stati risulta rosso su tutti i 105 stati, nav preesistente compres
 ~1,0:1: legge i colori calcolati `oklch()` come componenti rgb (VERDETTO: strumento). Misura
 sostitutiva, colori convertiti in sRGB via canvas nel browser: sezione nuova 0 fallimenti su 33
 stati (default, hover, focus) in chiaro e in scuro; riga di stato del corso 5,83:1 in chiaro e
-7,15:1 in scuro. Due violazioni preesistenti fuori dal diff: i timestamp della lista chat in hover
-e focus in scuro, 4,35:1.
+7,15:1 in scuro. Le due "violazioni" dei timestamp della lista chat in hover e focus in scuro
+(4,35:1) erano un artefatto della misura: il campione prendeva una data già tornata a riposo
+contro lo sfondo di un hover ancora in dissolvenza (alpha 0,017). Rimisurato con transizioni e
+animazioni spente: 0 fallimenti su 283-286 stati in chiaro e in scuro, senza modifiche al CSS.
 
 Corretti dopo il click-through: "Indicizza ora" mostrato anche sui corsi completi; conteggio x/y
 che non vedeva il testo aggiunto dopo l'ultimo run; la pagina corso mostrava "indice da
