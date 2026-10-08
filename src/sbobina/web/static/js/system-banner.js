@@ -40,8 +40,13 @@
       }
       region.replaceChildren();
       if (indicator) {
+        // S4: say what it means for the student; the technical pair stays
+        // in the tooltip for whoever needs it.
         indicator.textContent =
-          data.device.toUpperCase() + " · " + data.whisper_model;
+          data.device === "cuda"
+            ? "Trascrizione veloce (scheda video)"
+            : "Trascrizione su " + data.device.toUpperCase();
+        indicator.title = data.device.toUpperCase() + " · " + data.whisper_model;
       }
     })
     .catch(function () {
