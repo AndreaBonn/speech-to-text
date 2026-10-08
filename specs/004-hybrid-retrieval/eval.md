@@ -594,3 +594,46 @@ se è già aperto (le azioni accodate si riprendono all'avvio). BASIS: measured.
 
 Il corso "Prova T044" (lezione e PDF) e la chat di prova su Diritto restano in `data/`: si
 cancellano dall'interfaccia.
+
+## Click-through Impostazioni e pagina corso (T052, T053, 2026-10-08)
+
+Istanza isolata: `sbobina web` sulla porta 8799 con `SBOBINA_DATA_DIR` su una copia di `data/`
+(corsi, job, `vectors.sqlite3`, `search.sqlite3`) e `XDG_CONFIG_HOME` su una cartella temporanea,
+così preferenze e dati reali non sono toccati. Browser: Chromium headless 1243 via Playwright.
+
+| Controllo | Esito osservato |
+|---|---|
+| Apertura della sezione "Ricerca semantica" | scheletro, poi corpo; console senza errori |
+| Interruttore ricerca semantica | `true -> false`, letto di ritorno dall'API di stato |
+| Select del modello | `qwen3-embedding:8b (consigliato)`, unico modello di embedding installato |
+| Copertura per corso | `Diritto · 97/97`; `Prova T044 · 88/88, 3 da indicizzare` dopo un PDF caricato a ricerca spenta |
+| "Indicizza ora" con la durata prima del click | etichetta "Indicizza ora (meno di un minuto)", solo sui corsi con unità mancanti |
+| Click su "Indicizza ora" | bottone disabilitato subito; un secondo invio sullo stesso corso → HTTP 409; corso a 88/88 dopo l'indicizzazione |
+| Modello impostato a `bge-m3` (non installato) | box con `ollama pull bge-m3`; "Copia" mette il comando negli appunti e mostra la conferma |
+| Pagina corso con modello assente | "Solo parole chiave: modello di embedding non installato" |
+| Cambio modello in sospeso (vettore di un modello precedente) | banner "L'indice usa ancora il modello precedente"; "Ricostruisci" apre il dialog; Escape lo chiude col focus di ritorno sul bottone; "Annulla" lo chiude; "Conferma" → HTTP 202 |
+| Pagina corso a ricerca spenta | "Solo parole chiave: ricerca semantica spenta nelle Impostazioni" |
+| Pagina corso con cambio modello in sospeso e corso completo | "Ricerca per significato", coerente con la ricerca reale |
+| Risposta salvata in chat (turno denso di T044) | riga "Ricerca per significato" sotto la risposta |
+
+Render: Impostazioni e pagina corso a 375 e 1280 px senza overflow orizzontale (screenshot
+guardati). `a11y-gate`: axe pulito in chiaro e in scuro su entrambe le pagine, responsive pulito.
+Il gate degli stati risulta rosso su tutti i 105 stati, nav preesistente compresa, con rapporti
+~1,0:1: legge i colori calcolati `oklch()` come componenti rgb (VERDETTO: strumento). Misura
+sostitutiva, colori convertiti in sRGB via canvas nel browser: sezione nuova 0 fallimenti su 33
+stati (default, hover, focus) in chiaro e in scuro; riga di stato del corso 5,83:1 in chiaro e
+7,15:1 in scuro. Due violazioni preesistenti fuori dal diff: i timestamp della lista chat in hover
+e focus in scuro, 4,35:1.
+
+Corretti dopo il click-through: "Indicizza ora" mostrato anche sui corsi completi; conteggio x/y
+che non vedeva il testo aggiunto dopo l'ultimo run; la pagina corso mostrava "indice da
+ricostruire" col cambio modello in sospeso anche quando la ricerca usa i vettori; frase di
+`rebuild_needed` (vale "indice ricreato dopo un errore", non "cambio di modello"). BASIS: measured.
+
+Gate aggiuntivi di `a11y-gate`: RTL pulito su Impostazioni e pagina corso (0 px di overflow in
+LTR e RTL). `verify_focustrap` sul dialog di ricostruzione (harness dal DOM renderizzato, apertura
+con `showModal` come nell'app) risulta rosso: `role`/`aria-modal` espliciti assenti e "focus uscito
+dopo 2 Tab". Percorso del focus osservato: Annulla → Conferma → fuori dal documento → Annulla; il
+dialog è `:modal` (ruolo e modalità impliciti) e il contenuto dietro resta inerte, mai raggiunto.
+È il comportamento del `<dialog>` modale nativo, lo stesso dei cinque dialog già nel progetto
+(VERDETTO: strumento).
