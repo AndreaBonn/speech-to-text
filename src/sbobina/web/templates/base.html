@@ -55,7 +55,12 @@
       <div id="system-banner" class="banner-region" aria-live="polite"></div>
       <div id="engine-warning-banner" class="banner-region" aria-live="polite"></div>
       <main id="main-content">
-        <h1 class="page-title">{{ page_title }}</h1>
+        {% if breadcrumbs %}
+        <nav class="breadcrumbs" aria-label="Percorso">
+          {% for crumb in breadcrumbs %}{% if not loop.first %}<span class="breadcrumbs__sep" aria-hidden="true">›</span>{% endif %}<a href="{{ crumb.href }}">{{ crumb.label }}</a>{% endfor %}
+        </nav>
+        {% endif %}
+        {% block page_heading %}<h1 class="page-title">{{ page_title }}</h1>{% endblock %}
         {% block content %}{% endblock %}
       </main>
     </div>

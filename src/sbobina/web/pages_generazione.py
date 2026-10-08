@@ -13,6 +13,7 @@ from sbobina.web.errors import GenerationUnreadableError, NotFoundError
 from sbobina.web.generation_store import load_generation
 from sbobina.web.job_store import JobStore
 from sbobina.web.pages import JobStoreDep, render_page
+from sbobina.web.pages_nav import course_breadcrumbs
 
 router = APIRouter()
 logger = logging.getLogger("sbobina")
@@ -61,6 +62,9 @@ def generazione(
         damaged=damaged,
         course_key=key,
         course_label=course.label if course is not None else key,
+        breadcrumbs=course_breadcrumbs(
+            key=key, label=course.label if course is not None else key
+        ),
         generation_id=gen_id,
         topic=record.topic if record is not None else "",
     )

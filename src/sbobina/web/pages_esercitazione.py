@@ -8,6 +8,7 @@ from sbobina.courses import course_key
 from sbobina.web.errors import AttemptUnreadableError, NotFoundError
 from sbobina.web.job_store import JobStore
 from sbobina.web.pages import JobStoreDep, render_page
+from sbobina.web.pages_nav import course_breadcrumbs
 from sbobina.web.practice_store import load_attempt
 
 router = APIRouter()
@@ -59,6 +60,7 @@ def esercitazione(
         not_found=False,
         course_key=key,
         course_label=course.label,
+        breadcrumbs=course_breadcrumbs(key=key, label=course.label),
         attempt_id=attempt_id,
         generation_id=attempt.generation_id,
     )

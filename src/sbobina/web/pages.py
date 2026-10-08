@@ -16,7 +16,7 @@ from sbobina.web.job_models import JobRecord
 from sbobina.web.job_store import JobStore
 from sbobina.web.lecture_title import reader_title as _reader_title
 from sbobina.web.model_service import list_whisper_models, ollama_status
-from sbobina.web.pages_nav import build_nav
+from sbobina.web.pages_nav import build_nav, course_breadcrumbs
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -272,6 +272,7 @@ def documento(
         not_found=False,
         course_key=key,
         course_label=course.label,
+        breadcrumbs=course_breadcrumbs(key=key, label=course.label),
         doc_id=doc_id,
         filename=document.filename,
     )

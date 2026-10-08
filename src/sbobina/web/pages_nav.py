@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote
 
 from sbobina.web.job_models import JobStatus
 from sbobina.web.job_store import JobStore
@@ -58,3 +59,11 @@ def build_nav(active: str, store: JobStore) -> list[dict[str, Any]]:
             }
         )
     return items
+
+
+def course_breadcrumbs(key: str, label: str) -> list[dict[str, str]]:
+    """Corsi › <course>: the path shown above pages that belong to one course."""
+    return [
+        {"label": "Corsi", "href": "/corsi"},
+        {"label": label, "href": f"/corsi?corso={quote(key, safe='')}"},
+    ]

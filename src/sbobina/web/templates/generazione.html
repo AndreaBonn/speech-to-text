@@ -20,9 +20,6 @@
   data-generation-id="{{ generation_id }}"
 >
   <div class="practice__head">
-    <p class="practice__course">
-      <a class="table__link" href="/corsi?corso={{ course_key | urlencode }}">{{ course_label }}</a>
-    </p>
     {% if topic %}<p class="practice__progress">Argomento: {{ topic }}</p>{% endif %}
   </div>
   <div id="generazione-detail" class="generations__detail" aria-live="polite"></div>
