@@ -166,3 +166,24 @@ class TestAggregateLectureHitsToWindows:
         )
 
         assert result == []
+
+    def test_aggregate_lecture_hits_to_windows_mixed_hits_keep_lowest_resolved_scores(
+        self,
+    ) -> None:
+        spans, units = self._units()
+
+        result = aggregate_lecture_hits_to_windows(
+            hits=[
+                (-2.0, 10),
+                (-4.0, 11),
+                (-1.0, 10),
+                (-9.0, 99),
+                (-8.0, 40),
+                (-3.0, 20),
+            ],
+            segment_positions={10: 0, 11: 1, 20: 2, 40: 4},
+            spans=spans,
+            units=units,
+        )
+
+        assert result == [(-4.0, units[0]), (-3.0, units[1])]

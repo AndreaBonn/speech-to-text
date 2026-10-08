@@ -17,6 +17,17 @@ from sbobina.web.embedding_store import EmbeddingStatus, load_embed
 from sbobina.web.vector_reconcile import embed_course
 
 
+def test_cmd_indicizza_semantico_no_courses_prints_message_and_returns_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli_semantic, "settings", Settings(data_dir=tmp_path))
+
+    result = cli_semantic.cmd_indicizza_semantico(args=Namespace(tutti=True))
+
+    assert result == 0
+    assert capsys.readouterr().out == "Nessun corso da indicizzare.\n"
+
+
 def test_command_prints_full_coverage_and_truncated_passage(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

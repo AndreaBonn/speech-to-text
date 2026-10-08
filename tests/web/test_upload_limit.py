@@ -1,5 +1,7 @@
+import asyncio
 from collections.abc import Iterator
 
+import httpx
 import pytest
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -120,3 +122,34 @@ def test_patch_on_a_variable_id_matches_the_parent_suffix(
     assert rejected.status_code == 413
     assert accepted.status_code == 200
     assert reached == ["PATCH"]
+
+
+def test_upload_limit_middleware_root_path_has_no_limit() -> None:
+    async def endpoint(request: Request) -> PlainTextResponse:
+        return PlainTextResponse(content="accepted")
+
+    app = Starlette(
+        routes=[
+            Route(path="/", endpoint=endpoint, methods=["POST"]),
+            Route(path="/cards", endpoint=endpoint, methods=["POST"]),
+        ]
+    )
+    app.add_middleware(
+        UploadLimitMiddleware, limits={}, suffix_limits={"/cards": SMALL_LIMIT_BYTES}
+    )
+
+    async def requests() -> tuple[httpx.Response, httpx.Response]:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            root = await client.post(url="/", content=b"x" * (SMALL_LIMIT_BYTES + 1))
+            limited = await client.post(
+                url="/cards", content=b"x" * (SMALL_LIMIT_BYTES + 1)
+            )
+        return root, limited
+
+    root, limited = asyncio.run(main=requests())
+
+    assert (root.status_code, root.text) == (200, "accepted")
+    assert limited.status_code == 413
+    assert limited.json()["error"]["code"] == "PAYLOAD_TOO_LARGE"

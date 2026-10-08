@@ -1,8 +1,11 @@
+import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from sbobina import settings_service
+from sbobina.credential_store import CredentialStore
 from sbobina.runtime_config import runtime_settings
 from sbobina.settings import Settings
 from sbobina.user_preferences import (
@@ -63,3 +66,108 @@ def test_unsafe_settings_view_uses_running_semantic_settings(tmp_path: Path) -> 
     assert isinstance(preferences, dict)
     assert preferences["embedding_model"] == "running:latest"
     assert preferences["semantic_search"] is False
+
+
+def test_update_transcription_without_audio_consent_preserves_file(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(config_dir=tmp_path)
+    path = tmp_path / "preferences.json"
+    save_preferences(
+        path=path, preferences=UserPreferences(cloud_ack=datetime.now(tz=UTC))
+    )
+    before = path.read_bytes()
+    update = settings_service.TranscriptionUpdate(
+        transcription_engine="assemblyai", cloud_ack_audio=False
+    )
+
+    with pytest.raises(settings_service.CloudAckRequiredError):
+        settings_service.update_transcription(settings=settings, update=update)
+
+    assert path.read_bytes() == before
+    assert json.loads(before)["transcription_engine"] == "whisper"
+
+
+def test_update_transcription_with_audio_consent_saves_timestamp(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(config_dir=tmp_path)
+    update = settings_service.TranscriptionUpdate(
+        transcription_engine="assemblyai", cloud_ack_audio=True
+    )
+    started = datetime.now(tz=UTC)
+
+    settings_service.update_transcription(settings=settings, update=update)
+
+    saved = json.loads((tmp_path / "preferences.json").read_text(encoding="utf-8"))
+    assert saved["transcription_engine"] == "assemblyai"
+    assert (
+        started
+        <= datetime.fromisoformat(saved["cloud_ack_audio"])
+        <= datetime.now(tz=UTC)
+    )
+
+
+def test_update_transcription_existing_audio_consent_is_reused(tmp_path: Path) -> None:
+    consent = datetime(year=2025, month=1, day=2, tzinfo=UTC)
+    path = tmp_path / "preferences.json"
+    save_preferences(path=path, preferences=UserPreferences(cloud_ack_audio=consent))
+    update = settings_service.TranscriptionUpdate(
+        transcription_engine="assemblyai", cloud_ack_audio=False
+    )
+
+    settings_service.update_transcription(
+        settings=Settings(config_dir=tmp_path), update=update
+    )
+
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert saved["transcription_engine"] == "assemblyai"
+    assert datetime.fromisoformat(saved["cloud_ack_audio"]) == consent
+
+
+@pytest.mark.parametrize(
+    "consent", [None, datetime(year=2025, month=1, day=2, tzinfo=UTC)]
+)
+def test_update_transcription_whisper_needs_no_consent(
+    tmp_path: Path, consent: datetime | None
+) -> None:
+    path = tmp_path / "preferences.json"
+    preferences = UserPreferences(
+        transcription_engine="assemblyai", cloud_ack_audio=consent
+    )
+    save_preferences(path=path, preferences=preferences)
+    update = settings_service.TranscriptionUpdate(
+        transcription_engine="whisper", cloud_ack_audio=False
+    )
+
+    settings_service.update_transcription(
+        settings=Settings(config_dir=tmp_path), update=update
+    )
+
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert saved == preferences.model_copy(
+        update={"transcription_engine": "whisper"}
+    ).model_dump(mode="json")
+
+
+def test_settings_view_assemblyai_without_key_warns_until_key_saved(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(config_dir=tmp_path)
+    save_preferences(
+        path=tmp_path / "preferences.json",
+        preferences=UserPreferences(
+            transcription_engine="assemblyai", cloud_ack_audio=datetime.now(tz=UTC)
+        ),
+    )
+
+    warnings = settings_service.settings_view(settings=settings)["warnings"]
+
+    assert isinstance(warnings, dict)
+    assert warnings["missing_keys"] == ["assemblyai"]
+    CredentialStore(config_dir=tmp_path).set_key(
+        provider="assemblyai", key="test-audio-key"
+    )
+    configured = settings_service.settings_view(settings=settings)["warnings"]
+    assert isinstance(configured, dict)
+    assert configured["missing_keys"] == []

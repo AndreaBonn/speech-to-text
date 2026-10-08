@@ -124,3 +124,23 @@ def test_preload_windows_no_directories_found_warns(
     assert registered == []
     add_dir.assert_not_called()
     assert "Nessuna cartella DLL" in caplog.text
+
+
+def test_register_windows_dll_directories_non_windows_registers_nothing(
+    wheel_dirs: tuple[Path, Path],
+) -> None:
+    directories = list(wheel_dirs)
+    with (
+        patch.object(cuda_libs, "sys", SimpleNamespace(platform="linux")),
+        patch.object(os, "add_dll_directory", create=True) as add_dir,
+    ):
+        non_windows = cuda_libs._register_windows_dll_directories(lib_dirs=directories)
+        assert add_dir.call_args_list == []
+        with patch.object(cuda_libs, "sys", SimpleNamespace(platform="win32")):
+            windows = cuda_libs._register_windows_dll_directories(lib_dirs=directories)
+        assert [call.args for call in add_dir.call_args_list] == [
+            (str(path),) for path in directories
+        ]
+
+    assert non_windows == []
+    assert windows == directories

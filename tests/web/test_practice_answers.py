@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 from test_practice_models import make_attempt
 
+from sbobina.correction import CorrectorUnavailableError
 from sbobina.generation_models import GenerationFormat
 from sbobina.grading_models import Judgement, JudgementOutcome
 from sbobina.ollama_chat import ChatRequest
@@ -23,6 +24,43 @@ def test_apply_choice_outside_the_four_options_is_rejected(choice: Any) -> None:
     assert apply_choice(attempt=attempt, question_index=0, choice=3).answers
     with pytest.raises(ValidationError, match="quattro opzioni"):
         apply_choice(attempt=attempt, question_index=0, choice=choice)
+
+
+@pytest.mark.parametrize(
+    ("guard_whole_client", "expected_reason", "expected_calls"),
+    [(True, "GPU_BUSY", 0), (False, "OLLAMA_UNAVAILABLE", 1)],
+    ids=["local-engine-waits-for-gpu", "api-engine-skips-the-gpu-guard"],
+)
+def test_grade_answer_during_transcription_guards_only_the_local_judge(
+    tmp_path: Path,
+    guard_whole_client: bool,
+    expected_reason: str,
+    expected_calls: int,
+) -> None:
+    calls: list[ChatRequest] = []
+
+    def judge(request: ChatRequest) -> str:
+        calls.append(request)
+        raise CorrectorUnavailableError("judge offline")
+
+    arbiter = GpuArbiter()
+    services = PracticeServices(
+        store=JobStore(data_dir=tmp_path),
+        settings=Settings(),
+        arbiter=arbiter,
+        chat=judge,
+        guard_whole_client=guard_whole_client,
+    )
+    ungraded = OpenAnswer(answer_id=str(uuid4()), question_index=0, text="Risposta")
+
+    with arbiter.transcription_lease(stage="transcribing"):
+        result = grade_answer(
+            attempt=make_attempt(format=GenerationFormat.OPEN),
+            answer=ungraded,
+            services=services,
+        )
+
+    assert (result.reason, len(calls)) == (expected_reason, expected_calls)
 
 
 def test_grade_answer_already_graded_is_returned_without_calling_the_judge(

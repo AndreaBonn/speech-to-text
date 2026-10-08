@@ -1,3 +1,4 @@
+import subprocess
 import sys
 import time
 from collections.abc import Callable, Iterator
@@ -386,3 +387,21 @@ def test_job_deleted_while_running_does_not_stop_the_queue(harness: Harness) -> 
 
     wait_for(predicate=lambda: harness.finished(job_id=kept))
     assert harness.supervisor.is_running()
+
+
+@pytest.mark.parametrize("has_stdin", [True, False], ids=["piped", "no-stdin"])
+def test_release_process_forgets_the_child_and_closes_its_stdin(
+    tmp_path: Path, has_stdin: bool
+) -> None:
+    owner = Supervisor(job_store=JobStore(data_dir=tmp_path))
+    process = subprocess.Popen(
+        args=[sys.executable, "-c", "pass"],
+        stdin=subprocess.PIPE if has_stdin else None,
+    )
+    process.wait(timeout=5)
+    owner._process = process
+
+    owner._release_process(process=process)
+
+    assert owner._process is None
+    assert (process.stdin is not None and process.stdin.closed) is has_stdin

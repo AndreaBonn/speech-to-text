@@ -129,3 +129,15 @@ def test_content_disposition_keeps_accented_label_in_utf8_form() -> None:
         "filename*=utf-8''Diritto-%C3%A8-2026.sbobina.zip"
     )
     header.encode(encoding="latin-1")
+
+
+def test_lecture_label_no_matching_record_returns_key(tmp_path: Path) -> None:
+    data = seed_package(tmp_path=tmp_path)
+    services = ReviewServices(
+        store=data.store, settings=Settings(), now=NOW, scheduler=Scheduler()
+    )
+
+    assert api_package._lecture_label(key="unknown", services=services) == "unknown"
+    assert (
+        api_package._lecture_label(key=data.course.key, services=services) == "Fisica"
+    )

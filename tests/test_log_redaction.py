@@ -235,3 +235,36 @@ def test_filter_still_redacts_known_keys_in_a_record_nested_in_a_key_lookup() ->
     redaction.filter(outer)
 
     assert SENTINEL not in nested[0].getMessage()
+
+
+@pytest.mark.parametrize(
+    ("message", "args", "expected"),
+    [
+        pytest.param(
+            "payload=%s count=%d",
+            ({"key": SENTINEL}, 2),
+            "payload={'key': '***'} count=2",
+            id="dict-argument",
+        ),
+        pytest.param({"key": SENTINEL}, (), "{'key': '***'}", id="dict-message"),
+    ],
+)
+def test_filter_non_string_values_redacts_formatted_message(
+    message: object, args: tuple[object, ...], expected: str
+) -> None:
+    record = logging.LogRecord(
+        name="sbobina",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg=message,
+        args=args,
+        exc_info=None,
+    )
+    formatter = logging.Formatter(fmt="%(message)s")
+    assert SENTINEL in formatter.format(record=record)
+
+    accepted = SecretRedactionFilter(known_secrets=[]).filter(record=record)
+
+    assert accepted is True
+    assert formatter.format(record=record) == expected

@@ -15,9 +15,48 @@ from sbobina.user_preferences import (
 )
 from sbobina.web.errors import JobNotCancellableError
 from sbobina.web.gpu_lock import GpuArbiter, GpuBusyError
-from sbobina.web.job_models import JobStatus
+from sbobina.web.job_models import JobConfig, JobStatus, WorkItem
+from sbobina.web.transcription_gate import execute_pipeline_action
 
 __all__ = ["harness"]
+
+
+def test_execute_pipeline_action_failed_assemblyai_skips_correction(
+    harness: Harness,
+) -> None:
+    failed = harness.store.create(
+        config=JobConfig(transcription_engine="assemblyai", correct=True)
+    )
+    harness.store.update(record=failed.model_copy(update={"status": JobStatus.RUNNING}))
+    job_id = str(failed.id)
+    harness.marker(job_id=job_id, name="transcribe.exit").write_text(
+        data="1", encoding="utf-8"
+    )
+
+    result = execute_pipeline_action(
+        supervisor=harness.supervisor, item=WorkItem(job_id=job_id, action="pipeline")
+    )
+
+    assert result is False
+    assert harness.record(job_id=job_id).status is JobStatus.FAILED
+    assert harness.marker(job_id=job_id, name="transcribe.started").exists()
+    assert not harness.marker(job_id=job_id, name="correct.started").exists()
+
+    healthy = harness.store.create(
+        config=JobConfig(transcription_engine="assemblyai", correct=True)
+    )
+    harness.store.update(
+        record=healthy.model_copy(update={"status": JobStatus.RUNNING})
+    )
+    healthy_id = str(healthy.id)
+    assert (
+        execute_pipeline_action(
+            supervisor=harness.supervisor,
+            item=WorkItem(job_id=healthy_id, action="pipeline"),
+        )
+        is True
+    )
+    assert harness.marker(job_id=healthy_id, name="correct.started").exists()
 
 
 def _reader_count(arbiter: GpuArbiter) -> int:

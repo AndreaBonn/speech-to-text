@@ -10,7 +10,7 @@ from sbobina.correction import InvalidResponseError
 from sbobina.llm_errors import FailureKind, ProviderUnavailableError
 from sbobina.ollama_chat import ChatRequest
 from sbobina.providers.ollama_link import make_ollama_link_client
-from sbobina.web.gpu_lock import GpuBusyError
+from sbobina.web.gpu_lock import GpuArbiter, GpuBusyError
 
 
 class FakeOllamaClient:
@@ -211,3 +211,26 @@ def test_show_connection_error_maps_to_network() -> None:
         chat(_request())
 
     assert raised.value.kind == FailureKind.NETWORK
+
+
+def test_make_ollama_link_client_free_gpu_guard_returns_reply() -> None:
+    arbiter = GpuArbiter()
+    fake = FakeOllamaClient()
+    chat = make_ollama_link_client(
+        model_host="http://localhost:11434",
+        timeout_s=None,
+        guard=arbiter.chat_turn,
+        client=cast(ollama.Client, fake),
+    )
+
+    request = _request()
+    reply = chat(request)
+    with (
+        arbiter.transcription_lease(stage="transcribing"),
+        pytest.raises(ProviderUnavailableError) as raised,
+    ):
+        chat(request)
+    recovered = chat(request)
+
+    assert reply == recovered == '{"ok": true}'
+    assert raised.value.kind == FailureKind.BUSY

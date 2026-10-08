@@ -7,10 +7,33 @@ from vector_reconcile_fixtures import write_course
 from sbobina.web import embedding_backfill
 from sbobina.web.embedding_store import EmbeddingRun, EmbeddingStatus, load_embed
 from sbobina.web.embedding_supervisor import submit_embed_item
+from sbobina.web.errors import ConflictError
 from sbobina.web.job_models import WorkItem
 from sbobina.web.job_store import JobStore
 
 __all__ = ["semantic_harness"]
+
+
+def test_enqueue_course_unexpected_conflict_is_reraised(
+    semantic_harness: SemanticHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = semantic_harness.store
+    course = write_course(store=store)
+    conflict = ConflictError(message="Storage conflict", code="STORAGE_CONFLICT")
+
+    def conflict_on_submit(
+        *, store: JobStore, course_key: str
+    ) -> tuple[EmbeddingRun, WorkItem]:
+        raise conflict
+
+    with monkeypatch.context() as patch:
+        patch.setattr(embedding_backfill, "submit_embed_item", conflict_on_submit)
+        with pytest.raises(ConflictError) as caught:
+            embedding_backfill._enqueue_course(store=store, course_key=course.key)
+
+    assert caught.value is conflict
+    items = embedding_backfill._enqueue_course(store=store, course_key=course.key)
+    assert items == (WorkItem(job_id=course.id, course_id=course.id, action="embed"),)
 
 
 def test_backfill_scan_failure_queues_nothing(

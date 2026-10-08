@@ -8,6 +8,7 @@ from page_fixtures import (
     _models,
 )
 from pydantic import JsonValue
+from starlette.requests import Request
 
 from sbobina.settings import Settings
 from sbobina.web import pages
@@ -189,3 +190,18 @@ def test_index_explains_beam_size_with_the_recommended_value(tmp_path: Path) -> 
     assert 'aria-describedby="beam_size-tip"' in help_button
     tip = body.split('id="beam_size-tip"')[1].split("</span>")[0]
     assert "Consigliato: 5" in tip
+
+
+def test_index_non_list_ollama_models_renders_default_only(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(ollama_model="default-model"), data_dir=tmp_path)
+    status: dict[str, JsonValue] = {"status": "ready", "message": "", "models": None}
+    request = Request(scope={"type": "http", "app": app, "path": "/"})
+    with patch.object(pages, "ollama_status", return_value=status):
+        malformed = pages.index(request=request, store=app.state.job_store)
+        status["models"] = [{"model": "installed-model"}]
+        populated = pages.index(request=request, store=app.state.job_store)
+
+    assert malformed.status_code == populated.status_code == 200
+    assert b'value="default-model" selected' in bytes(malformed.body)
+    assert b'value="installed-model"' not in bytes(malformed.body)
+    assert b'value="installed-model"' in bytes(populated.body)

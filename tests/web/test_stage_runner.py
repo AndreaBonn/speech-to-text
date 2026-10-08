@@ -1,8 +1,10 @@
 import logging
+import os
 import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import replace
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
@@ -17,6 +19,52 @@ from sbobina.settings import Settings, settings
 from sbobina.web import stage_runner
 from sbobina.web.job_models import JobConfig
 from sbobina.web.job_store import JobStore
+
+
+@pytest.mark.parametrize("broken_stream", [False, True], ids=["eof", "read-error"])
+def test_watch_stdin_eof_or_read_error_exits_with_one(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    broken_stream: bool,
+) -> None:
+    stream = StringIO(initial_value="parent heartbeat\n")
+    if broken_stream:
+        stream.close()
+
+    def exit_process(code: int) -> None:
+        raise SystemExit(code)
+
+    monkeypatch.setattr(sys, "stdin", stream)
+    monkeypatch.setattr(os, "_exit", exit_process)
+
+    with pytest.raises(SystemExit) as caught:
+        stage_runner._watch_stdin()
+
+    assert caught.value.code == 1
+    if broken_stream:
+        assert "Lettura stdin fallita nel watchdog" in caplog.text
+        assert caplog.records[-1].exc_info is not None
+        assert isinstance(caplog.records[-1].exc_info[1], ValueError)
+    else:
+        assert stream.tell() == len("parent heartbeat\n")
+
+
+def test_start_stdin_watchdog_parent_gone_exits_from_a_daemon_thread(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exit_codes: list[int] = []
+    monkeypatch.setattr(sys, "stdin", StringIO(initial_value=""))
+    monkeypatch.setattr(os, "_exit", exit_codes.append)
+
+    thread = stage_runner.start_stdin_watchdog()
+    thread.join(timeout=5)
+
+    assert (thread.daemon, thread.name, thread.is_alive()) == (
+        True,
+        "stdin-watchdog",
+        False,
+    )
+    assert exit_codes == [1]
 
 
 @pytest.fixture

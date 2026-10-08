@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from sbobina import config_dir
 from sbobina.config_dir import ConfigDirUnsafeError, resolve_config_dir
 from sbobina.settings import Settings
 
@@ -105,3 +106,17 @@ def test_resolve_config_dir_allows_a_path_outside_both(tmp_path: Path) -> None:
     resolved = resolve_config_dir(settings=Settings(config_dir=config_dir))
 
     assert resolved == config_dir
+
+
+def test_repo_root_without_project_ancestor_returns_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "package" / "config_dir.py"
+    module_path.parent.mkdir()
+    module_path.touch()
+    monkeypatch.setattr(config_dir, "__file__", str(module_path))
+
+    assert config_dir._repo_root() is None
+
+    (tmp_path / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
+    assert config_dir._repo_root() == tmp_path

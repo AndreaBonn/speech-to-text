@@ -12,6 +12,7 @@ from sbobina.search_text import Passage
 from sbobina.web.api_files import TRANSCRIPT_FILES, transcript_revision
 from sbobina.web.course_retrieval import (
     WindowedQuery,
+    _dense_course_key,
     course_scope,
     lecture_revision,
     retrieve_windows,
@@ -21,6 +22,17 @@ from sbobina.web.document_index import DocumentState
 from sbobina.web.job_models import JobConfig, LectureMeta
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import LectureState, open_index
+
+
+def test_dense_course_key_unknown_jobs_returns_scope_course_id(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    store.create(config=JobConfig(subject="Unrelated"))
+    get_or_create(courses_dir=store.courses_dir, key="other", label="Other")
+    scope = RetrievalScope(
+        course_id="unregistered", job_ids=frozenset({"missing-a", "missing-b"})
+    )
+
+    assert _dense_course_key(store=store, scope=scope) == "unregistered"
 
 
 def test_course_scope_collects_lectures_by_effective_course(tmp_path: Path) -> None:

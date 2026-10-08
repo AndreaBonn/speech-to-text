@@ -1,7 +1,8 @@
 import httpx
 import pytest
 
-from sbobina.key_check import check_key
+from sbobina.key_check import _check_assemblyai, check_key
+from sbobina.llm_errors import FailureKind, ProviderUnavailableError
 
 SENTINEL_KEY = "sk-SENTINEL-0123456789abcdef"
 
@@ -69,3 +70,68 @@ def test_check_key_assemblyai_sends_the_key_in_the_header_only() -> None:
     assert result == "ok"
     assert seen[0].headers["authorization"] == SENTINEL_KEY
     assert SENTINEL_KEY not in str(seen[0].url)
+
+
+@pytest.mark.parametrize(
+    ("error_type", "expected"),
+    [
+        (httpx.ConnectError, FailureKind.NETWORK),
+        (httpx.ReadTimeout, FailureKind.TIMEOUT),
+    ],
+)
+def test_check_assemblyai_transport_failure_preserves_kind(
+    error_type: type[httpx.TransportError], expected: FailureKind
+) -> None:
+    failure = error_type("connection failed")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise failure
+
+    transport = httpx.MockTransport(handler=handler)
+    with pytest.raises(ProviderUnavailableError) as excinfo:
+        _check_assemblyai(api_key=SENTINEL_KEY, timeout_s=5, transport=transport)
+
+    assert excinfo.value.kind == expected
+    assert excinfo.value.provider == "assemblyai"
+    assert excinfo.value.retry_after_s is None
+    assert excinfo.value.__cause__ is failure
+    assert (
+        check_key(
+            provider="assemblyai",
+            api_key=SENTINEL_KEY,
+            timeout_s=5,
+            transport=transport,
+        )
+        == "network"
+    )
+
+
+@pytest.mark.parametrize(
+    ("status", "expected", "retry_after", "result"),
+    [
+        (401, FailureKind.AUTH, None, "auth"),
+        (429, FailureKind.RATE_LIMIT, 23.0, "limit"),
+    ],
+)
+def test_check_assemblyai_http_failure_preserves_kind_and_retry(
+    status: int, expected: FailureKind, retry_after: float | None, result: str
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code=status, headers={"Retry-After": "23"})
+
+    transport = httpx.MockTransport(handler=handler)
+    with pytest.raises(ProviderUnavailableError) as excinfo:
+        _check_assemblyai(api_key=SENTINEL_KEY, timeout_s=5, transport=transport)
+
+    assert excinfo.value.kind == expected
+    assert excinfo.value.provider == "assemblyai"
+    assert excinfo.value.retry_after_s == retry_after
+    assert (
+        check_key(
+            provider="assemblyai",
+            api_key=SENTINEL_KEY,
+            timeout_s=5,
+            transport=transport,
+        )
+        == result
+    )

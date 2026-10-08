@@ -7,6 +7,7 @@ import pytest
 
 from sbobina.embedding_prompts import EMBEDDING_PROMPT_VERSION
 from sbobina.embedding_units import content_hash
+from sbobina.web.vector_schema import IntegrityError, check_schema
 from sbobina.web.vector_store import StoredVector, VectorStore
 
 MODEL = f"qwen3-embedding:8b:digest:2048:prompt-{EMBEDDING_PROMPT_VERSION}"
@@ -14,6 +15,38 @@ HASH = content_hash(text="one passage")
 VECTOR = StoredVector(
     text_sha256=HASH, vector=tuple(index / 8 for index in range(4096)), truncated=True
 )
+
+
+def test_check_schema_corrupted_data_page_raises_integrity_error(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "vectors.sqlite3"
+    check_schema(path=path)
+    with closing(sqlite3.connect(database=path)) as connection:
+        connection.execute(
+            "INSERT INTO models (model_key, dimensions, created_at, updated_at) "
+            "VALUES ('probe', 42, '', '')"
+        )
+        connection.commit()
+        page = connection.execute(
+            "SELECT rootpage FROM sqlite_master WHERE name = 'models'"
+        ).fetchone()[0]
+        size = connection.execute("PRAGMA page_size").fetchone()[0]
+        assert connection.execute("PRAGMA quick_check").fetchall() == [("ok",)]
+
+    # The single row ends with the one-byte dimension; empty timestamps add no bytes.
+    with path.open(mode="r+b") as stream:
+        stream.seek(page * size - 1)
+        assert stream.read(1) == b"\x2a"
+        stream.seek(page * size - 1)
+        stream.write(b"\x00")
+    with closing(sqlite3.connect(database=path)) as connection:
+        assert connection.execute("PRAGMA quick_check").fetchall() == [
+            ("CHECK constraint failed in models",)
+        ]
+
+    with pytest.raises(IntegrityError, match="Vector database integrity check failed"):
+        check_schema(path=path)
 
 
 @pytest.mark.parametrize("version", [0, 999])

@@ -8,7 +8,18 @@ from pptx.util import Inches
 
 from sbobina.document_extract import extract
 from sbobina.document_models import DocumentKind, DocumentStatus
-from sbobina.extracted_text import normalize_pages
+from sbobina.extracted_text import _majority_edge_line, normalize_pages
+
+
+@pytest.mark.parametrize("pick_last", [False, True])
+def test_majority_edge_line_empty_pages_return_none(pick_last: bool) -> None:
+    empty = _majority_edge_line(lines_per_page=[[], []], pick_last=pick_last)
+    populated = _majority_edge_line(
+        lines_per_page=[["Header", "Footer"], ["Header", "Footer"]], pick_last=pick_last
+    )
+
+    assert empty is None
+    assert populated == ("Footer" if pick_last else "Header")
 
 
 def test_extract_pdf_three_pages_preserves_text(tmp_path: Path) -> None:

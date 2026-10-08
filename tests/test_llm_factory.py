@@ -1,11 +1,19 @@
+import json
+import logging
+
 import httpx
 import ollama
 import pytest
 from pydantic import SecretStr
 
 from sbobina import llm_factory
+from sbobina.correction import InvalidResponseError
 from sbobina.llm_chain import ChainLink, FallbackChain, ServedByRecorder
-from sbobina.llm_errors import FailureKind, ProviderUnavailableError
+from sbobina.llm_errors import (
+    ChainExhaustedError,
+    FailureKind,
+    ProviderUnavailableError,
+)
 from sbobina.ollama_chat import ChatRequest
 from sbobina.providers.openai_compat import PROFILES, make_openai_compat_client
 from sbobina.settings import LlmChainEntry, Settings
@@ -185,3 +193,101 @@ def test_ensure_ready_calls_ensure_model_only_for_local(
 
     llm_factory.ensure_ready(Settings(llm_engine="local", ollama_model="m"))
     assert calls == ["m"]
+
+
+def test_effective_model_label_api_optional_fallback_is_last() -> None:
+    settings = Settings(
+        llm_engine="api",
+        llm_ollama_fallback=False,
+        ollama_model="local-model",
+        llm_chain=[LlmChainEntry(provider="anthropic", model="cloud-model")],
+    )
+
+    without_fallback = llm_factory.effective_model_label(settings=settings)
+    settings.llm_ollama_fallback = True
+    with_fallback = llm_factory.effective_model_label(settings=settings)
+
+    assert without_fallback == "api: anthropic/cloud-model"
+    assert with_fallback == "api: anthropic/cloud-model > ollama/local-model"
+
+
+@pytest.fixture
+def anthropic_requests(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[httpx.Request]:
+    requests: list[httpx.Request] = []
+
+    def handle(
+        transport: httpx.HTTPTransport, request: httpx.Request
+    ) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            status_code=200,
+            json={
+                "content": [{"type": "text", "text": '{"ok": true}'}],
+                "stop_reason": "end_turn",
+            },
+        )
+
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", handle)
+    return requests
+
+
+def test_build_chat_client_anthropic_sends_messages_request(
+    anthropic_requests: list[httpx.Request],
+) -> None:
+    settings = Settings(
+        llm_engine="api",
+        llm_ollama_fallback=False,
+        llm_chain=[LlmChainEntry(provider="anthropic", model="claude-test")],
+    )
+    chat = llm_factory.build_chat_client(
+        settings=settings, keys={"anthropic": SENTINEL_KEY}
+    )
+    request = ChatRequest(
+        model="placeholder", system_prompt="system", user_message="hello", schema={}
+    )
+
+    reply = chat(request)
+
+    assert reply == '{"ok": true}'
+    assert [(r.method, str(r.url)) for r in anthropic_requests] == [
+        ("POST", "https://api.anthropic.com/v1/messages")
+    ]
+    assert anthropic_requests[0].headers["x-api-key"] == SENTINEL_KEY
+    assert json.loads(anthropic_requests[0].content)["model"] == "claude-test"
+    assert json.loads(anthropic_requests[0].content)["messages"] == [
+        {"role": "user", "content": "hello"}
+    ]
+
+
+def test_fallback_chain_invalid_threshold_warns_once_without_stale_cause(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    failure = ProviderUnavailableError(
+        kind=FailureKind.NETWORK, provider="network/m", retry_after_s=None
+    )
+
+    def invalid(request: ChatRequest) -> str:
+        if request.model == "network":
+            raise failure
+        raise InvalidResponseError("invalid JSON")
+
+    models = ("network", "m")
+    links = [ChainLink(provider="p", model=m, client=invalid) for m in models]
+    chain = FallbackChain(links=links)
+    request = ChatRequest(model="m", system_prompt="s", user_message="u", schema={})
+    with caplog.at_level(level=logging.WARNING, logger="sbobina"):
+        for _ in range(2):
+            with pytest.raises(InvalidResponseError):
+                chain(request=request)
+        assert caplog.messages == []
+        with pytest.raises(InvalidResponseError):
+            chain(request=request)
+        for _ in range(2):
+            with pytest.raises(ChainExhaustedError) as raised:
+                chain(request=request)
+            assert raised.value.causes == (failure,)
+    assert [(r.levelno, r.getMessage()) for r in caplog.records] == [
+        (logging.WARNING, "p/m escluso: troppe risposte non valide di fila")
+    ]

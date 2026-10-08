@@ -1,3 +1,4 @@
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
@@ -12,6 +13,31 @@ from sbobina.ollama_embed import EmbeddingUnavailableError
 from sbobina.settings import Settings
 from sbobina.web.dense_factory import RECHECK_INTERVAL_S
 from sbobina.web.vector_store import VectorStore
+
+
+@pytest.mark.parametrize(
+    "args", [(), ("model",), ("model", 7), ("model", "reason", "extra"), {"model": "m"}]
+)
+def test_query_warning_filter_unexpected_args_preserves_record(
+    args: tuple[object, ...] | dict[str, object],
+) -> None:
+    logger = logging.getLogger(name="sbobina.web.dense_retrieval")
+    record = logging.LogRecord(
+        name=logger.name,
+        level=logging.WARNING,
+        pathname=__file__,
+        lineno=1,
+        msg="Dense query unavailable: model=%s reason=%s",
+        args=(),
+        exc_info=None,
+    )
+    record.args = args
+    before = record.__dict__.copy()
+
+    accepted = logger.filter(record=record)
+
+    assert accepted is record
+    assert record.__dict__ == before
 
 
 def test_disabled_factory_skips_network_and_storage(

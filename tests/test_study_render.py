@@ -5,13 +5,43 @@ import pytest
 from study_fixtures import FakeChat, response_fixture, transcript_fixture
 
 from sbobina.render import RenderOptions
-from sbobina.study_models import FailedBlock
+from sbobina.study_models import Citation, FailedBlock, SummaryItem
 from sbobina.study_pipeline import StudyOptions, generate_study
-from sbobina.study_render import load_study, render_study_markdown, save_study
+from sbobina.study_render import (
+    _render_item,
+    load_study,
+    render_study_markdown,
+    save_study,
+)
 
 OPTIONS = RenderOptions(
     uncertain_threshold=0.7, paragraph_gap_s=2.0, paragraph_max_s=120.0
 )
+
+
+def test_render_item_invalid_citation_returns_no_lines() -> None:
+    transcript = transcript_fixture()
+    valid = SummaryItem(
+        text="Valid summary",
+        citations=(
+            Citation(segment_index=1, quote="la causa del contratto è illecita"),
+        ),
+    )
+    invalid = SummaryItem(
+        text="Invalid summary",
+        citations=(
+            Citation(segment_index=1, quote="words absent from this transcript"),
+        ),
+    )
+
+    rejected = _render_item(item=invalid, transcript=transcript, paragraphs={1: 2})
+    rendered = _render_item(item=valid, transcript=transcript, paragraphs={1: 2})
+
+    assert rejected == []
+    assert rendered == [
+        "- Valid summary",
+        "  > §2 00:10: la causa del contratto è illecita",
+    ]
 
 
 def test_render_study_markdown_recomputes_paragraph_but_preserves_timestamp() -> None:

@@ -96,6 +96,22 @@ def test_put_llm_field_pinned_by_env_is_409(
     assert response.json()["error"]["code"] == "LOCKED_BY_ENV"
 
 
+def test_put_transcription_with_llm_pinned_by_env_saves_the_unpinned_field(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SBOBINA_LLM_ENGINE", "local")
+
+    response = client.put(
+        f"{SETTINGS_URL}/transcription",
+        json={"transcription_engine": "whisper", "cloud_ack_audio": False},
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["locked_by_env"] == ["llm_engine"]
+    assert data["preferences"]["transcription_engine"] == "whisper"
+
+
 def test_put_key_returns_only_the_masked_view(client: TestClient) -> None:
     response = client.put(f"{SETTINGS_URL}/keys/groq", json={"key": SENTINEL_KEY})
 
@@ -275,3 +291,25 @@ def test_unsafe_config_dir_view_shows_the_engine_pinned_by_env(
 
     assert data["preferences"]["llm_engine"] == "api"
     assert "llm_engine" in data["locked_by_env"]
+
+
+def test_put_transcription_consent_required_before_save(client: TestClient) -> None:
+    url = f"{SETTINGS_URL}/transcription"
+    assert (
+        client.put(url=url, json={"transcription_engine": "whisper"}).status_code == 200
+    )
+    path = _config_dir() / "preferences.json"
+    before = path.read_bytes()
+
+    rejected = client.put(url=url, json={"transcription_engine": "assemblyai"})
+
+    assert rejected.status_code == 409
+    assert rejected.json()["error"]["code"] == "CLOUD_ACK_REQUIRED"
+    assert path.read_bytes() == before
+    accepted = client.put(
+        url=url, json={"transcription_engine": "assemblyai", "cloud_ack_audio": True}
+    )
+    assert accepted.status_code == 200
+    preferences = accepted.json()["data"]["preferences"]
+    assert preferences == json.loads(path.read_bytes())
+    assert preferences["transcription_engine"] == "assemblyai"

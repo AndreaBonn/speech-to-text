@@ -1,5 +1,18 @@
+import numpy as np
+import pytest
+
 from sbobina.embedding_units import DocUnit, LectureUnit
-from sbobina.hybrid_eval import fuse_rankings, lecture_window_ref, pool_top_n
+from sbobina.hybrid_eval import (
+    content_hash,
+    dense_candidates,
+    fuse_rankings,
+    gold_ref,
+    lecture_window_ref,
+    pool_top_n,
+    pooling_unit,
+    ref_to_dict,
+    score_lookup,
+)
 from sbobina.retrieval_metrics import DocumentRef, LectureRef
 
 
@@ -138,3 +151,86 @@ class TestLectureWindowRef:
         )
 
         assert ref == LectureRef(job_id="job", start_s=10, end_s=30)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (
+            {"kind": "document", "filename": "law.pdf", "page": 7},
+            DocumentRef(filename="law.pdf", page=7),
+        ),
+        (
+            {"kind": "lecture", "job_id": "lesson", "start_s": 12.5, "end_s": 29.0},
+            LectureRef(job_id="lesson", start_s=12.5, end_s=29.0),
+        ),
+    ],
+)
+def test_gold_ref_round_trip_preserves_reference(
+    raw: dict[str, object], expected: DocumentRef | LectureRef
+) -> None:
+    ref = gold_ref(raw=raw)
+
+    assert ref == expected
+    assert ref_to_dict(ref=ref) == raw
+
+
+@pytest.mark.parametrize(
+    "expected",
+    [
+        DocUnit(passage_id="D7", text="", ref=DocumentRef(filename="law.pdf", page=7)),
+        LectureUnit(
+            passage_id="L2",
+            text="",
+            ref=LectureRef(job_id="lesson", start_s=12.5, end_s=29.0),
+        ),
+    ],
+)
+def test_pooling_unit_pool_entry_reconstructs_empty_text(
+    expected: DocUnit | LectureUnit,
+) -> None:
+    entry = {"passage_id": expected.passage_id, "ref": ref_to_dict(ref=expected.ref)}
+
+    actual = pooling_unit(entry=entry)
+
+    assert actual == expected
+
+
+def test_dense_candidates_known_vectors_and_empty_units_return_native_scores() -> None:
+    parallel = DocUnit(
+        passage_id="D1", text="parallel", ref=DocumentRef(filename="f.pdf", page=1)
+    )
+    orthogonal = DocUnit(
+        passage_id="D2", text="orthogonal", ref=DocumentRef(filename="f.pdf", page=2)
+    )
+    cache = {
+        content_hash(text=parallel.text): np.array([1.0, 0.0]),
+        content_hash(text=orthogonal.text): np.array([0.0, 1.0]),
+    }
+
+    ranked = dense_candidates(
+        units=[orthogonal, parallel], cache=cache, query_vector=[1.0, 0.0]
+    )
+    empty = dense_candidates(units=[], cache=cache, query_vector=[1.0, 0.0])
+
+    assert ranked == [(0.0, orthogonal), (-1.0, parallel)]
+    assert min(ranked, key=lambda hit: hit[0]) == (-1.0, parallel)
+    assert empty == []
+
+
+def test_score_lookup_overlapping_rankings_keep_first_score() -> None:
+    first = DocUnit(
+        passage_id="D1", text="first", ref=DocumentRef(filename="f.pdf", page=1)
+    )
+    duplicate = DocUnit(passage_id="D1", text="copy", ref=first.ref)
+    second = LectureUnit(
+        passage_id="L1",
+        text="second",
+        ref=LectureRef(job_id="job", start_s=0, end_s=10),
+    )
+
+    scores = score_lookup(
+        rankings=[[], [(2.0, first)], [(-3.0, duplicate), (-1.0, second)]]
+    )
+
+    assert scores == {"D1": 2.0, "L1": -1.0}

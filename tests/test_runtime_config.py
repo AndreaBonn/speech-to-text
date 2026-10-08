@@ -60,3 +60,25 @@ def test_runtime_keys_unsafe_config_dir_falls_back_to_env_only(
     keys = runtime_keys(settings=Settings(config_dir=unsafe, data_dir=data_dir))
 
     assert keys == {}
+
+
+def test_runtime_settings_unsafe_config_ignores_saved_preferences(
+    tmp_path: Path,
+) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    save_preferences(
+        path=preferences_path(config_dir=config_dir),
+        preferences=UserPreferences(
+            transcription_engine="assemblyai", cloud_ack_audio=datetime.now(tz=UTC)
+        ),
+    )
+    safe = Settings(config_dir=config_dir, data_dir=tmp_path / "data")
+    assert runtime_settings(settings=safe).transcription_engine == "assemblyai"
+    unsafe = Settings(config_dir=config_dir, data_dir=tmp_path)
+
+    effective = runtime_settings(settings=unsafe)
+
+    assert effective is unsafe
+    assert effective.model_dump() == unsafe.model_dump()
+    assert effective.transcription_engine == "whisper"

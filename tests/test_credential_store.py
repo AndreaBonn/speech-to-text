@@ -227,3 +227,68 @@ def test_is_unreadable_accepts_string_keys(tmp_path: Path) -> None:
     )
 
     assert CredentialStore(config_dir=tmp_path).is_unreadable() is False
+
+
+def test_get_keys_non_object_json_returns_empty_and_warns(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    store = CredentialStore(config_dir=tmp_path)
+    store.set_key(provider="groq", key=SENTINEL)
+    assert store.get_keys() == {"groq": SENTINEL}
+    store.path.write_text("[]", encoding="utf-8")
+    caplog.clear()
+
+    with caplog.at_level(logging.WARNING):
+        keys = store.get_keys()
+
+    assert keys == {}
+    assert store.path.read_text(encoding="utf-8") == "[]"
+    assert caplog.record_tuples == [
+        (
+            "sbobina.credential_store",
+            logging.WARNING,
+            "credentials.json non è un oggetto JSON, trattato come vuoto",
+        )
+    ]
+
+
+def test_peek_keys_non_object_json_returns_empty(tmp_path: Path) -> None:
+    store = CredentialStore(config_dir=tmp_path)
+    store.set_key(provider="groq", key=SENTINEL)
+    assert store.peek_keys() == {"groq": SENTINEL}
+    store.path.write_text("[]", encoding="utf-8")
+
+    keys = store.peek_keys()
+
+    assert keys == {}
+    assert store.path.read_text(encoding="utf-8") == "[]"
+
+
+def test_is_unreadable_symlink_reports_lost_keys(tmp_path: Path) -> None:
+    target = tmp_path / "saved.json"
+    target.write_text('{"groq": "saved-key"}', encoding="utf-8")
+    store = CredentialStore(config_dir=tmp_path)
+    assert store.is_unreadable() is False
+    store.path.symlink_to(target=target)
+
+    unreadable = store.is_unreadable()
+
+    assert unreadable is True
+    assert target.read_text(encoding="utf-8") == '{"groq": "saved-key"}'
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="simulates Windows on POSIX")
+def test_get_keys_on_windows_leaves_file_mode_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    store = CredentialStore(config_dir=tmp_path)
+    store.set_key(provider="groq", key=SENTINEL)
+    store.path.chmod(0o644)
+    monkeypatch.setattr(sys, "platform", "win32")
+
+    with caplog.at_level(logging.WARNING):
+        keys = store.get_keys()
+
+    assert keys == {"groq": SENTINEL}
+    assert stat.S_IMODE(store.path.stat().st_mode) == 0o644
+    assert not any("permess" in record.message for record in caplog.records)

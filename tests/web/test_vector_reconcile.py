@@ -20,10 +20,27 @@ from sbobina.web.api_files import TRANSCRIPT_FILES
 from sbobina.web.document_store import read_document_in, write_document
 from sbobina.web.vector_reconcile import (
     EmbeddingProgress,
+    _course_inputs,
     embed_course,
     embedding_model_key,
 )
 from sbobina.web.vector_store import Coverage, StoredVector
+
+
+def test_course_inputs_unregistered_course_returns_only_lectures(
+    tmp_path: Path,
+) -> None:
+    context = make_context(tmp_path=tmp_path, fake=FakeEmbedder())
+    write_lecture(store=context.store, texts=["Lecture text"])
+    other = write_course(store=context.store, label="Storia")
+    write_pages(store=context.store, course=other, texts=["Document text"])
+
+    inputs = _course_inputs(store=context.store, course_key="diritto")
+
+    assert [item.text for item in inputs] == ["Lecture text"]
+    assert [
+        item.text for item in _course_inputs(store=context.store, course_key=other.key)
+    ] == ["Document text"]
 
 
 def test_embed_course_sends_only_twenty_missing_texts(tmp_path: Path) -> None:

@@ -441,3 +441,32 @@ def test_make_openai_compat_client_limits_reasoning_only_for_gemini(
     client(_request())
 
     assert json.loads(captured[0].content).get("reasoning_effort") == expected
+
+
+@pytest.mark.parametrize(
+    ("error_type", "expected"),
+    [
+        (httpx.ConnectError, FailureKind.NETWORK),
+        (httpx.ReadTimeout, FailureKind.TIMEOUT),
+    ],
+)
+def test_list_models_transport_failure_preserves_kind(
+    error_type: type[httpx.TransportError], expected: FailureKind
+) -> None:
+    failure = error_type("connection failed")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise failure
+
+    with pytest.raises(ProviderUnavailableError) as excinfo:
+        list_models(
+            profile=PROFILES["openai"],
+            api_key=SENTINEL_KEY,
+            timeout_s=5,
+            transport=httpx.MockTransport(handler=handler),
+        )
+
+    assert excinfo.value.kind == expected
+    assert excinfo.value.provider == "openai/models"
+    assert excinfo.value.retry_after_s is None
+    assert excinfo.value.__cause__ is failure

@@ -1,3 +1,5 @@
+import asyncio
+import json
 from collections.abc import Iterator
 from dataclasses import replace
 from pathlib import Path
@@ -8,17 +10,30 @@ import pytest
 from conftest import make_segment, make_transcript, make_word
 from fastapi.encoders import jsonable_encoder
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 from test_review_queue import NOW
 
-from sbobina.card_models import Anchor, DocumentAnchor, GenerationAnchor, LectureAnchor
+from sbobina.card_models import (
+    Anchor,
+    CardDeleted,
+    CardEdited,
+    DocumentAnchor,
+    GenerationAnchor,
+    LectureAnchor,
+)
 from sbobina.course_registry import get_or_create
+from sbobina.flashcard_scheduler import Scheduler
 from sbobina.models import save_transcript
 from sbobina.settings import Settings
+from sbobina.web import api_cards, card_store
 from sbobina.web.app import create_app
 from sbobina.web.card_store import cards_path
+from sbobina.web.course_dependencies import ReviewServices
 from sbobina.web.course_retrieval import lecture_revision
+from sbobina.web.errors import NotFoundError
 from sbobina.web.job_models import JobConfig, LectureMeta
 from sbobina.web.job_store import JobStore
+from sbobina.web.responses import app_error_handler
 
 BASE_URL = "http://127.0.0.1:8765"
 CARDS_URL = "/api/v1/courses/diritto/cards"
@@ -56,6 +71,56 @@ def _body(anchor: Anchor = GENERATION) -> dict[str, Any]:
         "back": "Risposta",
         "anchor": jsonable_encoder(obj=anchor),
     }
+
+
+def test_edit_card_deleted_after_append_returns_not_found(
+    store: JobStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    course = get_or_create(
+        courses_dir=store.courses_dir, key="diritto", label="Diritto"
+    )
+    services = ReviewServices(
+        store=store, settings=Settings(), now=NOW, scheduler=Scheduler()
+    )
+    draft = api_cards.CreateCardBody(front="Question", back="Answer", anchor=GENERATION)
+    first = api_cards.add_card(body=draft, course=course, services=services)["data"]
+    kept = api_cards.add_card(body=draft, course=course, services=services)["data"]
+    body = api_cards.CardTextBody(front="Edited question", back="Edited answer")
+    edited = api_cards.edit_card(
+        card_id=first["id"], body=body, course=course, services=services
+    )
+    assert edited["data"]["front"] == "Edited question"
+
+    def append_then_delete(
+        *, courses_dir: Path, course_id: str, event: CardEdited
+    ) -> None:
+        card_store.append_card_event(
+            courses_dir=courses_dir, course_id=course_id, event=event
+        )
+        # Schedule a real deletion in the unlocked gap before the route reloads cards.
+        card_store.append_card_event(
+            courses_dir=courses_dir,
+            course_id=course_id,
+            event=CardDeleted(card_id=event.card_id, occurred_at=NOW),
+        )
+
+    monkeypatch.setattr(api_cards, "append_card_event", append_then_delete)
+    with pytest.raises(NotFoundError) as caught:
+        api_cards.edit_card(
+            card_id=first["id"], body=body, course=course, services=services
+        )
+    response = asyncio.run(
+        app_error_handler(request=Request(scope={"type": "http"}), exc=caught.value)
+    )
+
+    assert response.status_code == 404
+    assert json.loads(bytes(response.body))["error"]["code"] == "NOT_FOUND"
+    assert [
+        card.id
+        for card in card_store.load_cards(
+            courses_dir=store.courses_dir, course_id=course.id
+        )
+    ] == [kept["id"]]
 
 
 def _transcript(store: JobStore, job_id: str, texts: list[str]) -> None:

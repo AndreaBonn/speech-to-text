@@ -161,3 +161,68 @@ def test_sentences_and_delete_hit_the_transcript_endpoints() -> None:
         ("GET", "/v2/transcript/t1/sentences"),
         ("DELETE", "/v2/transcript/t1"),
     ]
+
+
+def test_close_prevents_further_requests() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code=200, json=SENTENCES)
+
+    client = _client(handler=handler)
+    assert client.sentences(transcript_id="t1") == SENTENCES
+
+    client.close()
+
+    with pytest.raises(RuntimeError, match="client has been closed"):
+        client.sentences(transcript_id="t1")
+
+
+@pytest.mark.parametrize(
+    ("error_type", "expected"),
+    [
+        (httpx.ConnectError, FailureKind.NETWORK),
+        (httpx.ReadTimeout, FailureKind.TIMEOUT),
+    ],
+)
+def test_sentences_transport_failure_preserves_kind(
+    error_type: type[httpx.TransportError], expected: FailureKind
+) -> None:
+    failure = error_type("connection failed")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise failure
+
+    client = _client(handler=handler)
+    try:
+        with pytest.raises(ProviderUnavailableError) as excinfo:
+            client.sentences(transcript_id="t1")
+    finally:
+        client.close()
+
+    assert excinfo.value.kind == expected
+    assert excinfo.value.provider == "assemblyai"
+    assert excinfo.value.retry_after_s is None
+    assert excinfo.value.__cause__ is failure
+
+
+def test_wait_on_poll_receives_elapsed_seconds() -> None:
+    clock = FakeClock()
+    clock.t = 100.0
+    seen: list[httpx.Request] = []
+    elapsed: list[float] = []
+    handler = _poll_handler(
+        statuses=[
+            httpx.Response(status_code=200, json={"status": "queued"}),
+            httpx.Response(status_code=503),
+            httpx.Response(status_code=200, json={"status": "completed"}),
+        ],
+        seen=seen,
+    )
+    client = _client(handler=handler, clock=clock)
+    try:
+        reply = client.wait(transcript_id="t1", max_wait_s=900, on_poll=elapsed.append)
+    finally:
+        client.close()
+
+    assert reply == {"status": "completed"}
+    assert elapsed == [0.0, 5.0, 10.0]
+    assert len(seen) == 3

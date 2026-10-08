@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 from embedding_fixtures import EmbeddingHarness, embedding_harness
@@ -7,11 +8,118 @@ from test_supervisor import wait_for
 
 from sbobina.ollama_embed import EmbeddingUnavailableError
 from sbobina.web import course_actions, embedding_supervisor
-from sbobina.web.embedding_store import EmbeddingStatus, create_embed, save_embed
+from sbobina.web.embedding_store import (
+    EmbeddingRun,
+    EmbeddingStatus,
+    create_embed,
+    save_embed,
+)
 from sbobina.web.errors import ConflictError, JobNotCancellableError, NotFoundError
 from sbobina.web.job_models import WorkItem
+from sbobina.web.job_store import JobStore
 
 __all__ = ["embedding_harness"]
+
+
+def test_enqueue_checked_embed_submit_race_keeps_one_item(
+    embedding_harness: EmbeddingHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness = embedding_harness
+    course_id = harness.course_dir.name
+    real_submit = embedding_supervisor.submit_embed_item
+
+    def competing_submit(
+        *, store: JobStore, course_id: str
+    ) -> tuple[EmbeddingRun, WorkItem]:
+        _, competing = real_submit(store=store, course_id=course_id)
+        harness.supervisor._queue.append(competing)
+        return real_submit(store=store, course_id=course_id)
+
+    monkeypatch.setattr(embedding_supervisor, "submit_embed_item", competing_submit)
+    with harness.supervisor._condition:
+        embedding_supervisor._enqueue_checked_embed(
+            supervisor=harness.supervisor, course_id=course_id, reason=None
+        )
+
+    assert list(harness.supervisor._queue) == [
+        WorkItem(job_id=course_id, course_id=course_id, action="embed")
+    ]
+    assert harness.record().status is EmbeddingStatus.QUEUED
+
+
+def test_enqueue_checked_embed_unexpected_conflict_is_reraised(
+    embedding_harness: EmbeddingHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness = embedding_harness
+    conflict = ConflictError(message="Storage conflict", code="STORAGE_CONFLICT")
+
+    def conflict_on_submit(
+        *, store: JobStore, course_id: str
+    ) -> tuple[EmbeddingRun, WorkItem]:
+        raise conflict
+
+    with monkeypatch.context() as patch:
+        patch.setattr(embedding_supervisor, "submit_embed_item", conflict_on_submit)
+        with harness.supervisor._condition, pytest.raises(ConflictError) as caught:
+            embedding_supervisor._enqueue_checked_embed(
+                supervisor=harness.supervisor,
+                course_id=harness.course_dir.name,
+                reason=None,
+            )
+
+    assert caught.value is conflict
+    assert list(harness.supervisor._queue) == []
+    with harness.supervisor._condition:
+        embedding_supervisor._enqueue_checked_embed(
+            supervisor=harness.supervisor,
+            course_id=harness.course_dir.name,
+            reason=None,
+        )
+    assert list(harness.supervisor._queue) == [
+        WorkItem(
+            job_id=harness.course_dir.name,
+            course_id=harness.course_dir.name,
+            action="embed",
+        )
+    ]
+
+
+def test_execute_embed_action_cancelled_during_estimate_skips_lease_and_child(
+    embedding_harness: EmbeddingHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness = embedding_harness
+    course_actions.submit_embed(supervisor=harness.supervisor, course_key="diritto")
+    item = harness.supervisor._queue.popleft()
+    assert embedding_supervisor.claim_embed_item(store=harness.store, item=item)
+
+    def cancel_during_estimate(*, course_dir: Path) -> float:
+        save_embed(
+            course_dir=course_dir,
+            record=replace(harness.record(), status=EmbeddingStatus.CANCELLED),
+        )
+        return 10.0
+
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            embedding_supervisor, "estimate_embed_seconds", cancel_during_estimate
+        )
+        embedding_supervisor.execute_embed_action(
+            supervisor=harness.supervisor, item=item, ollama_unavailable_exit=2
+        )
+
+    assert harness.record().status is EmbeddingStatus.CANCELLED
+    assert harness.released == []
+    assert not (harness.course_dir / "embed.started").exists()
+
+    course_actions.submit_embed(supervisor=harness.supervisor, course_key="diritto")
+    retry = harness.supervisor._queue.popleft()
+    assert embedding_supervisor.claim_embed_item(store=harness.store, item=retry)
+    embedding_supervisor.execute_embed_action(
+        supervisor=harness.supervisor, item=retry, ollama_unavailable_exit=2
+    )
+    assert harness.record().status is EmbeddingStatus.DONE
+    assert (harness.course_dir / "embed.started").exists()
+    assert harness.released == [("chat:9b", 0), ("test", 0)]
 
 
 def test_duplicate_submits_queue_one_course(

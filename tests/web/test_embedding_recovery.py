@@ -1,4 +1,5 @@
 import logging
+import os
 from dataclasses import replace
 from pathlib import Path
 
@@ -21,6 +22,60 @@ from sbobina.web.embedding_supervisor import submit_embed_item
 __all__ = ["embedding_harness", "semantic_harness"]
 
 CORRUPT_RECORD = '{"status": "running"'
+
+
+def test_recover_embed_runs_missing_records_keeps_queued_course(
+    embedding_harness: EmbeddingHarness,
+) -> None:
+    harness = embedding_harness
+    write_course(store=harness.store, label="Absent")
+    vanished = write_course(store=harness.store, label="Vanished")
+    (harness.store.courses_dir / vanished.id / EMBEDDING_FILENAME).symlink_to(
+        target=harness.course_dir / "missing.json"
+    )
+    create_embed(course_dir=harness.course_dir)
+
+    recovered = embedding_queue.recover_embed_runs(
+        courses_dir=harness.store.courses_dir
+    )
+
+    assert [item.course_id for _, item in recovered] == [harness.course_dir.name]
+    assert harness.record().status is EmbeddingStatus.QUEUED
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root writes despite directory mode")
+def test_recover_embed_runs_read_only_quarantine_logs_and_recovers_healthy(
+    embedding_harness: EmbeddingHarness, caplog: pytest.LogCaptureFixture
+) -> None:
+    harness = embedding_harness
+    broken = write_course(store=harness.store, label="Broken")
+    directory = harness.store.courses_dir / broken.id
+    path = directory / EMBEDDING_FILENAME
+    path.write_text(data=CORRUPT_RECORD, encoding="utf-8")
+    create_embed(course_dir=harness.course_dir)
+    original_mode = directory.stat().st_mode
+    try:
+        directory.chmod(mode=0o555)
+        recovered = embedding_queue.recover_embed_runs(
+            courses_dir=harness.store.courses_dir
+        )
+    finally:
+        directory.chmod(mode=original_mode)
+
+    assert [item.course_id for _, item in recovered] == [harness.course_dir.name]
+    assert path.read_text(encoding="utf-8") == CORRUPT_RECORD
+    errors = [record for record in caplog.records if record.levelno == logging.ERROR]
+    assert len(errors) == 1
+    assert "Cannot move aside unreadable embedding run" in errors[0].getMessage()
+    assert errors[0].exc_info is not None
+    assert isinstance(errors[0].exc_info[1], PermissionError)
+    assert list(directory.glob(f"{EMBEDDING_FILENAME}.corrupt-*")) == []
+
+    embedding_queue.recover_embed_runs(courses_dir=harness.store.courses_dir)
+    assert [
+        item.read_text(encoding="utf-8")
+        for item in directory.glob(f"{EMBEDDING_FILENAME}.corrupt-*")
+    ] == [CORRUPT_RECORD]
 
 
 def test_recovery_quarantines_unreadable_record_and_unblocks_course(
