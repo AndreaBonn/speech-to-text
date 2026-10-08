@@ -6,6 +6,7 @@ from sbobina.render import (
     RenderOptions,
     find_uncertain_spans,
     group_paragraphs,
+    most_uncertain_threshold,
 )
 
 
@@ -16,6 +17,9 @@ class WordView:
     ``index`` is the word's flat position in the transcript, the handle the
     reader sends back when the user edits a span. ``segment`` is the index of
     the transcript segment holding the word, the handle a card anchor needs.
+    ``most_uncertain`` is a stricter subset of ``uncertain`` (see
+    ``render.most_uncertain_threshold``), letting the client pick between the
+    "Tutte" and "Le più dubbie" reader levels without seeing raw probabilities.
     """
 
     index: int
@@ -24,6 +28,7 @@ class WordView:
     end: float
     text: str
     uncertain: bool
+    most_uncertain: bool
     corrected_from: str | None
 
 
@@ -35,6 +40,8 @@ class ReviewPoint:
     before: str
     text: str
     after: str
+    # True when a word of the span is also below the stricter threshold (R1).
+    most_uncertain: bool
 
 
 def _build_word_view(
@@ -47,6 +54,7 @@ def _build_word_view(
         end=word.end,
         text=word.text,
         uncertain=word.probability < threshold,
+        most_uncertain=word.probability < most_uncertain_threshold(threshold=threshold),
         corrected_from=word.corrected_from,
     )
 
@@ -91,7 +99,9 @@ def build_paragraphs(
     return paragraphs
 
 
-def _build_review_point(words: tuple[Word, ...], span: tuple[int, int]) -> ReviewPoint:
+def _build_review_point(
+    words: tuple[Word, ...], span: tuple[int, int], strict_threshold: float
+) -> ReviewPoint:
     start, end = span
     return ReviewPoint(
         start=words[start].start,
@@ -100,6 +110,9 @@ def _build_review_point(words: tuple[Word, ...], span: tuple[int, int]) -> Revie
         ).strip(),
         text="".join(word.text for word in words[start:end]).strip(),
         after="".join(word.text for word in words[end : end + CONTEXT_WORDS]).strip(),
+        most_uncertain=any(
+            word.probability < strict_threshold for word in words[start:end]
+        ),
     )
 
 
@@ -120,6 +133,10 @@ def build_review_points(transcript: Transcript, threshold: float) -> list[Review
     """
     words = transcript.words
     return [
-        _build_review_point(words=words, span=span)
+        _build_review_point(
+            words=words,
+            span=span,
+            strict_threshold=most_uncertain_threshold(threshold=threshold),
+        )
         for span in find_uncertain_spans(words=words, threshold=threshold)
     ]

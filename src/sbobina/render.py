@@ -8,6 +8,11 @@ from sbobina.models import Segment, Transcript, Word
 CONTEXT_WORDS = 4
 SECONDS_PER_HOUR = 3600
 SECONDS_PER_MINUTE = 60
+# Measured 2026-10-08 on data/jobs/82144973-acfa-4b8b-ab8b-90c8ef51e85e
+# (85-minute Diritto lecture, job threshold 0.7): at the full threshold 20.7%
+# of words are flagged ("Tutte"); halving it to 0.35 keeps only 5.7% flagged,
+# a visibly sparser "most doubtful" set without losing the clearest outliers.
+MOST_UNCERTAIN_FACTOR = 0.5
 # Apostrophes are not trailing punctuation: in Italian a final one is an
 # elision ("po'"), part of the word rather than a closing quote.
 _WORD_PARTS = re.compile(r"^(\s*)([\"'’“«(\[¿]*)(.*?)([\"”».,;:!?)\]…]*)$", re.DOTALL)
@@ -49,6 +54,24 @@ def _render_word(word: Word, threshold: float) -> str:
     if word.corrected_from is not None:
         return mark_correction(word.text, word.corrected_from)
     return mark_word(word.text) if word.probability < threshold else word.text
+
+
+def most_uncertain_threshold(threshold: float) -> float:
+    """Stricter threshold for the reader's "most doubtful" level.
+
+    Parameters
+    ----------
+    threshold : float
+        The job's own uncertainty threshold ("Tutte" level).
+
+    Returns
+    -------
+    float
+        A threshold always below or equal to ``threshold``, so the "most
+        doubtful" set of words is a subset of the full one regardless of
+        how the job was configured.
+    """
+    return threshold * MOST_UNCERTAIN_FACTOR
 
 
 def find_uncertain_spans(

@@ -172,6 +172,7 @@ def test_get_transcript_variant_returns_reader_then_not_found(
                         "end": 0.4,
                         "text": " cloroplasto",
                         "uncertain": True,
+                        "most_uncertain": False,
                         "corrected_from": "clorofilla",
                     }
                 ],
@@ -183,12 +184,19 @@ def test_get_transcript_variant_returns_reader_then_not_found(
                         "end": 1.4,
                         "text": " dopo",
                         "uncertain": False,
+                        "most_uncertain": False,
                         "corrected_from": None,
                     }
                 ],
             ],
             "review_points": [
-                {"start": 0.0, "before": "", "text": "cloroplasto", "after": "dopo"}
+                {
+                    "start": 0.0,
+                    "before": "",
+                    "text": "cloroplasto",
+                    "after": "dopo",
+                    "most_uncertain": False,
+                }
             ],
         },
         "meta": {"revision": revision},

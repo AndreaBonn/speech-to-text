@@ -257,3 +257,54 @@
 .reader.is-editing .reader__hint {
   display: none;
 }
+
+/* R1: the level picker hides the milder doubts (or all of them) in the text;
+   a corrected word keeps its own underline. */
+.reader__levels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-sm);
+}
+
+.reader__levels-label {
+  color: var(--color-ink-2);
+}
+
+.reader[data-uncertain-level="none"] .word--uncertain,
+.reader[data-uncertain-level="most"] .word--uncertain:not(.word--most-uncertain) {
+  background: none;
+  color: inherit;
+}
+
+.reader[data-uncertain-level="none"] .word--uncertain:not(.word--corrected),
+.reader[data-uncertain-level="most"] .word--uncertain:not(.word--most-uncertain):not(.word--corrected) {
+  text-decoration: none;
+}
+
+/* R2: one card per passage, with stepping through them from the head. */
+.reader__points-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-xs);
+}
+
+.reader__points-title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+}
+
+.reader__points-nav {
+  display: flex;
+  gap: var(--space-2xs);
+}
+
+.btn.reader__points-step {
+  min-width: 44px;
+  justify-content: center;
+}

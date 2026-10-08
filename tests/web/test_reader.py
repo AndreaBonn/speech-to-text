@@ -29,6 +29,7 @@ def test_build_paragraphs_threshold_and_correction_preserves_word_fields() -> No
                 end=0.4,
                 text=" cloroplasto",
                 uncertain=True,
+                most_uncertain=False,
                 corrected_from="clorofilla",
             ),
             WordView(
@@ -38,9 +39,28 @@ def test_build_paragraphs_threshold_and_correction_preserves_word_fields() -> No
                 end=0.8,
                 text=" chiaro",
                 uncertain=False,
+                most_uncertain=False,
                 corrected_from=None,
             ),
         ]
+    ]
+
+
+def test_build_paragraphs_most_uncertain_is_stricter_subset_of_uncertain() -> None:
+    # threshold 0.7 -> uncertain below 0.7; most_uncertain below 0.35 (half).
+    words = [
+        make_word(" chiarissima", 0.0, 0.9),  # confident: neither flag
+        make_word(" dubbia", 0.4, 0.5),  # below 0.7, not below 0.35
+        make_word(" oscura", 0.8, 0.2),  # below both
+    ]
+    transcript = make_transcript([make_segment(words)])
+
+    [paragraph] = build_paragraphs(transcript=transcript, options=OPTIONS)
+
+    assert [(w.uncertain, w.most_uncertain) for w in paragraph] == [
+        (False, False),
+        (True, False),
+        (True, True),
     ]
 
 
@@ -148,4 +168,23 @@ def test_build_paragraphs_segment_index_counts_segments_not_words() -> None:
         (1, 0),
         (2, 1),
         (3, 1),
+    ]
+
+
+def test_build_review_points_flag_spans_with_a_most_uncertain_word() -> None:
+    """R1: a point is "most doubtful" when one of its words is below half the
+    job threshold, so the reader can hide the milder ones."""
+    words = [
+        make_word(" chiara", 0.0, 0.95),
+        make_word(" dubbia", 2.0, 0.5),
+        make_word(" chiara", 4.0, 0.95),
+        make_word(" oscura", 30.0, 0.2),
+    ]
+    transcript = make_transcript([make_segment(words)])
+
+    points = build_review_points(transcript=transcript, threshold=0.7)
+
+    assert [(point.text, point.most_uncertain) for point in points] == [
+        ("dubbia", False),
+        ("oscura", True),
     ]

@@ -91,3 +91,21 @@ def test_reader_downloads_sit_in_one_menu_with_names_of_use(tmp_path: Path) -> N
     ):
         assert f'id="{element_id}"' in menu
     assert "Scarica .md" not in body
+
+
+def test_reader_offers_three_uncertainty_levels(tmp_path: Path) -> None:
+    """R1: Nessuna, Le più dubbie (default), Tutte."""
+    job_id = _done_job(tmp_path=tmp_path, subject="Diritto")
+
+    body = _get(tmp_path=tmp_path, url=f"/lettore/{job_id}")
+
+    picker = body.split('id="uncertain-level"')[1].split("</div>")[0]
+    assert 'aria-labelledby="uncertain-level-label"' in picker
+    for level, label in (
+        ("none", "Nessuna"),
+        ("most", "Le più dubbie"),
+        ("all", "Tutte"),
+    ):
+        assert f'data-level="{level}"' in picker
+        assert f">{label}</button>" in picker
+    assert 'data-level="most" aria-pressed="true"' in picker

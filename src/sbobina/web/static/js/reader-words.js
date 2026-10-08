@@ -10,6 +10,9 @@
     if (word.uncertain) {
       classes.push("word--uncertain");
     }
+    if (word.most_uncertain) {
+      classes.push("word--most-uncertain");
+    }
     if (word.corrected_from) {
       classes.push("word--corrected");
     }

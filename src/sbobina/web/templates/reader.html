@@ -63,6 +63,15 @@
   <p id="reader-no-audio" class="banner banner--info">Lezione importata: l'audio non è incluso. Il testo resta leggibile, e un clic su una parola o su un minuto porta a quel punto del testo.</p>
   {% endif %}
 
+  <div class="reader__levels">
+    <span id="uncertain-level-label" class="reader__levels-label">Parole incerte</span>
+    <div id="uncertain-level" class="segmented" role="group" aria-labelledby="uncertain-level-label">
+      <button type="button" class="segmented__option" data-level="none" aria-pressed="false">Nessuna</button>
+      <button type="button" class="segmented__option is-active" data-level="most" aria-pressed="true">Le più dubbie</button>
+      <button type="button" class="segmented__option" data-level="all" aria-pressed="false">Tutte</button>
+    </div>
+  </div>
+
   <div class="reader__layout">
     <article id="reader-text" class="reader__text" aria-label="Trascrizione">
       <div class="skeleton-row"></div>
