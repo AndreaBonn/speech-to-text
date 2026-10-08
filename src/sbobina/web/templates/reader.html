@@ -16,7 +16,7 @@
     <div class="reader__toolbar-title">
       <h1 class="page-title reader__title">{{ title }}</h1>
       <p class="reader__subtitle">
-        Caricata il {{ created_at }} · <span aria-live="polite">Corso: <strong id="course-current">{{ course or "nessuno" }}</strong></span>
+        Caricata il {{ created_at }} · <span aria-live="polite">Corso: <strong id="course-current" data-course="{{ course }}">{{ course or "nessuno" }}</strong></span>
         <button type="button" id="course-edit" class="btn btn--ghost btn--inline"
                 aria-expanded="false" aria-controls="course-form">{% if course %}Modifica{% else %}Assegna{% endif %}</button>
       </p>

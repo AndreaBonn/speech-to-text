@@ -41,3 +41,8 @@ test("a course with nothing to index says so", () => {
 test("the exact count stays available for the tooltip", () => {
   assert.equal(Coverage.coverageDetail(course(97, 97, 0)), "97 passaggi indicizzati su 97");
 });
+
+test("a course never indexed but with text to index says so", () => {
+  assert.equal(Coverage.coverageText(course(0, 0, 12)), "non ancora indicizzata");
+  assert.equal(Coverage.coverageText({ coverage: null, missing_units: 12 }), "non ancora indicizzata");
+});

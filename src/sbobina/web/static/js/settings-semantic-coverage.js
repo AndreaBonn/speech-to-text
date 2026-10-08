@@ -10,7 +10,9 @@
   function coverageText(course) {
     var coverage = course.coverage;
     if (!coverage || coverage.total === 0) {
-      return "nessun contenuto da indicizzare";
+      // The coverage counts the last synced manifest; text never indexed
+      // shows up only in missing_units.
+      return course.missing_units > 0 ? "non ancora indicizzata" : "nessun contenuto da indicizzare";
     }
     var text;
     if (coverage.embedded >= coverage.total) {

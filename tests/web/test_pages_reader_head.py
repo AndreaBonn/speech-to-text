@@ -52,7 +52,7 @@ def test_reader_course_is_a_line_with_an_edit_button(tmp_path: Path) -> None:
 
     body = _get(tmp_path=tmp_path, url=f"/lettore/{job_id}")
 
-    assert '<strong id="course-current">Diritto</strong>' in body
+    assert '<strong id="course-current" data-course="Diritto">Diritto</strong>' in body
     edit = body.split('id="course-edit"')[1].split("</button>")[0]
     assert 'aria-controls="course-form"' in edit
     assert ">Modifica" in edit

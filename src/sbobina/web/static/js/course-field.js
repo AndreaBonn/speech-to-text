@@ -38,6 +38,8 @@
   }
 
   function showCurrent(course) {
+    // The real value lives in data-course: "nessuno" is only the label.
+    currentEl.dataset.course = course || "";
     currentEl.textContent = course || "nessuno";
     editButton.textContent = course ? "Modifica" : "Assegna";
   }
@@ -132,7 +134,7 @@
   });
   cancelButton.addEventListener("click", function () {
     clearError();
-    input.value = currentEl.textContent === "nessuno" ? "" : currentEl.textContent;
+    input.value = currentEl.dataset.course || "";
     setOpen(false);
     editButton.focus();
   });

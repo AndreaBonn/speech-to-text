@@ -104,11 +104,17 @@
 
   // I1: the cloud block opens by itself when a cloud engine is in use; with
   // everything local it stays closed but can still be opened by hand.
+  // Opens only when a cloud engine gets turned on (or is on at load): a later
+  // unrelated save must not reopen a block the user closed.
+  var cloudWasOn = false;
+
   function syncCloudBlock() {
     var prefs = settingsState.preferences;
-    if (prefs.llm_engine === "api" || prefs.transcription_engine === "assemblyai") {
+    var cloudOn = prefs.llm_engine === "api" || prefs.transcription_engine === "assemblyai";
+    if (cloudOn && !cloudWasOn) {
       byId("cloud-settings").open = true;
     }
+    cloudWasOn = cloudOn;
   }
 
   function renderAll() {
