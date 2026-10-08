@@ -179,6 +179,7 @@ def test_list_jobs_pagination_returns_correct_meta(
         "per_page": 2,
         "total": 3,
         "total_pages": 2,
+        "status_counts": {"queued": 3},
     }
     assert [item["id"] for item in response.json()["data"]] == [str(records[0].id)]
 
@@ -220,6 +221,7 @@ def test_list_jobs_filters_effective_course(client: TestClient, tmp_path: Path) 
         "per_page": 1,
         "total": 2,
         "total_pages": 2,
+        "status_counts": {"queued": 2},
     }
     assert [item["id"] for item in response.json()["data"]] == [str(records[1].id)]
     missing = client.get(url=JOBS_URL, params={"course": ""}).json()
@@ -362,3 +364,54 @@ def test_delete_job_protects_an_active_study_on_a_done_job(
     active = study_status in (StudyStatus.QUEUED, StudyStatus.RUNNING)
     assert response.status_code == (409 if active else 204)
     assert directory.exists() == active
+
+
+def _job_with_status(store: JobStore, status: JobStatus, subject: str) -> str:
+    record = store.create(config=JobConfig(subject=subject))
+    store.update(record=record.model_copy(update={"status": status}))
+    return str(record.id)
+
+
+def test_list_jobs_filters_by_status_and_counts_each_status(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """T1/C10: filter by one or more statuses; meta counts every status."""
+    store = JobStore(data_dir=tmp_path)
+    done = _job_with_status(store=store, status=JobStatus.DONE, subject="Diritto")
+    _job_with_status(store=store, status=JobStatus.INTERRUPTED, subject="Diritto")
+    _job_with_status(store=store, status=JobStatus.CANCELLED, subject="Diritto")
+    _job_with_status(store=store, status=JobStatus.DONE, subject="Fisica")
+
+    body = client.get(
+        url=JOBS_URL, params={"course": "diritto", "status": "done"}
+    ).json()
+
+    assert [item["id"] for item in body["data"]] == [done]
+    assert body["meta"]["total"] == 1
+    assert body["meta"]["status_counts"] == {
+        "done": 1,
+        "interrupted": 1,
+        "cancelled": 1,
+    }
+
+
+def test_list_jobs_accepts_several_statuses(client: TestClient, tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    _job_with_status(store=store, status=JobStatus.DONE, subject="Diritto")
+    _job_with_status(store=store, status=JobStatus.INTERRUPTED, subject="Diritto")
+    _job_with_status(store=store, status=JobStatus.CANCELLED, subject="Diritto")
+
+    body = client.get(
+        url=JOBS_URL, params=[("status", "interrupted"), ("status", "cancelled")]
+    ).json()
+
+    assert sorted(item["status"] for item in body["data"]) == [
+        "cancelled",
+        "interrupted",
+    ]
+
+
+def test_list_jobs_rejects_unknown_status(client: TestClient) -> None:
+    response = client.get(url=JOBS_URL, params={"status": "sparita"})
+
+    assert response.status_code == 422

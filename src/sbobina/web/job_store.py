@@ -2,8 +2,9 @@ import json
 import os
 import shutil
 import time
+from collections import Counter
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -36,6 +37,8 @@ class JobPage:
     per_page: int
     total: int
     total_pages: int
+    # Jobs per status within the course filter, before the status filter.
+    status_counts: dict[str, int] = field(default_factory=dict)
 
 
 def _replace_with_retry(source: Path, destination: Path) -> None:
@@ -139,14 +142,24 @@ class JobStore:
         return normalized_course_key(label=label)
 
     def list(
-        self, page: int = 1, per_page: int = 10, course_key: str | None = None
+        self,
+        page: int = 1,
+        per_page: int = 10,
+        course_key: str | None = None,
+        statuses: frozenset[JobStatus] | None = None,
     ) -> JobPage:
         if page < 1 or per_page < 1:
             raise ValidationError(message="Pagina e dimensione devono essere positive")
-        records = [
+        in_course = [
             record
             for record in self.iter_records()
             if course_key is None or self._course_key(record=record) == course_key
+        ]
+        status_counts = Counter(record.status.value for record in in_course)
+        records = [
+            record
+            for record in in_course
+            if statuses is None or record.status in statuses
         ]
         records.sort(key=lambda record: record.created_at, reverse=True)
         total = len(records)
@@ -157,6 +170,7 @@ class JobStore:
             per_page=per_page,
             total=total,
             total_pages=(total + per_page - 1) // per_page,
+            status_counts=dict(status_counts),
         )
 
     def update(self, record: JobRecord) -> JobRecord:

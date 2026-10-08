@@ -174,9 +174,19 @@ def list_jobs(
     page: Annotated[int, Query(ge=1)] = 1,
     per_page: Annotated[int, Query(ge=1)] = 20,
     course: str | None = None,
+    status: Annotated[list[JobStatus] | None, Query()] = None,
 ) -> dict[str, Any]:
-    """Return jobs ordered by creation time with pagination metadata."""
-    result = services.store.list(page=page, per_page=per_page, course_key=course)
+    """Return jobs ordered by creation time with pagination metadata.
+
+    ``status`` may repeat; ``meta.status_counts`` counts every status in the
+    course filter, so a page can show "Completate (n)" next to its filter.
+    """
+    result = services.store.list(
+        page=page,
+        per_page=per_page,
+        course_key=course,
+        statuses=frozenset(status) if status else None,
+    )
     return {
         "data": [
             _job_dict(record=record, store=services.store) for record in result.items
@@ -186,6 +196,7 @@ def list_jobs(
             "per_page": result.per_page,
             "total": result.total,
             "total_pages": result.total_pages,
+            "status_counts": result.status_counts,
         },
     }
 
