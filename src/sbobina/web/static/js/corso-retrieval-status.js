@@ -8,6 +8,7 @@
 
   var STATUS_URL = "/api/v1/semantic-index/status";
   var el = document.getElementById("corsi-detail-retrieval");
+  var textEl = document.getElementById("corsi-detail-retrieval-text");
   var mode = window.SbobinaRetrievalMode;
 
   function courseEntry(data, key) {
@@ -53,7 +54,8 @@
     }
     currentKey = key;
     el.hidden = false;
-    el.textContent = "Verifica della ricerca semantica…";
+    el.dataset.mode = "checking";
+    textEl.textContent = "Verifica della ricerca semantica…";
     fetch(STATUS_URL)
       .then(function (response) {
         if (!response.ok) {
@@ -63,12 +65,17 @@
       })
       .then(function (body) {
         if (currentKey === key) {
-          el.textContent = mode.phrase(reportFor(body.data, key));
+          // C7: a state with a word, not a loose grey label.
+          var report = reportFor(body.data, key);
+          el.dataset.mode = report.mode;
+          textEl.textContent =
+            report.mode === "dense" ? "Ricerca per significato attiva" : mode.phrase(report);
         }
       })
       .catch(function () {
         if (currentKey === key) {
-          el.textContent = "Solo parole chiave: stato della ricerca semantica non verificabile ora.";
+          el.dataset.mode = "bm25";
+          textEl.textContent = "Solo parole chiave: stato della ricerca semantica non verificabile ora.";
         }
       });
   }
@@ -79,7 +86,7 @@
     }
     currentKey = null;
     el.hidden = true;
-    el.textContent = "";
+    textEl.textContent = "";
   }
 
   window.SbobinaCourseRetrievalStatus = { show: show, hide: hide };

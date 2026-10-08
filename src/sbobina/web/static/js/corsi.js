@@ -11,7 +11,7 @@
   var listEmptyEl = document.getElementById("corsi-list-empty");
   var listPaginationEl = document.getElementById("corsi-list-pagination");
 
-  var backLink = document.getElementById("corsi-detail-back");
+  var backLink = document.getElementById("corsi-crumb-root");
 
   var listPage = 1;
   var detail = window.SbobinaCourseDetail;

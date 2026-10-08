@@ -30,6 +30,17 @@
     return;
   }
   var slowTimer = null;
+  // C2: inside a course the search is scoped to it and the course picker
+  // goes away (CSS on body.is-course-detail); null means "pick in the form".
+  var scopeKey = null;
+  var DEFAULT_PLACEHOLDER = input.placeholder;
+
+  function applyScope(key, label) {
+    scopeKey = key;
+    input.placeholder = key === null ? DEFAULT_PLACEHOLDER : "Cerca in " + label;
+    resetResults();
+    statusEl.hidden = true;
+  }
   // Only the latest search may paint: an older, slower answer is dropped.
   var latestRequest = 0;
 
@@ -238,8 +249,16 @@
       input.focus();
       return;
     }
-    runSearch(query, 1, courseSelect.value);
+    runSearch(query, 1, scopeKey !== null ? scopeKey : courseSelect.value);
   });
+
+  document.addEventListener("sbobina:course-scope", function (event) {
+    applyScope(event.detail.key, event.detail.label);
+  });
+  // The detail view may have opened before this script loaded.
+  if (document.body.dataset.courseKey !== undefined) {
+    applyScope(document.body.dataset.courseKey, document.body.dataset.courseLabel);
+  }
 
   loadCourses();
 })();

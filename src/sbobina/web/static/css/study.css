@@ -290,3 +290,137 @@
   }
 }
 
+
+/* ---------- Course detail head (S1, C1, C2, C3, C7, C10) ---------- */
+
+.breadcrumbs[hidden] {
+  display: none;
+}
+
+/* C2: inside a course the search is scoped to it. */
+.is-course-detail #search-title,
+.is-course-detail .search__filter,
+.is-course-detail #search-help {
+  display: none;
+}
+
+.course-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs) var(--space-lg);
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.course-summary[hidden] {
+  display: none;
+}
+
+.course-summary__item {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.course-summary__item:hover {
+  text-decoration: underline;
+}
+
+.course-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+  margin: 0 0 var(--space-sm);
+}
+
+.retrieval-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-3xs) var(--space-xs);
+  border-radius: var(--radius-mark);
+  font-size: var(--text-sm);
+  background: var(--color-paper-3);
+  color: var(--color-ink-2);
+}
+
+.retrieval-state[hidden] {
+  display: none;
+}
+
+.retrieval-state[data-mode="dense"] {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.retrieval-state[data-mode="dense"]::before {
+  content: "✓";
+  font-weight: var(--weight-semibold);
+}
+
+.retrieval-state[data-mode="bm25"] {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+/* C1: section anchors stay in reach on a page this long. */
+.course-sections {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  gap: var(--space-2xs);
+  overflow-x: auto;
+  margin: 0 0 var(--space-md);
+  padding: var(--space-xs) 0;
+  background: var(--color-paper);
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+
+.course-sections a {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-input);
+  color: var(--color-ink-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.course-sections a:hover {
+  background: var(--color-paper-3);
+}
+
+.course-sections a.is-active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: var(--weight-medium);
+}
+
+#corsi-lessons,
+#corsi-examcues,
+#corsi-materials,
+#corsi-generations,
+#corsi-chat {
+  scroll-margin-top: 72px;
+}
+
+.course-lesson__attempts td {
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  background: var(--color-paper-2);
+}
+
+.btn.btn--inline {
+  min-height: 0;
+  padding: 0 var(--space-2xs);
+  text-decoration: underline;
+}
+
+/* C3: folded attempts stay folded also where rows become cards. */
+.history-table tr[hidden] {
+  display: none;
+}

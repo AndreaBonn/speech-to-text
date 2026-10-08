@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 
+{% block page_heading %}
+<nav class="breadcrumbs" id="corsi-breadcrumbs" aria-label="Percorso" hidden><a href="/corsi" id="corsi-crumb-root">Corsi</a></nav>
+<h1 class="page-title" id="corsi-page-title">Corsi</h1>
+{% endblock %}
+
 {% block content %}
 <section class="search" aria-labelledby="search-title">
   <h2 id="search-title" class="section-title">Cerca nelle lezioni e nei materiali</h2>
@@ -59,11 +64,33 @@
   </div>
 
   <div id="corsi-detail" class="courses__detail" hidden>
-    <a id="corsi-detail-back" class="btn btn--ghost" href="/corsi">&larr; Tutti i corsi</a>
-    <h2 id="corsi-detail-title" class="section-title"></h2>
-    <p id="corsi-detail-retrieval" class="field__helper" role="status" aria-live="polite" hidden></p>
+    <div id="corsi-summary" class="course-summary" hidden></div>
+    <div class="course-head">
+      <div id="corsi-detail-retrieval" class="retrieval-state" hidden>
+        <span id="corsi-detail-retrieval-text" role="status" aria-live="polite"></span>
+        <span class="toggletip">
+          <button type="button" class="toggletip__button"
+                  aria-label="Cos'è la ricerca per significato" aria-describedby="retrieval-tip">?</button>
+          <span id="retrieval-tip" class="toggletip__bubble" role="tooltip">
+            Le Domande sul corso e le esercitazioni trovano anche i passaggi scritti
+            con parole diverse ma con lo stesso senso. Senza, contano solo le parole
+            uguali. La casella di ricerca in alto cerca sempre per parole.
+          </span>
+        </span>
+      </div>
 {% include "_corso-export.html" %}
+    </div>
 
+    <nav id="corsi-sections" class="course-sections" aria-label="Sezioni del corso">
+      <a href="#corsi-lessons">Lezioni</a>
+      <a href="#corsi-examcues">Frasi da esame</a>
+      <a href="#corsi-materials">Materiali</a>
+      <a href="#corsi-generations">Esercitazioni</a>
+      <a href="#corsi-chat">Domande sul corso</a>
+    </nav>
+
+    <section id="corsi-lessons" class="course-lessons" aria-labelledby="corsi-lessons-title">
+    <h3 id="corsi-lessons-title" class="section-title">Lezioni</h3>
     <div id="corsi-detail-status" class="history__status" role="alert" hidden></div>
 
     <div class="table-wrap">
@@ -72,7 +99,6 @@
           <tr>
             <th scope="col">Lezione</th>
             <th scope="col">Data</th>
-            <th scope="col">Durata</th>
             <th scope="col">Stato</th>
           </tr>
         </thead>
@@ -88,6 +114,7 @@
     </div>
 
     <nav id="corsi-detail-pagination" class="pagination" aria-label="Pagine delle lezioni del corso" hidden></nav>
+    </section>
 
     <section id="corsi-examcues" class="examcues" aria-labelledby="corsi-examcues-title">
       <h3 id="corsi-examcues-title" class="section-title">Frasi da esame</h3>
@@ -263,6 +290,8 @@
 <script src="/static/js/dom.js" defer></script>
 <script src="/static/js/retrieval-mode.js" defer></script>
 <script src="/static/js/corso-retrieval-status.js" defer></script>
+<script src="/static/js/corso-sintesi.js" defer></script>
+<script src="/static/js/corso-sezioni.js" defer></script>
 <script src="/static/js/corso-frasi-esame-render.js" defer></script>
 <script src="/static/js/corso-frasi-esame.js" defer></script>
 <script src="/static/js/card-dialog.js" defer></script>

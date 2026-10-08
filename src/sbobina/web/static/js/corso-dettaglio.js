@@ -19,7 +19,10 @@
 
   var listEl = document.getElementById("corsi-list");
   var detailEl = document.getElementById("corsi-detail");
-  var detailTitleEl = document.getElementById("corsi-detail-title");
+  // S1: the course name is the page title; the path above leads back.
+  var detailTitleEl = document.getElementById("corsi-page-title");
+  var breadcrumbsEl = document.getElementById("corsi-breadcrumbs");
+  var LIST_TITLE = "Corsi";
   var detailStatusEl = document.getElementById("corsi-detail-status");
   var detailTbody = document.getElementById("corsi-detail-tbody");
   var detailEmptyEl = document.getElementById("corsi-detail-empty");
@@ -37,6 +40,7 @@
   var practice = window.SbobinaCoursePractice;
   var packageExport = window.SbobinaCourseExport;
   var retrievalStatus = window.SbobinaCourseRetrievalStatus;
+  var summary = window.SbobinaCourseSummary;
   var clearChildren = dom.clearChildren;
   var textCell = dom.textCell;
   var showSkeleton = dom.showSkeleton;
@@ -83,11 +87,9 @@
     }
     row.appendChild(nameCell);
 
-    row.appendChild(
-      textCell(new Date(job.created_at).toLocaleString("it-IT"), "Data")
-    );
-    // Not exposed by the job record yet: no duration field to show.
-    row.appendChild(textCell("—", "Durata"));
+    var dateCell = textCell(window.SbobinaWhen.format(job.created_at), "Data");
+    dateCell.title = window.SbobinaWhen.full(job.created_at);
+    row.appendChild(dateCell);
 
     var statusCell = document.createElement("td");
     statusCell.setAttribute("data-label", "Stato");
@@ -98,6 +100,69 @@
     row.appendChild(statusCell);
 
     return row;
+  }
+
+  // C3: unfinished attempts (cancelled, interrupted, failed) fold into one
+  // row that expands them on request; lectures stay in view.
+  function renderLessons(jobs) {
+    var attempts = [];
+    jobs.forEach(function (job) {
+      var row = renderDetailRow(job);
+      if (summary.isAttempt(job.status)) {
+        row.hidden = true;
+        row.classList.add("course-lesson--attempt");
+        attempts.push(row);
+      }
+      detailTbody.appendChild(row);
+    });
+    if (attempts.length > 0) {
+      detailTbody.appendChild(attemptsToggleRow(attempts));
+    }
+  }
+
+  function attemptsToggleRow(attempts) {
+    var row = document.createElement("tr");
+    row.className = "course-lesson__attempts";
+    var cell = document.createElement("td");
+    cell.colSpan = 3;
+    var count = attempts.length;
+    var text = document.createElement("span");
+    text.textContent =
+      (count === 1 ? "1 tentativo non completato" : count + " tentativi non completati") + " · ";
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn btn--ghost btn--inline";
+    button.setAttribute("aria-expanded", "false");
+    button.textContent = "Mostra";
+    button.addEventListener("click", function () {
+      var open = button.getAttribute("aria-expanded") !== "true";
+      button.setAttribute("aria-expanded", String(open));
+      button.textContent = open ? "Nascondi" : "Mostra";
+      attempts.forEach(function (attemptRow) {
+        attemptRow.hidden = !open;
+      });
+    });
+    cell.appendChild(text);
+    cell.appendChild(button);
+    row.appendChild(cell);
+    return row;
+  }
+
+  function setCourseView(key, label) {
+    var inDetail = key !== null;
+    detailTitleEl.textContent = inDetail ? label : LIST_TITLE;
+    breadcrumbsEl.hidden = !inDetail;
+    document.body.classList.toggle("is-course-detail", inDetail);
+    if (inDetail) {
+      document.body.dataset.courseKey = key;
+      document.body.dataset.courseLabel = label;
+    } else {
+      delete document.body.dataset.courseKey;
+      delete document.body.dataset.courseLabel;
+    }
+    document.dispatchEvent(
+      new CustomEvent("sbobina:course-scope", { detail: { key: key, label: label } })
+    );
   }
 
   function loadDetail(key, page) {
@@ -130,9 +195,7 @@
           return;
         }
         clearChildren(detailTbody);
-        body.data.forEach(function (job) {
-          detailTbody.appendChild(renderDetailRow(job));
-        });
+        renderLessons(body.data);
         renderPagination(detailPaginationEl, body.meta, function (nextPage) {
           loadDetail(key, nextPage);
         });
@@ -166,7 +229,8 @@
     }
     listEl.hidden = true;
     detailEl.hidden = false;
-    detailTitleEl.textContent = labelFor(key, knownLabel);
+    setCourseView(key, labelFor(key, knownLabel));
+    summary.show(key);
     loadDetail(key, 1);
     examCues.show(key);
     materials.show(key);
@@ -181,6 +245,8 @@
     currentCourseKey = null;
     detailEl.hidden = true;
     listEl.hidden = false;
+    setCourseView(null, null);
+    summary.hide();
     examCues.hide();
     materials.hide();
     generations.hide();
@@ -195,7 +261,7 @@
       currentCourseKey !== null &&
       Object.prototype.hasOwnProperty.call(labelsByKey, currentCourseKey)
     ) {
-      detailTitleEl.textContent = labelsByKey[currentCourseKey];
+      setCourseView(currentCourseKey, labelsByKey[currentCourseKey]);
     }
   }
 
