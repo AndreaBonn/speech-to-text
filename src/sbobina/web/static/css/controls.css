@@ -168,6 +168,68 @@
   border-color: var(--color-danger);
 }
 
+/* C9/T2/I2: a destructive action that is not the point of the row: text in
+   the danger colour, no frame competing with the primary action. */
+.btn--danger-text {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-danger);
+}
+
+.btn--danger-text:hover {
+  background: var(--color-danger-bg);
+}
+
+/* C9/L3: one "Scarica" menu instead of a row of file names. Built on
+   <details>, so it opens with Enter/Space and needs no script. */
+.download-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.download-menu > summary {
+  list-style: none;
+}
+
+.download-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.download-menu > summary::after {
+  content: "▾";
+  margin-left: var(--space-2xs);
+}
+
+.download-menu__list {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  top: calc(100% + var(--space-2xs));
+  left: 0;
+  min-width: 16rem;
+  margin: 0;
+  padding: var(--space-2xs);
+  list-style: none;
+  background: var(--color-surface);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-overlay);
+}
+
+.download-menu__list a {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-input);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.download-menu__list a:hover,
+.download-menu__list a:focus-visible {
+  background: var(--color-paper-3);
+}
+
 .btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;

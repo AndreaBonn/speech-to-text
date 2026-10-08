@@ -108,6 +108,7 @@
   --dur-slow: 260ms;
 
   /* z-index ladder from ui-ux.md */
+  --z-dropdown: 100;
   --z-sticky: 200;
   --z-overlay: 300;
   --z-modal: 400;

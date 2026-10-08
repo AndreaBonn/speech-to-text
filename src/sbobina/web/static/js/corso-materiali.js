@@ -136,7 +136,7 @@
 
     var deleteButton = document.createElement("button");
     deleteButton.type = "button";
-    deleteButton.className = "btn btn--danger";
+    deleteButton.className = "btn btn--danger-text";
     deleteButton.textContent = "Elimina";
     deleteButton.addEventListener("click", function () {
       if (

@@ -43,20 +43,30 @@
     link.href = cue.href;
     link.textContent = dom.formatTime(cue.start);
     link.setAttribute("aria-label", "Ascolta da " + dom.formatTime(cue.start));
-    li.appendChild(link);
-    li.appendChild(levelBadge(cue.level));
+    // C6: one row (time and strength, quote, action); the context opens on request.
+    var head = document.createElement("span");
+    head.className = "examcues__head";
+    head.appendChild(link);
+    head.appendChild(levelBadge(cue.level));
+    li.appendChild(head);
     var quote = document.createElement("p");
     quote.className = "examcues__quote";
     quote.textContent = cue.quote;
     li.appendChild(quote);
+    li.appendChild(cardButton(cue));
     // The quote alone ("e all'esame") may not say what will be asked.
     if (cue.followup) {
+      var context = document.createElement("details");
+      context.className = "examcues__context";
+      var summary = document.createElement("summary");
+      summary.textContent = "Contesto";
       var followup = document.createElement("p");
       followup.className = "examcues__followup";
       followup.textContent = "Segue: «" + cue.followup + "»";
-      li.appendChild(followup);
+      context.appendChild(summary);
+      context.appendChild(followup);
+      li.appendChild(context);
     }
-    li.appendChild(cardButton(cue));
     return li;
   }
 

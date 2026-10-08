@@ -41,6 +41,24 @@
 
   var statusEl = document.getElementById("generations-status");
   var listEl = document.getElementById("generations-list");
+  // C8: what exists comes first; the form opens on request once there is any.
+  var formEl = document.getElementById("generations-form");
+  var newButton = document.getElementById("generations-new");
+  var formOpened = false;
+
+  function syncForm(hasItems) {
+    newButton.hidden = !hasItems;
+    formEl.hidden = hasItems && !formOpened;
+    newButton.setAttribute("aria-expanded", String(!formEl.hidden));
+  }
+
+  newButton.addEventListener("click", function () {
+    formOpened = formEl.hidden;
+    syncForm(true);
+    if (formOpened) {
+      formEl.querySelector("select, input").focus();
+    }
+  });
   var emptyEl = document.getElementById("generations-empty");
   var paginationEl = document.getElementById("generations-pagination");
 
@@ -112,9 +130,10 @@
     li.appendChild(actions);
   }
 
+  // C9: the main action first (Svolgi), then Mostra and Scarica, Elimina last.
   function appendDoneActions(li, key, record) {
     var actions = el("div", "generations__actions");
-    var deleteButton = el("button", "btn btn--danger", "Elimina");
+    var deleteButton = el("button", "btn btn--danger-text", "Elimina");
     deleteButton.type = "button";
     deleteButton.addEventListener("click", function () {
       if (
@@ -123,8 +142,8 @@
         deleteGeneration(key, record);
       }
     });
-    actions.appendChild(deleteButton);
     if (record.status !== "done") {
+      actions.appendChild(deleteButton);
       li.appendChild(actions);
       return;
     }
@@ -141,12 +160,13 @@
         detailContainer.hidden = true;
       }
     });
-    actions.appendChild(toggleButton);
     if (record.format !== "summary") {
       actions.appendChild(window.SbobinaPracticeStart.button(itemUrl(key, record), key, statusEl));
     }
+    actions.appendChild(toggleButton);
+    actions.appendChild(detail.downloadLinks(apiBase(key), record));
+    actions.appendChild(deleteButton);
     li.appendChild(actions);
-    li.appendChild(detail.downloadLinks(apiBase(key), record));
     li.appendChild(detailContainer);
   }
 
@@ -233,6 +253,9 @@
         load(key, nextPage);
       });
     }
+    if (!isPoll) {
+      syncForm(body.meta.total > 0);
+    }
     schedulePoll(hasActive);
   }
 
@@ -280,8 +303,10 @@
   function show(key) {
     stopPolling();
     currentKey = key;
+    formOpened = false;
     formModule.show(key, {
       onSubmitted: function () {
+        formOpened = false;
         load(key, 1);
       },
     });

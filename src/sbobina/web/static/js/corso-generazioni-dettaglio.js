@@ -222,16 +222,34 @@
     summary: ["riassunto.md", "riassunto.docx"],
   };
 
+  // C9: names of use, Word first; the file name stays the download name.
+  var DOWNLOAD_LABELS = {
+    "compito.docx": "Compito (Word)",
+    "soluzioni.docx": "Soluzioni (Word)",
+    "riassunto.docx": "Riassunto (Word)",
+    "compito.md": "Compito (Markdown)",
+    "soluzioni.md": "Soluzioni (Markdown)",
+    "riassunto.md": "Riassunto (Markdown)",
+  };
+
   function downloadLinks(generationApiBase, record) {
-    var wrap = el("div", "generations__downloads");
-    (DOWNLOAD_NAMES[record.format] || []).forEach(function (name) {
-      var link = el("a", "btn btn--ghost", name);
+    var menu = el("details", "download-menu");
+    menu.appendChild(el("summary", "btn btn--ghost", "Scarica"));
+    var list = el("ul", "download-menu__list");
+    var names = (DOWNLOAD_NAMES[record.format] || []).slice().sort(function (a, b) {
+      return (b.slice(-5) === ".docx") - (a.slice(-5) === ".docx");
+    });
+    names.forEach(function (name) {
+      var item = el("li", "");
+      var link = el("a", "", DOWNLOAD_LABELS[name] || name);
       link.href =
         generationApiBase + "/" + encodeURIComponent(record.id) + "/files/" + name;
       link.setAttribute("download", "");
-      wrap.appendChild(link);
+      item.appendChild(link);
+      list.appendChild(item);
     });
-    return wrap;
+    menu.appendChild(list);
+    return menu;
   }
 
   window.SbobinaGenerationDetail = {

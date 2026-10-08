@@ -185,6 +185,20 @@
     <section id="corsi-generations" class="generations" aria-labelledby="corsi-generations-title">
       <h3 id="corsi-generations-title" class="section-title">Esercitazioni e riassunti</h3>
 
+      <div id="generations-status" class="history__status" role="alert" hidden></div>
+
+      <ul id="generations-list" class="generations__list" hidden></ul>
+
+      <div id="generations-empty" class="empty-state" hidden>
+        <p class="empty-state__text">
+          Nessuna esercitazione o riassunto ancora: compila il modulo qui sotto per generarne uno.
+        </p>
+      </div>
+
+      <nav id="generations-pagination" class="pagination" aria-label="Pagine delle generazioni" hidden></nav>
+
+      <button type="button" id="generations-new" class="btn btn--secondary generations__new"
+              aria-expanded="false" aria-controls="generations-form" hidden>Nuove domande o riassunto…</button>
       <form id="generations-form" class="generations__form" novalidate>
         <div class="field">
           <label class="field__label" for="generations-format">Formato</label>
@@ -229,17 +243,6 @@
         <button type="submit" id="generations-submit" class="btn btn--primary">Genera</button>
       </form>
 
-      <div id="generations-status" class="history__status" role="alert" hidden></div>
-
-      <ul id="generations-list" class="generations__list" hidden></ul>
-
-      <div id="generations-empty" class="empty-state" hidden>
-        <p class="empty-state__text">
-          Nessuna esercitazione o riassunto ancora: compila il modulo per generarne uno.
-        </p>
-      </div>
-
-      <nav id="generations-pagination" class="pagination" aria-label="Pagine delle generazioni" hidden></nav>
     </section>
 
 {% include "_corso-esercitazioni.html" %}
