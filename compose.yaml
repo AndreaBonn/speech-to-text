@@ -1,0 +1,37 @@
+# sbobina with Docker: `docker compose up -d`, then open http://127.0.0.1:8765
+# Runs on the CPU everywhere (Linux, Windows, macOS). For an NVIDIA GPU see
+# compose.gpu.yaml. Models are downloaded on first use into named volumes.
+
+name: sbobina
+
+services:
+  app:
+    build: .
+    image: sbobina:local
+    init: true
+    environment:
+      SBOBINA_OLLAMA_HOST: http://ollama:11434
+    # Loopback only: the UI has no login. The host port must stay 8765, the
+    # origin the server checks (SBOBINA_WEB_PORT in the image).
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - data:/data
+      - whisper-models:/models
+      - config:/config
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:0.18.0
+    # No published port: only the app reaches it, on the compose network.
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  data:
+  whisper-models:
+  config:
+  ollama-models:

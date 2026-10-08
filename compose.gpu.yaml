@@ -1,0 +1,22 @@
+# NVIDIA GPU for the app and Ollama, layered on compose.yaml.
+# Needs the NVIDIA driver on the host, plus the NVIDIA Container Toolkit on
+# Linux or Docker Desktop with WSL2 on Windows. Not available on macOS.
+#
+# To keep `docker compose up -d` as the only command, put these two lines in
+# a .env file next to this one:
+#   COMPOSE_PATH_SEPARATOR=:
+#   COMPOSE_FILE=compose.yaml:compose.gpu.yaml
+
+x-nvidia-gpu: &nvidia-gpu
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: all
+          capabilities: [gpu]
+
+services:
+  app:
+    deploy: *nvidia-gpu
+  ollama:
+    deploy: *nvidia-gpu
