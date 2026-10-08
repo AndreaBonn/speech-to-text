@@ -11,6 +11,7 @@ from conftest import make_segment, make_transcript, make_word
 
 from sbobina.models import save_transcript
 from sbobina.web.api_files import TRANSCRIPT_FILES
+from sbobina.web.job_models import JobConfig, JobStatus
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import open_index
 from sbobina.web.search_service import reconcile, search_session
@@ -210,3 +211,27 @@ def test_reconcile_ignores_stray_files_in_the_jobs_directory(tmp_path: Path) -> 
         indexed = set(index.indexed_lectures())
 
     assert (replaced, indexed) == (1, {"job"})
+
+
+@pytest.mark.parametrize(
+    "status", [JobStatus.INTERRUPTED, JobStatus.CANCELLED, JobStatus.FAILED]
+)
+def test_reconcile_drops_lectures_that_ended_unfinished(
+    tmp_path: Path, status: JobStatus
+) -> None:
+    """C2/C5 twin: a job that stopped early keeps a transcript on disk; search
+    must not list it next to the finished lecture of the same audio."""
+    store = JobStore(data_dir=tmp_path)
+    done = store.create(config=JobConfig())
+    write_transcript(directory=store.jobs_dir / str(done.id), text="possesso")
+    store.update(record=done.model_copy(update={"status": JobStatus.DONE}))
+    stopped = store.create(config=JobConfig())
+    write_transcript(directory=store.jobs_dir / str(stopped.id), text="possesso")
+    with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
+        reconcile(store=store, index=index)
+        assert set(index.indexed_lectures()) == {str(done.id), str(stopped.id)}
+
+        store.update(record=stopped.model_copy(update={"status": status}))
+        reconcile(store=store, index=index)
+
+        assert set(index.indexed_lectures()) == {str(done.id)}

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 
+from pydantic import ValidationError as PydanticValidationError
+
 from sbobina.document_models import DocumentStatus
 from sbobina.document_passages import DocumentPassage, chunk_document_pages
 from sbobina.models import load_transcript
@@ -17,6 +19,7 @@ from sbobina.web.document_store import (
     read_document_in,
     read_text,
 )
+from sbobina.web.job_models import JobRecord, JobStatus
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_index import (
     DocumentSearchPage,
@@ -97,6 +100,25 @@ def _reconcile(store: JobStore, index: SearchIndex) -> int:
     )
 
 
+# Jobs that stopped before finishing keep a partial or duplicate transcript on
+# disk; search lists only lectures that are done or still on their way.
+UNFINISHED_STATUSES = frozenset(
+    {JobStatus.INTERRUPTED, JobStatus.CANCELLED, JobStatus.FAILED}
+)
+
+
+def _ended_unfinished(directory: Path) -> bool:
+    path = directory / "job.json"
+    if not path.is_file():
+        return False
+    try:
+        record = JobRecord.model_validate_json(path.read_text(encoding="utf-8"))
+    except PydanticValidationError:
+        logger.warning("job.json non leggibile, lezione indicizzata comunque: %s", path)
+        return False
+    return record.status in UNFINISHED_STATUSES
+
+
 def _reconcile_lectures(store: JobStore, index: SearchIndex) -> int:
     indexed = index.indexed_lectures()
     # T092: an orphan import is not searchable either; once indexed, it drops.
@@ -105,6 +127,8 @@ def _reconcile_lectures(store: JobStore, index: SearchIndex) -> int:
     replaced = 0
     for directory in store.jobs_dir.glob("*"):
         if not directory.is_dir() or directory.name in hidden:
+            continue
+        if _ended_unfinished(directory=directory):
             continue
         preferred = preferred_transcript(directory=directory)
         if preferred is None:
