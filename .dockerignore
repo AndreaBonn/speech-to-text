@@ -1,0 +1,11 @@
+# Allow-list: the image needs only the package and its lockfile. Everything
+# else (data/, audio, .venv, .env, specs, tests) stays out of the context.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!LICENSE
+!NOTICE
+!src/
+**/__pycache__
+**/*.pyc
