@@ -222,7 +222,9 @@
   background: currentColor;
 }
 
-.badge--queued {
+/* L2: a cancelled job was the user's own choice, nothing to look at. */
+.badge--queued,
+.badge--cancelled {
   background: var(--color-paper-3);
   color: var(--color-ink-2);
 }
@@ -245,7 +247,6 @@
   color: var(--color-danger);
 }
 
-.badge--cancelled,
 .badge--interrupted,
 .badge--ready_no_text {
   background: var(--color-warning-bg);
