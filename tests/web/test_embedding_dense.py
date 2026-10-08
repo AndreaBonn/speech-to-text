@@ -110,8 +110,11 @@ def test_rank_waiting_writer_skips_embedding(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     "stage,label",
-    [("embedding", "un'indicizzazione semantica"),
-     ("transcribing", "una trascrizione"), ("custom-stage", "custom-stage")],
+    [
+        ("embedding", "un'indicizzazione semantica"),
+        ("transcribing", "una trascrizione"),
+        ("custom-stage", "custom-stage"),
+    ],
 )
 def test_gpu_busy_message_uses_stage_label(stage: str, label: str) -> None:
     error = GpuBusyError(stage=stage, estimate_s=20.0)
@@ -129,7 +132,9 @@ def test_vector_store_for_process_reuses_the_factory_store(
     assert dense_factory.vector_store_for_process(data_dir=tmp_path / ".") is vectors
 
 
-def test_rank_busy_reason_takes_priority_during_incomplete_index(tmp_path: Path) -> None:
+def test_rank_busy_reason_takes_priority_during_incomplete_index(
+    tmp_path: Path,
+) -> None:
     dense, vectors, client = ranker(tmp_path=tmp_path)
     passages = [document(number=0)]
     arbiter = GpuArbiter()

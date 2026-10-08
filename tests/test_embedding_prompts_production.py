@@ -48,6 +48,9 @@ def test_format_document_for_production_without_document_prompt_preserves_text(
 
 
 def test_format_document_for_production_gemma_uses_measured_document_prompt() -> None:
-    assert format_document_for_production(
-        model="embeddinggemma:latest", text="Il possesso è un diritto."
-    ) == "title: none | text: Il possesso è un diritto."
+    assert (
+        format_document_for_production(
+            model="embeddinggemma:latest", text="Il possesso è un diritto."
+        )
+        == "title: none | text: Il possesso è un diritto."
+    )

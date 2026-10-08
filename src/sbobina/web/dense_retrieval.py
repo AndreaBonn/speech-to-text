@@ -87,7 +87,11 @@ class DenseRanker:
         self._matrices: tuple[_DenseList, _DenseList] | None = None
 
     def rank(
-        self, *, course: str, passages: list[RetrievedPassage], question: str,
+        self,
+        *,
+        course: str,
+        passages: list[RetrievedPassage],
+        question: str,
         arbiter: GpuArbiter | None = None,
     ) -> tuple[list[RetrievedPassage], RetrievalReport]:
         """Rank under whole-course coverage using reconciliation's normalized key.
@@ -116,8 +120,11 @@ class DenseRanker:
         )
 
     def _rank_query(
-        self, matrices: tuple[_DenseList, _DenseList], question: str,
-        coverage: Coverage, arbiter: GpuArbiter | None,
+        self,
+        matrices: tuple[_DenseList, _DenseList],
+        question: str,
+        coverage: Coverage,
+        arbiter: GpuArbiter | None,
     ) -> tuple[list[RetrievedPassage], RetrievalReport]:
         query, reason = self._safe_query_vector(question=question, arbiter=arbiter)
         if query is None:

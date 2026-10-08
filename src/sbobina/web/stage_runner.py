@@ -275,7 +275,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     install_redaction(settings=settings)
     parser = argparse.ArgumentParser(description="Esegue uno stage di un job locale")
-    parser.add_argument("stage", choices=(*STAGES, GENERATION_STAGE, OCR_STAGE, EMBED_STAGE))
+    parser.add_argument(
+        "stage", choices=(*STAGES, GENERATION_STAGE, OCR_STAGE, EMBED_STAGE)
+    )
     parser.add_argument("job_dir", type=Path)
     try:
         args = parser.parse_args(args=argv)

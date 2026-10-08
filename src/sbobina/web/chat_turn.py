@@ -202,8 +202,10 @@ def _reply_to(
 
 
 def ask(
-    services: ChatServices, where: ChatLocation,
-    records: list[ChatRecord], question: str,
+    services: ChatServices,
+    where: ChatLocation,
+    records: list[ChatRecord],
+    question: str,
 ) -> ChatAnswerRecord:
     """Answer one question in an existing conversation and persist both."""
     courses_dir = services.store.courses_dir

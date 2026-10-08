@@ -201,7 +201,9 @@ def _collect_sources(
 
 
 def execute_generation(
-    job: GenerationJob, chat: GenerationChat, model: str,
+    job: GenerationJob,
+    chat: GenerationChat,
+    model: str,
     dense: DenseRuntime | None = None,
 ) -> None:
     """Retrieve passages for job.record's request and persist the result."""
@@ -216,7 +218,9 @@ def execute_generation(
     with search_session(store=job.store, path=job.index_path) as index:
         passages, retrieval_mode = retrieve_generation_passages(
             context=GenerationRetrieval(job=job, dense=dense or DenseRuntime()),
-            index=index, request=request, budget_words=budget_words,
+            index=index,
+            request=request,
+            budget_words=budget_words,
         )
     result = generate(request=request, passages=passages, chat=chat, options=options)
     sources = _collect_sources(job=job, passages=passages)
@@ -252,7 +256,9 @@ def run_generation_stage(course_dir: Path) -> None:
     chat = llm_factory.build_from_settings(settings=config, recorder=job.recorder)
     label = llm_factory.effective_model_label(settings=config)
     execute_generation(
-        job=job, chat=chat, model=label,
+        job=job,
+        chat=chat,
+        model=label,
         dense=dense_for_process(settings=config, data_dir=data_dir),
     )
 
