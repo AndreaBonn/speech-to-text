@@ -36,10 +36,9 @@ def _bisection_order(length: int) -> list[int]:
         low, high = queue.popleft()
         if high - low <= 1:
             continue
+        # Strictly inside a span whose interior no other span shares: always new.
         mid = (low + high) // 2
-        if mid not in seen:
-            order.append(mid)
-            seen.add(mid)
+        order.append(mid)
         queue.append((low, mid))
         queue.append((mid, high))
     return order

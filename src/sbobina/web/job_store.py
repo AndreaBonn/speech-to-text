@@ -39,14 +39,14 @@ class JobPage:
 
 
 def _replace_with_retry(source: Path, destination: Path) -> None:
-    for attempt in range(1, REPLACE_MAX_ATTEMPTS + 1):
+    for _ in range(REPLACE_MAX_ATTEMPTS - 1):
         try:
             os.replace(source, destination)
             return
         except PermissionError:
-            if attempt == REPLACE_MAX_ATTEMPTS:
-                raise
             time.sleep(REPLACE_RETRY_DELAY_S)
+    # The last attempt lets its PermissionError reach the caller.
+    os.replace(source, destination)
 
 
 def atomic_write(path: Path, content: str) -> None:

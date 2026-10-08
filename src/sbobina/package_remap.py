@@ -4,6 +4,7 @@ import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import replace
 from types import MappingProxyType
+from typing import assert_never
 from uuid import uuid4
 
 from sbobina.card_models import (
@@ -190,6 +191,8 @@ def _anchor(anchor: Anchor, ids: IdMaps) -> Anchor:
                     table=ids.generations, value=anchor.generation_id
                 ),
             )
+        case _ as unhandled:
+            assert_never(unhandled)
 
 
 def _card(event: CardEvent, ids: IdMaps) -> CardEvent:

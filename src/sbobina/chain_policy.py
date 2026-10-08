@@ -5,6 +5,7 @@ mutating, so the caller owns thread-safety and the wall clock.
 """
 
 from dataclasses import dataclass, replace
+from typing import assert_never
 
 from sbobina.llm_errors import FailureKind
 
@@ -17,17 +18,6 @@ _CONNECTIVITY_FAILURE_THRESHOLD = 3
 _CONNECTIVITY_COOLDOWN_S = 120.0
 _INVALID_RESPONSE_THRESHOLD = 3
 
-# auth/missing_key/model_missing: the credential or the model will not
-# change mid-chain. bad_request: a rejected model/parameter repeats on
-# every chunk, so retrying it is never useful for this chain.
-_PERMANENT_KINDS = frozenset(
-    {
-        FailureKind.AUTH,
-        FailureKind.MISSING_KEY,
-        FailureKind.MODEL_MISSING,
-        FailureKind.BAD_REQUEST,
-    }
-)
 # rate_limit/quota: the provider names a cooldown (or none, default 60s).
 # busy: the GPU guard never names one, so it always falls back to its own
 # default below.
@@ -36,11 +26,6 @@ _COOLDOWN_DEFAULTS_S: dict[FailureKind, float] = {
     FailureKind.QUOTA: _DEFAULT_COOLDOWN_S,
     FailureKind.BUSY: _BUSY_COOLDOWN_S,
 }
-_COOLDOWN_KINDS = frozenset(_COOLDOWN_DEFAULTS_S)
-# timeout/server/network: transient connectivity issues, tolerated twice.
-_CONNECTIVITY_KINDS = frozenset(
-    {FailureKind.TIMEOUT, FailureKind.SERVER, FailureKind.NETWORK}
-)
 
 
 @dataclass(frozen=True)
@@ -60,18 +45,29 @@ class LinkState:
     def record_failure(
         self, kind: FailureKind, retry_after_s: float | None, now: float
     ) -> "LinkState":
-        if kind in _PERMANENT_KINDS:
-            return replace(self, disabled=True)
-        if kind in _COOLDOWN_KINDS:
-            cooldown = (
-                retry_after_s
-                if retry_after_s is not None
-                else _COOLDOWN_DEFAULTS_S[kind]
-            )
-            return replace(self, cooldown_until=now + cooldown)
-        if kind in _CONNECTIVITY_KINDS:
-            return self._record_connectivity_failure(now=now)
-        raise ValueError(f"Unhandled failure kind: {kind}")
+        # Spelled out per member so mypy rejects a FailureKind left unclassified.
+        match kind:
+            # The credential or the model will not change mid-chain; a rejected
+            # model/parameter repeats on every chunk, so retrying never helps.
+            case (
+                FailureKind.AUTH
+                | FailureKind.MISSING_KEY
+                | FailureKind.MODEL_MISSING
+                | FailureKind.BAD_REQUEST
+            ):
+                return replace(self, disabled=True)
+            case FailureKind.RATE_LIMIT | FailureKind.QUOTA | FailureKind.BUSY:
+                cooldown = (
+                    retry_after_s
+                    if retry_after_s is not None
+                    else _COOLDOWN_DEFAULTS_S[kind]
+                )
+                return replace(self, cooldown_until=now + cooldown)
+            # Transient connectivity issues, tolerated twice.
+            case FailureKind.TIMEOUT | FailureKind.SERVER | FailureKind.NETWORK:
+                return self._record_connectivity_failure(now=now)
+            case _ as unhandled:
+                assert_never(unhandled)
 
     def _record_connectivity_failure(self, now: float) -> "LinkState":
         failures = self.consecutive_connectivity_failures + 1

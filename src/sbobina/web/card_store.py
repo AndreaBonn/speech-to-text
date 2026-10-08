@@ -121,19 +121,16 @@ def _apply_card_event(event: CardEvent, cards: dict[str, Card]) -> None:
         card = cards[event.card_id]
         if isinstance(event, CardEdited):
             cards[event.card_id] = replace(card, front=event.front, back=event.back)
-        elif isinstance(event, CardSuspended):
+        else:
             cards[event.card_id] = replace(card, suspended=event.suspended)
 
 
 def _fold_cards(events: list[CardEvent], reviews: list[ReviewEvent]) -> dict[str, Card]:
     cards: dict[str, Card] = {}
+    # Events and Card share validate_card_text, so applying a loaded event
+    # cannot fail; malformed lines are rejected when the log is parsed.
     for event in events:
-        try:
-            _apply_card_event(event=event, cards=cards)
-        except ValueError as error:
-            logger.warning(
-                "Skipping invalid card event for %s: %s", event.card_id, error
-            )
+        _apply_card_event(event=event, cards=cards)
     for event_review in reviews:
         if event_review.card_id in cards:
             cards[event_review.card_id] = replace(

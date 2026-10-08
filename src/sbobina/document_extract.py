@@ -5,6 +5,7 @@ documents; callers never touch those libraries directly.
 """
 
 from pathlib import Path
+from typing import assert_never
 
 from docx import Document
 from pptx import Presentation
@@ -54,6 +55,8 @@ def _raw_pages(path: Path, kind: DocumentKind) -> tuple[tuple[str, ...], str | N
             return _extract_docx(path=path), None
         case DocumentKind.TXT | DocumentKind.MD:
             return _extract_plain_text(path=path)
+        case _ as unhandled:
+            assert_never(unhandled)
 
 
 def _extract_pptx(path: Path) -> tuple[str, ...]:

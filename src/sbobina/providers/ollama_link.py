@@ -123,8 +123,5 @@ def _check_model_presence(client: Client, model: str) -> None:
 def _classify_show_response_error(err: ResponseError) -> FailureKind:
     if err.status_code == _HTTP_NOT_FOUND:
         return FailureKind.MODEL_MISSING
-    try:
-        kind, _retry_after_s = classify_http_failure(status=err.status_code, headers={})
-    except ValueError:
-        return FailureKind.SERVER
+    kind, _retry_after_s = classify_http_failure(status=err.status_code, headers={})
     return kind
