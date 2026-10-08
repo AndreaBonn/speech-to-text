@@ -202,6 +202,8 @@ def _parse_reply(
         finish_reason = data["choices"][0]["finish_reason"]
     except (ValueError, KeyError, IndexError, TypeError) as exc:
         raise InvalidResponseError(f"{label}: risposta non valida") from exc
+    if content is not None and not isinstance(content, str):
+        raise InvalidResponseError(f"{label}: risposta non valida")
     if not content:
         raise InvalidResponseError(f"{label}: contenuto vuoto")
     truncated = finish_reason == "length"

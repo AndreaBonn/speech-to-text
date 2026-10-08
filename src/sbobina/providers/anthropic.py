@@ -128,7 +128,8 @@ def _extract_text(data: dict[str, Any], label: str) -> str:
     try:
         blocks = data["content"]
         text = "".join(block["text"] for block in blocks if block.get("type") == "text")
-    except (KeyError, TypeError) as exc:
+    # AttributeError: a string or object `content` iterates as characters/keys.
+    except (KeyError, TypeError, AttributeError) as exc:
         raise InvalidResponseError(f"{label}: risposta non valida") from exc
     if not text:
         raise InvalidResponseError(f"{label}: contenuto vuoto")

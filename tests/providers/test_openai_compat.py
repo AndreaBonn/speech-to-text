@@ -246,6 +246,32 @@ def test_make_openai_compat_client_raises_invalid_response_on_empty_content() ->
         client(_request())
 
 
+@pytest.mark.parametrize(
+    "content",
+    [[{"type": "text", "text": "{}"}], {"text": "{}"}, 42],
+    ids=["list", "object", "number"],
+)
+def test_make_openai_compat_client_non_string_content_raises_invalid_response(
+    content: object,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = _ok_body()
+        body["choices"] = [{"message": {"content": content}, "finish_reason": "stop"}]
+        return httpx.Response(200, json=body)
+
+    client = make_openai_compat_client(
+        profile=PROFILES["openai"],
+        api_key=SENTINEL_KEY,
+        timeout_s=5,
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(
+        InvalidResponseError, match="openai/model-x: risposta non valida"
+    ):
+        client(_request())
+
+
 def test_make_openai_compat_client_raises_invalid_response_on_malformed_body() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, content=b"not json at all")

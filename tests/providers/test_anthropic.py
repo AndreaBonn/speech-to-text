@@ -318,3 +318,32 @@ def test_list_models_does_not_raise_on_200() -> None:
     list_models(
         api_key=SENTINEL_KEY, timeout_s=5, transport=httpx.MockTransport(handler)
     )
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param({}, id="missing"),
+        pytest.param({"content": None}, id="null"),
+        pytest.param({"content": 42}, id="number"),
+        pytest.param({"content": "invalid"}, id="string"),
+        pytest.param({"content": {"type": "text", "text": "invalid"}}, id="object"),
+    ],
+)
+def test_make_anthropic_client_invalid_content_raises_invalid_response(
+    body: dict[str, object],
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code=200, json=body)
+
+    client = make_anthropic_client(
+        api_key=SENTINEL_KEY,
+        timeout_s=5,
+        transport=httpx.MockTransport(handler=handler),
+    )
+
+    request = _request()
+    with pytest.raises(
+        InvalidResponseError, match="anthropic/claude-x: risposta non valida"
+    ):
+        client(request)
