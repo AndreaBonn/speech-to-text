@@ -276,3 +276,32 @@
   font-weight: var(--weight-medium);
 }
 
+
+/* T1/T2: history filters above the table, the clean-up below it. */
+.history__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-md);
+  margin: 0 0 var(--space-md);
+}
+
+.history__course {
+  display: flex;
+  flex-direction: column;
+  min-width: 14rem;
+}
+
+.history__count {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-3);
+}
+
+.history__bulk {
+  margin-top: var(--space-md);
+}
+
+.history__bulk[hidden] {
+  display: none;
+}

@@ -18,7 +18,18 @@
   var paginationEl = document.getElementById("storico-pagination");
   var statusEl = document.getElementById("storico-status");
 
+  var filtersEl = document.getElementById("storico-filters");
+  var courseSelect = document.getElementById("storico-course");
+  var bulkEl = document.getElementById("storico-bulk");
+  var bulkButton = document.getElementById("storico-bulk-delete");
+  var Filters = window.SbobinaHistoryFilters;
+  var COURSES_URL = "/api/v1/courses?per_page=100";
+  // T2: the bulk clean-up lists every unfinished attempt in one request.
+  var BULK_PAGE_SIZE = 500;
+
   var currentPage = 1;
+  var currentFilter = "all";
+  var unfinishedCount = 0;
 
   // ---------- helpers ----------
 
@@ -73,8 +84,9 @@
         '<a class="btn btn--secondary" href="/lettore/' + job.id + '">Apri</a>'
       );
     }
+    // T2: deleting is never the point of a row; it stays quiet next to Apri.
     actions.push(
-      '<button type="button" class="btn btn--danger" data-delete="' +
+      '<button type="button" class="btn btn--danger-text" data-delete="' +
         job.id +
         '">Elimina</button>'
     );
@@ -90,10 +102,14 @@
   }
 
   function renderRow(job) {
-    var created = new Date(job.created_at).toLocaleString("it-IT");
+    var created =
+      '<time datetime="' + escapeHtml(job.created_at) + '" title="' +
+      escapeHtml(window.SbobinaWhen.full(job.created_at)) + '">' +
+      window.SbobinaWhen.format(job.created_at) + "</time>";
     return (
       '<tr data-job-id="' + job.id + '">' +
       '<td class="cell-name" data-label="Lezione">' + escapeHtml(jobTitle(job)) + engineNote(job) + "</td>" +
+      '<td data-label="Corso">' + escapeHtml(job.course || "Senza corso") + "</td>" +
       '<td data-label="Data">' + created + "</td>" +
       '<td data-label="Stato"><span class="badge badge--' +
       job.status +
@@ -187,9 +203,96 @@
 
   function showSkeleton() {
     tbody.innerHTML =
-      '<tr><td colspan="4"><div class="skeleton-row"></div></td></tr>' +
-      '<tr><td colspan="4"><div class="skeleton-row"></div></td></tr>' +
-      '<tr><td colspan="4"><div class="skeleton-row"></div></td></tr>';
+      '<tr><td colspan="5"><div class="skeleton-row"></div></td></tr>' +
+      '<tr><td colspan="5"><div class="skeleton-row"></div></td></tr>' +
+      '<tr><td colspan="5"><div class="skeleton-row"></div></td></tr>';
+  }
+
+  // ---------- filters (T1) and bulk clean-up (T2) ----------
+
+  function courseQuery() {
+    return courseSelect.value ? "&course=" + encodeURIComponent(courseSelect.value) : "";
+  }
+
+  function showCounts(statusCounts) {
+    var counts = Filters.counts(statusCounts || {});
+    filtersEl.querySelectorAll("[data-count]").forEach(function (el) {
+      el.textContent = "(" + counts[el.getAttribute("data-count")] + ")";
+    });
+    unfinishedCount = counts.unfinished;
+    bulkEl.hidden = unfinishedCount === 0;
+    bulkButton.textContent =
+      unfinishedCount === 1
+        ? "Elimina il tentativo non completato"
+        : "Elimina i " + unfinishedCount + " tentativi non completati";
+  }
+
+  function setFilter(filter) {
+    currentFilter = filter;
+    filtersEl.querySelectorAll("[data-filter]").forEach(function (button) {
+      var on = button.getAttribute("data-filter") === filter;
+      button.classList.toggle("is-active", on);
+      button.setAttribute("aria-pressed", String(on));
+    });
+    load(1);
+  }
+
+  function deleteUnfinished() {
+    var count = unfinishedCount;
+    if (
+      !window.confirm(
+        "Eliminare " + (count === 1 ? "il tentativo non completato" : "i " + count + " tentativi non completati") +
+          "? L'operazione non si può annullare."
+      )
+    ) {
+      return;
+    }
+    bulkButton.disabled = true;
+    fetch(JOBS_URL + "?per_page=" + BULK_PAGE_SIZE + Filters.statusQuery("unfinished") + courseQuery())
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error("unfinished list failed");
+        }
+        return response.json();
+      })
+      .then(function (body) {
+        return body.data.reduce(function (chain, job) {
+          return chain.then(function (deleted) {
+            return fetch(JOBS_URL + "/" + job.id, { method: "DELETE" }).then(function (response) {
+              return deleted + (response.status === 204 ? 1 : 0);
+            });
+          });
+        }, Promise.resolve(0));
+      })
+      .then(function (deleted) {
+        bulkButton.disabled = false;
+        load(1);
+        statusEl.hidden = false;
+        statusEl.textContent =
+          deleted === 1 ? "Eliminato 1 tentativo." : "Eliminati " + deleted + " tentativi.";
+      })
+      .catch(function () {
+        bulkButton.disabled = false;
+        showStatus("Pulizia non riuscita: alcuni tentativi potrebbero essere rimasti. Riprova.");
+      });
+  }
+
+  function loadCourses() {
+    fetch(COURSES_URL)
+      .then(function (response) {
+        return response.ok ? response.json() : { data: [] };
+      })
+      .then(function (body) {
+        body.data.forEach(function (course) {
+          var option = document.createElement("option");
+          option.value = course.key;
+          option.textContent = course.label;
+          courseSelect.appendChild(option);
+        });
+      })
+      .catch(function () {
+        // Without the list the history still shows every course.
+      });
   }
 
   function load(page) {
@@ -197,7 +300,10 @@
     clearStatus();
     emptyEl.hidden = true;
     showSkeleton();
-    fetch(JOBS_URL + "?page=" + page + "&per_page=" + PER_PAGE)
+    fetch(
+      JOBS_URL + "?page=" + page + "&per_page=" + PER_PAGE +
+        Filters.statusQuery(currentFilter) + courseQuery()
+    )
       .then(function (response) {
         if (!response.ok) {
           throw new Error("storico fetch failed");
@@ -205,11 +311,16 @@
         return response.json();
       })
       .then(function (body) {
+        showCounts(body.meta.status_counts);
         if (body.data.length === 0) {
           tbody.innerHTML = "";
           paginationEl.hidden = true;
-          if (page === 1) {
+          var filtered = currentFilter !== "all" || courseSelect.value !== "";
+          if (page === 1 && !filtered) {
             emptyEl.hidden = false;
+          } else if (page === 1) {
+            statusEl.hidden = false;
+            statusEl.textContent = "Nessuna trascrizione con questi filtri.";
           }
           return;
         }
@@ -223,5 +334,17 @@
       });
   }
 
+  filtersEl.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-filter]");
+    if (button) {
+      setFilter(button.getAttribute("data-filter"));
+    }
+  });
+  courseSelect.addEventListener("change", function () {
+    load(1);
+  });
+  bulkButton.addEventListener("click", deleteUnfinished);
+
+  loadCourses();
   load(1);
 })();

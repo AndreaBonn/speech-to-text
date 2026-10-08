@@ -2,6 +2,20 @@
 
 {% block content %}
 <div id="storico-root" class="history">
+  <div class="history__toolbar">
+    <div id="storico-filters" class="segmented" role="group" aria-label="Filtra per stato">
+      <button type="button" class="segmented__option is-active" data-filter="all" aria-pressed="true">Tutte <span class="history__count" data-count="all"></span></button>
+      <button type="button" class="segmented__option" data-filter="done" aria-pressed="false">Completate <span class="history__count" data-count="done"></span></button>
+      <button type="button" class="segmented__option" data-filter="unfinished" aria-pressed="false">Non completate <span class="history__count" data-count="unfinished"></span></button>
+    </div>
+    <label class="history__course">
+      <span class="field__label">Corso</span>
+      <select id="storico-course" class="select-input">
+        <option value="">Tutti i corsi</option>
+      </select>
+    </label>
+  </div>
+
   <div id="storico-status" class="history__status" role="alert" hidden></div>
 
   <div class="table-wrap">
@@ -9,15 +23,16 @@
       <thead>
         <tr>
           <th scope="col">Lezione</th>
+          <th scope="col">Corso</th>
           <th scope="col">Data</th>
           <th scope="col">Stato</th>
           <th scope="col">Azioni</th>
         </tr>
       </thead>
       <tbody id="storico-tbody">
-        <tr><td colspan="4"><div class="skeleton-row"></div></td></tr>
-        <tr><td colspan="4"><div class="skeleton-row"></div></td></tr>
-        <tr><td colspan="4"><div class="skeleton-row"></div></td></tr>
+        <tr><td colspan="5"><div class="skeleton-row"></div></td></tr>
+        <tr><td colspan="5"><div class="skeleton-row"></div></td></tr>
+        <tr><td colspan="5"><div class="skeleton-row"></div></td></tr>
       </tbody>
     </table>
   </div>
@@ -28,9 +43,14 @@
   </div>
 
   <nav id="storico-pagination" class="pagination" aria-label="Pagine dello storico" hidden></nav>
+
+  <div id="storico-bulk" class="history__bulk" hidden>
+    <button type="button" id="storico-bulk-delete" class="btn btn--danger"></button>
+  </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/storico-filtri.js" defer></script>
 <script src="/static/js/storico.js" defer></script>
 {% endblock %}
