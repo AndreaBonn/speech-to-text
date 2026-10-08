@@ -32,7 +32,7 @@
   }
 
   function formatDate(iso) {
-    return new Date(iso).toLocaleString("it-IT");
+    return window.SbobinaWhen.format(iso);
   }
 
   function onMessageSent() {

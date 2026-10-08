@@ -197,12 +197,12 @@
 
   function renderSummary(material) {
     dom.clearChildren(summaryEl);
-    var generated = new Date(material.generated_at).toLocaleString("it-IT");
+    var generated = window.SbobinaWhen.format(material.generated_at);
     summaryEl.appendChild(
       element(
         "p",
         "study__meta",
-        "Generato il " +
+        "Generato " +
           generated +
           " con " +
           material.model +
