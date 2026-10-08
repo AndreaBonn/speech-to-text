@@ -29,6 +29,8 @@
     };
 
     var keysState = {};
+    // I2: a provider saved from its row gets tested right after the re-render.
+    var testAfterRender = null;
 
     function setKeys(keys) {
       keysState = keys;
@@ -100,34 +102,47 @@
       var controls = document.createElement("div");
       controls.className = "key-row__controls";
 
+      // I2: one action at a time. Typing shows "Salva e prova"; a saved key
+      // offers Prova and a quiet Rimuovi; an empty row offers nothing to click.
       var saveButton = document.createElement("button");
       saveButton.type = "button";
       saveButton.className = "btn btn--primary";
-      saveButton.textContent = "Salva";
-      saveButton.disabled = fromEnv;
+      saveButton.textContent = "Salva e prova";
+      Dom.setHidden(saveButton, true);
       saveButton.addEventListener("click", function () {
         saveKey(provider, input, error);
       });
+      input.addEventListener("input", function () {
+        Dom.setHidden(saveButton, input.value.trim() === "");
+      });
       controls.appendChild(saveButton);
 
-      var removeButton = document.createElement("button");
-      removeButton.type = "button";
-      removeButton.className = "btn btn--ghost";
-      removeButton.textContent = "Rimuovi";
-      removeButton.disabled = fromEnv || !entry.configured;
-      removeButton.addEventListener("click", function () {
-        removeKey(provider);
-      });
-      controls.appendChild(removeButton);
+      if (entry.configured || fromEnv) {
+        var testButton = document.createElement("button");
+        testButton.type = "button";
+        testButton.className = "btn btn--secondary";
+        testButton.textContent = "Prova";
+        testButton.addEventListener("click", function () {
+          testKey(provider, result);
+        });
+        controls.appendChild(testButton);
+      }
 
-      var testButton = document.createElement("button");
-      testButton.type = "button";
-      testButton.className = "btn btn--secondary";
-      testButton.textContent = "Prova";
-      testButton.addEventListener("click", function () {
+      if (entry.configured && !fromEnv) {
+        var removeButton = document.createElement("button");
+        removeButton.type = "button";
+        removeButton.className = "btn btn--danger-text";
+        removeButton.textContent = "Rimuovi";
+        removeButton.addEventListener("click", function () {
+          removeKey(provider);
+        });
+        controls.appendChild(removeButton);
+      }
+
+      if (testAfterRender === provider) {
+        testAfterRender = null;
         testKey(provider, result);
-      });
-      controls.appendChild(testButton);
+      }
 
       row.appendChild(controls);
       row.appendChild(error);
@@ -149,6 +164,7 @@
           return;
         }
         input.value = "";
+        testAfterRender = provider;
         keysState[provider] = {
           configured: result.body.data.configured,
           last4: result.body.data.last4,

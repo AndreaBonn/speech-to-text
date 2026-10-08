@@ -44,3 +44,16 @@ def test_impostazioni_page_has_the_semantic_search_section(tmp_path: Path) -> No
     assert body.index("/static/js/settings-semantic-coverage.js") < body.index(
         "/static/js/settings-semantic.js"
     )
+
+
+def test_cloud_chain_and_keys_sit_in_one_closed_block(tmp_path: Path) -> None:
+    """I1: closed by default; impostazioni.js opens it for cloud engines."""
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/impostazioni").text
+
+    block = body.split('<details id="cloud-settings"')[1].split("</details>")[0]
+    assert "open" not in block.split(">")[0]
+    assert "Servizi cloud: ordine dei modelli e chiavi API</summary>" in block
+    assert 'id="chain-form"' in block
+    assert 'id="keys-list"' in block

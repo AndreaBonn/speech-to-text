@@ -273,3 +273,24 @@
 .semantic-coverage__item .btn {
   margin-left: auto;
 }
+
+/* I1: chain and keys wait in one block until a cloud engine is in use. */
+.settings-cloud {
+  margin: 0 0 var(--space-lg);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  padding: 0 var(--space-md);
+}
+
+.settings-cloud__summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: var(--weight-semibold);
+}
+
+.settings-cloud__note {
+  margin-top: 0;
+}

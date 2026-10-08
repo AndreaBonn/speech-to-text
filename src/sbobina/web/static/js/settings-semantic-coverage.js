@@ -5,6 +5,37 @@
 (function () {
   "use strict";
 
+  // I3: the state in words; "unità" is an internal unit (a text passage), so
+  // the exact count only goes to the tooltip.
+  function coverageText(course) {
+    var coverage = course.coverage;
+    if (!coverage || coverage.total === 0) {
+      return "nessun contenuto da indicizzare";
+    }
+    var text;
+    if (coverage.embedded >= coverage.total) {
+      text =
+        course.missing_units > 0
+          ? "pronta sul testo già indicizzato, ci sono parti nuove da indicizzare"
+          : "pronta su tutte le lezioni e i materiali";
+    } else {
+      text =
+        "pronta al " + Math.floor((coverage.embedded / coverage.total) * 100) +
+        "%, il resto è da indicizzare";
+    }
+    if (coverage.truncated > 0) {
+      text += " (alcuni passaggi molto lunghi sono stati accorciati)";
+    }
+    return text;
+  }
+
+  function coverageDetail(course) {
+    if (!course.coverage) {
+      return "";
+    }
+    return course.coverage.embedded + " passaggi indicizzati su " + course.coverage.total;
+  }
+
   function create(options) {
     var Dom = window.SbobinaSettingsDom;
     var byId = Dom.byId;
@@ -28,22 +59,6 @@
         return "meno di un minuto";
       }
       return "circa " + Math.round(seconds / 60) + " min";
-    }
-
-    function coverageText(course) {
-      if (!course.coverage) {
-        return "Nessun contenuto da indicizzare.";
-      }
-      var text = course.coverage.embedded + "/" + course.coverage.total + " unità indicizzate";
-      if (course.coverage.truncated > 0) {
-        text += ", " + course.coverage.truncated + " troncate";
-      }
-      // The coverage counts the last synchronized manifest; text added since
-      // then shows up only in missing_units.
-      if (course.missing_units > 0) {
-        text += ", " + course.missing_units + " da indicizzare";
-      }
-      return text;
     }
 
     function buttonLabel(course) {
@@ -75,7 +90,11 @@
       title.className = "semantic-coverage__label";
       title.textContent = course.label;
       item.appendChild(title);
-      item.appendChild(document.createTextNode(" · " + coverageText(course)));
+      var state = document.createElement("span");
+      state.className = "semantic-coverage__state";
+      state.textContent = " · " + coverageText(course);
+      state.title = coverageDetail(course);
+      item.appendChild(state);
       if (course.queued_action === null && course.missing_units === 0) {
         return item;
       }
@@ -104,5 +123,9 @@
     return { render: render };
   }
 
-  window.SbobinaSettingsSemanticCoverage = { create: create };
+  window.SbobinaSettingsSemanticCoverage = {
+    create: create,
+    coverageText: coverageText,
+    coverageDetail: coverageDetail,
+  };
 })();

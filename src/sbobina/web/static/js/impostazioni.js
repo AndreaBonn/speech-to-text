@@ -102,8 +102,18 @@
     renderAll();
   }
 
+  // I1: the cloud block opens by itself when a cloud engine is in use; with
+  // everything local it stays closed but can still be opened by hand.
+  function syncCloudBlock() {
+    var prefs = settingsState.preferences;
+    if (prefs.llm_engine === "api" || prefs.transcription_engine === "assemblyai") {
+      byId("cloud-settings").open = true;
+    }
+  }
+
   function renderAll() {
     renderBanner();
+    syncCloudBlock();
     renderEngine();
     chainModule.render();
     keysModule.render();
