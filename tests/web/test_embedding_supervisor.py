@@ -163,4 +163,4 @@ def test_recovery_skips_malformed_record_and_recovers_valid_course(
     harness.supervisor.recover_on_boot()
     assert len(harness.supervisor._queue) == 1
     assert harness.supervisor._queue[0].course_id == harness.course_dir.name
-    assert "Cannot recover embedding run" in caplog.text
+    assert "Unreadable embedding run" in caplog.text

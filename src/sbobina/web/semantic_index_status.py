@@ -1,3 +1,4 @@
+import logging
 from dataclasses import asdict
 from pathlib import Path
 
@@ -13,6 +14,8 @@ from sbobina.web.embedding_store import EmbeddingStatus, load_embed
 from sbobina.web.job_store import JobStore
 from sbobina.web.vector_reconcile import count_missing_units, embedding_model_key
 from sbobina.web.vector_store import VectorStore
+
+logger = logging.getLogger(__name__)
 
 # The Settings page waits on these probes: a hung Ollama must not hold it for
 # the full embedding timeout. A refused local connection fails at once anyway.
@@ -51,7 +54,17 @@ def _model_view(settings: Settings) -> tuple[dict[str, JsonValue], str | None]:
 
 
 def _run_view(directory: Path) -> dict[str, JsonValue]:
-    run = load_embed(course_dir=directory)
+    try:
+        run = load_embed(course_dir=directory)
+    except (OSError, ValueError, KeyError, TypeError):
+        # One unreadable record must not take down the whole status page;
+        # the next start moves it aside (embedding_queue._quarantine).
+        logger.warning("Unreadable embedding run in %s", directory, exc_info=True)
+        return {
+            "run": {"status": "unreadable"},
+            "queued_action": None,
+            "last_indexed_at": None,
+        }
     active = run is not None and run.status in (
         EmbeddingStatus.QUEUED,
         EmbeddingStatus.RUNNING,
