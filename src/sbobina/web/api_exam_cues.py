@@ -109,11 +109,12 @@ def list_exam_cues(key: str, services: Services, query: QueryOptions) -> dict[st
     # Only DONE jobs: a job interrupted after the transcript was already
     # written (recover_record, work_items.py) still has a readable file on
     # disk, and its stale cues must not surface alongside a finished lecture.
-    done_job_ids = [
-        job_id
-        for job_id in sorted(scope.job_ids)
-        if services.get(job_id=job_id).status == JobStatus.DONE
-    ]
+    done = {
+        str(record.id)
+        for record in services.iter_records()
+        if record.status == JobStatus.DONE
+    }
+    done_job_ids = sorted(scope.job_ids & done)
     results = [
         (job_id, _cues_for_job(store=services, job_id=job_id))
         for job_id in done_job_ids

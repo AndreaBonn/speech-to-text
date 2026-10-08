@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -63,10 +64,15 @@ class ReviewBody(BaseModel):
 
 
 def _queue(course_id: str, services: ReviewServices) -> tuple[Card, ...]:
-    return due_today(
+    return _due(
         cards=load_cards(courses_dir=services.store.courses_dir, course_id=course_id),
-        now=services.now,
-        new_limit=services.settings.review_new_per_day,
+        services=services,
+    )
+
+
+def _due(cards: Sequence[Card], services: ReviewServices) -> tuple[Card, ...]:
+    return due_today(
+        cards=cards, now=services.now, new_limit=services.settings.review_new_per_day
     )
 
 
@@ -123,7 +129,7 @@ def _summary_item(course: Course, services: ReviewServices) -> dict[str, Any]:
     return {
         "course_key": course.key,
         "label": course.label,
-        "due": len(_queue(course_id=course.id, services=services)),
+        "due": len(_due(cards=cards, services=services)),
         "cards": sum(1 for card in cards if not card.suspended),
         "next_due": None if upcoming is None else upcoming.isoformat(),
     }
