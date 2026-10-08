@@ -6,7 +6,7 @@ from page_fixtures import BASE_URL
 from sbobina.settings import Settings
 from sbobina.web.app import create_app
 
-VENDOR = Path("src/sbobina/web/static/vendor/katex-0.19.0")
+VENDOR = Path(__file__).parents[2] / "src/sbobina/web/static/vendor/katex-0.19.0"
 
 
 def test_katex_assets_are_served_locally(tmp_path: Path) -> None:

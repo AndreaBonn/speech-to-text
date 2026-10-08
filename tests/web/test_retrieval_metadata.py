@@ -11,7 +11,7 @@ from sbobina.web.generation_store import (
 
 
 def test_generation_runner_shrinks_below_original_limit() -> None:
-    path = Path("src/sbobina/web/generation_runner.py")
+    path = Path(__file__).parents[2] / "src/sbobina/web/generation_runner.py"
     assert len(path.read_text().splitlines()) < 298
 
 

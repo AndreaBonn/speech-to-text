@@ -1,3 +1,4 @@
+import os
 import sys
 from collections.abc import Iterator
 
@@ -5,6 +6,8 @@ import httpx
 import pytest
 
 from sbobina.models import Segment, Transcript, Word
+from sbobina.settings import Settings
+from sbobina.settings import settings as global_settings
 
 
 def make_word(text: str, start: float, probability: float = 0.99) -> Word:
@@ -99,13 +102,15 @@ def _isolated_user_config_dir(
     config_home = tmp_path_factory.mktemp("config-home")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(config_home))
     monkeypatch.setenv("APPDATA", str(config_home))
-    for name in (
-        "SBOBINA_CONFIG_DIR",
-        "SBOBINA_LLM_ENGINE",
-        "SBOBINA_LLM_CHAIN",
-        "SBOBINA_TRANSCRIPTION_ENGINE",
-    ):
-        monkeypatch.delenv(name, raising=False)
+    # Any SBOBINA_* in the developer's shell or .env (API keys, model names)
+    # would override the defaults the tests assert on.
+    for name in [name for name in os.environ if name.startswith("SBOBINA_")]:
+        monkeypatch.delenv(name)
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
+    # The module-level instance was built at import, before this fixture ran.
+    clean = Settings()
+    for field in Settings.model_fields:
+        monkeypatch.setattr(global_settings, field, getattr(clean, field))
 
 
 @pytest.fixture(autouse=True)
