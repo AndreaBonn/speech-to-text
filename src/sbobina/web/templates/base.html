@@ -32,21 +32,24 @@
     <nav class="rail" aria-label="Navigazione principale">
       <div class="rail__brand">Transcriber</div>
       <div class="rail__scroll">
-        <ul class="rail__list">
-          {% for item in nav_items %}
+        {% for group, items in nav_items | groupby("group") %}
+        {% if group == "tools" %}<p class="rail__group-title" id="rail-tools">Strumenti</p>{% endif %}
+        <ul class="rail__list{% if group == 'tools' %} rail__list--tools{% endif %}"{% if group == "tools" %} aria-labelledby="rail-tools"{% endif %}>
+          {% for item in items %}
           <li class="rail__item">
             {% if item.disabled %}
             <span class="rail__link rail__link--disabled" aria-disabled="true">{{ item.label }}</span>
             {% else %}
             <a
-              class="rail__link{% if item.active %} rail__link--active{% endif %}"
+              class="rail__link{% if item.active %} rail__link--active{% endif %}{% if item.detail %} rail__link--detail{% endif %}"
               href="{{ item.href }}"
               {% if item.active %}aria-current="page"{% endif %}
-            >{{ item.label }}</a>
+            >{% if item.detail %}<span class="rail__link-label">{{ item.label }}</span><span class="rail__link-detail">{{ item.detail }}</span>{% else %}{{ item.label }}{% endif %}</a>
             {% endif %}
           </li>
           {% endfor %}
         </ul>
+        {% endfor %}
       </div>
       <button id="theme-toggle" type="button" class="btn btn--ghost rail__theme" hidden>Tema</button>
       <div id="rail-indicator" class="rail__indicator" aria-live="polite"></div>
@@ -66,6 +69,7 @@
     </div>
   </div>
   <script src="/static/js/when.js"></script>
+  <script src="/static/js/rail.js"></script>
   <script src="/static/js/system-banner.js"></script>
   <script src="/static/js/engine-warning.js"></script>
   <script src="/static/js/toggletip.js"></script>

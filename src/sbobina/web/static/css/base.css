@@ -116,6 +116,32 @@ body {
   }
 }
 
+/* S5: technical pages in their own group under the daily destinations. */
+.rail__group-title {
+  margin: var(--space-md) 0 var(--space-2xs);
+  padding: var(--space-sm) var(--space-sm) 0;
+  border-top: var(--rule-hair) solid var(--color-rule);
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+
+/* R6: the last-lecture entry names the lecture on a second line. */
+.rail__link--detail {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.rail__link-detail {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+  font-weight: var(--weight-regular);
+}
+
 .rail__indicator {
   margin-top: var(--space-xs);
   text-align: center;
@@ -205,7 +231,11 @@ body {
 
   .rail__scroll {
     flex: 1 1 auto;
+    display: flex;
+    gap: var(--space-xs);
     overflow-x: auto;
+    /* S3: the fade on the right says the row goes on past the edge. */
+    mask-image: linear-gradient(to right, #000 85%, transparent);
     /* The nav scrolls horizontally, but the scrollbar itself is not part
        of the design: the brand above stays put either way. */
     scrollbar-width: none;
@@ -223,6 +253,15 @@ body {
   .rail__link,
   .rail__link--disabled {
     white-space: nowrap;
+  }
+
+  .rail__group-title,
+  .rail__link-detail {
+    display: none;
+  }
+
+  .rail__scroll--end {
+    mask-image: none;
   }
 
   .rail__indicator {

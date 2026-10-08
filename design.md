@@ -47,11 +47,17 @@ Spacing: 4-pt scale `--space-3xs` … `--space-3xl`. Radii: 6 px controls,
 
 ## Layout
 - Rail `--rail-width`, content up to `--content-max`, reader text column at
-  `--measure-reading`. Below 768 px the rail becomes a top bar with the seven
-  destinations in one scrollable row; no hamburger.
-- Pages: Nuova trascrizione · Corsi · Ripasso · Lettore · Storico · Modelli ·
-  Confronto (WER). Corsi added in T013 to group lectures by course; Ripasso
-  added in T028, right after Corsi, for the spaced-repetition queue.
+  `--measure-reading`. Below 768 px the rail becomes a top bar with all the
+  destinations in one scrollable row, a fade on the right edge while more
+  follow and the current page scrolled into view; no hamburger.
+- Pages: Nuova trascrizione · Corsi · Ripasso · Ultima lezione · Storico, then
+  a "Strumenti" group with Modelli · Confronto (WER) · Impostazioni (UX S5).
+  "Ultima lezione" names the newest completed lecture and opens it in the
+  reader (UX R6, it replaced the "Lettore" entry). Corsi added in T013 to
+  group lectures by course; Ripasso added in T028, right after Corsi, for the
+  spaced-repetition queue.
+- Page title at `--text-lg`: the title names the place, it is not a poster.
+  Pages that belong to a course show the path Corsi › <corso> above it (UX S1).
 - The reader puts the transcript in the centre column and the list of points
   to re-listen in a side column from 1024 px; below, the list follows the text.
 

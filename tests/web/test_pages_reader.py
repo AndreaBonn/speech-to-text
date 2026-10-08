@@ -52,7 +52,9 @@ def test_rail_disables_reader_link_without_a_done_job(tmp_path: Path) -> None:
         response = client.get(url="/")
 
     assert response.status_code == 200
-    link = re.search(pattern=r"<span\b[^>]*>Lettore</span>", string=response.text)
+    link = re.search(
+        pattern=r"<span\b[^>]*>Ultima lezione</span>", string=response.text
+    )
     assert link is not None
     assert 'aria-disabled="true"' in link.group()
     assert 'class="rail__link rail__link--disabled"' in link.group()
