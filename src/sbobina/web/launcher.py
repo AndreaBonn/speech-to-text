@@ -3,12 +3,13 @@ import socket
 import threading
 import time
 import webbrowser
+from pathlib import Path
 
 import httpx
 import uvicorn
 
 from sbobina.platform_info import PlatformInfo, RuntimeChoice, resolve_for_settings
-from sbobina.settings import Settings
+from sbobina.settings import LOOPBACK_HOSTS, Settings
 from sbobina.web.app import create_app
 from sbobina.web.model_service import is_whisper_model_cached, ollama_status
 
@@ -18,6 +19,13 @@ BROWSER_POLL_ATTEMPTS = 100
 BROWSER_POLL_INTERVAL_S = 0.1
 READINESS_TIMEOUT_S = 0.5
 READINESS_PATH = "/api/v1/system"
+# Docker writes the first, Podman the second, at the container's root.
+CONTAINER_MARKERS = (Path("/.dockerenv"), Path("/run/.containerenv"))
+
+
+def is_inside_container(markers: tuple[Path, ...] = CONTAINER_MARKERS) -> bool:
+    """True when a container runtime's marker file exists."""
+    return any(marker.exists() for marker in markers)
 
 
 def base_url(host: str, port: int) -> str:
@@ -77,16 +85,34 @@ def startup_report(config: Settings) -> list[str]:
     return [_runtime_line(info=info, choice=choice), model_line, str(ollama["message"])]
 
 
+def allowed_bind_host(config: Settings) -> str | None:
+    """Return the address to bind, or ``None`` when it is refused here.
+
+    No login: outside a container, every interface means the whole LAN.
+    """
+    bind_host = config.web_bind_host or config.web_host
+    if bind_host not in LOOPBACK_HOSTS and not is_inside_container():
+        logger.error("web_bind_host=%s è ammesso solo dentro un container", bind_host)
+        return None
+    return bind_host
+
+
 def run_server(config: Settings, open_browser: bool) -> int:
-    """Serve the web UI on ``config.web_host:web_port``; return the exit code.
+    """Serve the web UI on ``web_bind_host`` (default ``web_host``); return the exit code.
 
     The same ``config`` builds the Origin check, so the port the server binds
-    and the origin it accepts cannot drift apart.
+    and the origin it accepts cannot drift apart; ``web_host`` stays the
+    origin even when a container binds every interface.
     """
     host, port = config.web_host, config.web_port
-    if not is_port_available(host=host, port=port):
+    bind_host = allowed_bind_host(config=config)
+    if bind_host is None:
+        return 1
+    if not is_port_available(host=bind_host, port=port):
         logger.error(
-            "Porta %d già occupata su %s: scegli un'altra porta con --port", port, host
+            "Porta %d già occupata su %s: scegli un'altra porta con --port",
+            port,
+            bind_host,
         )
         return 1
     url = base_url(host=host, port=port)
@@ -97,5 +123,7 @@ def run_server(config: Settings, open_browser: bool) -> int:
         threading.Thread(
             target=open_browser_when_ready, args=(url,), daemon=True
         ).start()
-    uvicorn.run(create_app(settings=config), host=host, port=port, log_level="info")
+    uvicorn.run(
+        create_app(settings=config), host=bind_host, port=port, log_level="info"
+    )
     return 0

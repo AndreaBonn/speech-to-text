@@ -4,6 +4,7 @@ import threading
 import time
 import webbrowser
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -227,3 +228,70 @@ def test_run_server_logs_the_startup_report_before_serving(
         launcher.run_server(config=Settings(web_port=8765), open_browser=False)
 
     assert caplog.messages[:2] == ["Dispositivo: CPU", "Ollama: ok"]
+
+
+def test_is_inside_container_true_when_a_marker_exists(tmp_path: Path) -> None:
+    marker = tmp_path / ".dockerenv"
+    marker.touch()
+
+    assert launcher.is_inside_container(markers=(tmp_path / "absent", marker)) is True
+
+
+def test_is_inside_container_false_without_markers(tmp_path: Path) -> None:
+    assert launcher.is_inside_container(markers=(tmp_path / ".dockerenv",)) is False
+
+
+def test_run_server_all_interfaces_outside_container_exits_1_without_starting(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    started: list[object] = []
+    monkeypatch.setattr(launcher, "is_inside_container", lambda: False)
+    monkeypatch.setattr(launcher, "is_port_available", lambda host, port: True)
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: started.append(a))
+
+    exit_code = launcher.run_server(
+        config=Settings(web_bind_host="0.0.0.0"), open_browser=False
+    )
+
+    assert exit_code == 1
+    assert started == []
+    assert "solo dentro un container" in caplog.text
+
+
+def test_run_server_all_interfaces_inside_container_binds_it_and_keeps_origin(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    probed: list[str] = []
+    runs: list[dict[str, object]] = []
+    apps: list[Any] = []
+    monkeypatch.setattr(launcher, "is_inside_container", lambda: True)
+
+    def fake_port_check(host: str, port: int) -> bool:
+        probed.append(host)
+        return True
+
+    monkeypatch.setattr(launcher, "is_port_available", fake_port_check)
+
+    def fake_run(app: Any, **kw: object) -> None:
+        apps.append(app)
+        runs.append(kw)
+
+    monkeypatch.setattr(uvicorn, "run", fake_run)
+
+    with caplog.at_level(logging.INFO, logger=launcher.logger.name):
+        exit_code = launcher.run_server(
+            config=Settings(
+                web_host="127.0.0.1", web_port=8765, web_bind_host="0.0.0.0"
+            ),
+            open_browser=False,
+        )
+    client = TestClient(apps[0], base_url="http://127.0.0.1:8765")
+    accepted = client.post(
+        "/api/v1/system", headers={"Origin": "http://127.0.0.1:8765"}
+    )
+
+    assert exit_code == 0
+    assert probed == ["0.0.0.0"]
+    assert runs == [{"host": "0.0.0.0", "port": 8765, "log_level": "info"}]
+    assert "Interfaccia su http://127.0.0.1:8765" in caplog.messages
+    assert accepted.status_code == 405  # reached routing: origin accepted

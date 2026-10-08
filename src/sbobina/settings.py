@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Device = Literal["auto", "cuda", "cpu"]
 LOOPBACK_HOSTS = ("127.0.0.1", "::1", "localhost")
+ALL_INTERFACES_HOSTS = ("0.0.0.0", "::")
 LlmProvider = Literal["groq", "gemini", "openai", "anthropic"]
 LLM_CHAIN_MAX_LINKS = 8
 TranscriptionEngine = Literal["whisper", "assemblyai"]
@@ -94,6 +95,10 @@ class Settings(BaseSettings):
     paragraph_max_s: float = Field(default=120.0, gt=0.0)
     web_host: str = "127.0.0.1"
     web_port: int = 8765
+    # None binds web_host; 0.0.0.0 or :: binds every interface, which the
+    # launcher allows only inside a container whose port is published on the
+    # host's loopback: web_host stays the origin the browser sends.
+    web_bind_host: str | None = None
     data_dir: Path = Path("data")
     web_max_upload_mb: int = 1024
     extraction_timeout_s: float = Field(default=120.0, gt=0.0)
@@ -131,6 +136,15 @@ class Settings(BaseSettings):
     def validate_web_host(cls, value: str) -> str:
         if value not in LOOPBACK_HOSTS:
             raise ValueError("L'host web deve essere 127.0.0.1, ::1 o localhost")
+        return value
+
+    @field_validator("web_bind_host")
+    @classmethod
+    def validate_web_bind_host(cls, value: str | None) -> str | None:
+        # A loopback bind is web_host's job: a second loopback value could pick
+        # another IP family than the origin and leave the server unreachable.
+        if value is not None and value not in ALL_INTERFACES_HOSTS:
+            raise ValueError("web_bind_host deve essere 0.0.0.0 o ::")
         return value
 
     @field_validator("llm_chain")

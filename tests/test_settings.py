@@ -141,3 +141,20 @@ def test_settings_survives_the_job_config_merge_round_trip_without_losing_fields
     assert merged.groq_api_key.get_secret_value() == SENTINEL
     assert merged.llm_engine == "api"
     assert merged.llm_chain == [LlmChainEntry(provider="groq", model="llama-3.3")]
+
+
+@pytest.mark.parametrize("host", [None, "0.0.0.0", "::"])
+def test_settings_web_bind_host_accepts_unset_or_all_interfaces(
+    host: str | None,
+) -> None:
+    assert Settings(web_bind_host=host).web_bind_host == host
+
+
+@pytest.mark.parametrize(
+    "host", ["192.168.1.5", "example.org", "", "127.0.0.1", "::1", "localhost"]
+)
+def test_settings_web_bind_host_rejects_single_addresses_loopback_included(
+    host: str,
+) -> None:
+    with pytest.raises(pydantic.ValidationError, match="web_bind_host"):
+        Settings(web_bind_host=host)
