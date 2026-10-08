@@ -90,6 +90,10 @@ class Harness:
         ).status
 
 
+WORKER_TIMEOUT_S = 10.0
+SHORT_TIMEOUT_S = 0.2
+
+
 def _build_worker(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, timeout_s: float
 ) -> Harness:
@@ -110,7 +114,11 @@ def _build_worker(
 
 @pytest.fixture
 def harness(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Harness]:
-    built = _build_worker(tmp_path=tmp_path, monkeypatch=monkeypatch, timeout_s=0.2)
+    # Generous: a loaded machine can take longer than a short timeout just to
+    # start the child interpreter. Only the timeout test uses a short one.
+    built = _build_worker(
+        tmp_path=tmp_path, monkeypatch=monkeypatch, timeout_s=WORKER_TIMEOUT_S
+    )
     try:
         yield built
     finally:
@@ -130,12 +138,22 @@ def test_successful_extraction_marks_ready(harness: Harness) -> None:
     wait_for(predicate=lambda: harness.status(doc_id="doc-1") == DocumentStatus.READY)
 
 
-def test_child_past_timeout_is_killed_and_marked_failed(harness: Harness) -> None:
+def test_child_past_timeout_is_killed_and_marked_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness = _build_worker(
+        tmp_path=tmp_path, monkeypatch=monkeypatch, timeout_s=SHORT_TIMEOUT_S
+    )
     doc_dir = harness.add_document(doc_id="doc-1")
     (doc_dir / "sleep").touch()
-    harness.worker.start()
-    harness.worker.submit(course_id="course-1", doc_id="doc-1")
-    wait_for(predicate=lambda: harness.status(doc_id="doc-1") == DocumentStatus.FAILED)
+    try:
+        harness.worker.start()
+        harness.worker.submit(course_id="course-1", doc_id="doc-1")
+        wait_for(
+            predicate=lambda: harness.status(doc_id="doc-1") == DocumentStatus.FAILED
+        )
+    finally:
+        harness.worker.stop()
     document = document_store.read_document(
         courses_dir=harness.courses_dir, course_id="course-1", doc_id="doc-1"
     )
