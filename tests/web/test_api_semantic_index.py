@@ -259,3 +259,12 @@ def test_status_and_catalog_probe_ollama_with_short_timeout(
     assert semantic_harness.client.get(STATUS_URL).status_code == 200
     assert semantic_harness.client.get(CATALOG_URL).status_code == 200
     assert timeouts and all(value <= 2.0 for value in timeouts)
+
+
+def test_status_reports_rebuild_needed_until_reindex(
+    semantic_harness: SemanticHarness,
+) -> None:
+    h = semantic_harness
+    assert h.client.get(STATUS_URL).json()["data"]["rebuild_needed"] is False
+    h.vectors.rebuild_needed = True
+    assert h.client.get(STATUS_URL).json()["data"]["rebuild_needed"] is True

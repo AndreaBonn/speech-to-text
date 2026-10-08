@@ -36,6 +36,7 @@
   var examCues = window.SbobinaCourseExamCues;
   var practice = window.SbobinaCoursePractice;
   var packageExport = window.SbobinaCourseExport;
+  var retrievalStatus = window.SbobinaCourseRetrievalStatus;
   var clearChildren = dom.clearChildren;
   var textCell = dom.textCell;
   var showSkeleton = dom.showSkeleton;
@@ -173,6 +174,7 @@
     practice.show(key);
     chat.show(key);
     packageExport.show(key);
+    retrievalStatus.show(key);
   }
 
   function showList() {
@@ -185,6 +187,7 @@
     practice.hide();
     chat.hide();
     packageExport.hide();
+    retrievalStatus.hide();
   }
 
   function refreshTitle() {

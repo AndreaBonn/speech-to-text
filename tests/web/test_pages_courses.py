@@ -31,6 +31,25 @@ def test_corsi_page_returns_shell(tmp_path: Path) -> None:
     assert body.index("/static/js/corsi.js") < body.index("/static/js/search.js")
 
 
+def test_corsi_page_has_the_semantic_retrieval_status_line(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/corsi").text
+
+    assert 'id="corsi-detail-retrieval"' in body
+    assert "/static/js/retrieval-mode.js" in body
+    assert "/static/js/corso-retrieval-status.js" in body
+    assert body.index("/static/js/retrieval-mode.js") < body.index(
+        "/static/js/corso-retrieval-status.js"
+    )
+    assert body.index("/static/js/corso-retrieval-status.js") < body.index(
+        "/static/js/corso-dettaglio.js"
+    )
+    assert body.index("/static/js/retrieval-mode.js") < body.index(
+        "/static/js/corso-chat-thread.js"
+    )
+
+
 def test_corsi_page_marks_its_rail_entry_active(tmp_path: Path) -> None:
     app = create_app(settings=Settings(), data_dir=tmp_path)
     with TestClient(app=app, base_url=BASE_URL) as client:

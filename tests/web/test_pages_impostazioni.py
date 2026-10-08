@@ -22,3 +22,25 @@ def test_impostazioni_page_returns_shell(tmp_path: Path) -> None:
     assert "/static/js/settings-chain.js" in body
     assert "/static/js/settings-keys.js" in body
     assert "/static/js/impostazioni.js" in body
+
+
+def test_impostazioni_page_has_the_semantic_search_section(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/impostazioni").text
+
+    assert "Ricerca semantica" in body
+    assert 'id="semantic-search-toggle"' in body
+    assert 'id="semantic-model-select"' in body
+    assert 'id="semantic-pull-command"' in body
+    assert 'id="semantic-rebuild-dialog"' in body
+    assert 'id="semantic-coverage-list"' in body
+    assert "/static/js/retrieval-mode.js" in body
+    assert "/static/js/settings-semantic-coverage.js" in body
+    assert "/static/js/settings-semantic.js" in body
+    assert body.index("/static/js/retrieval-mode.js") < body.index(
+        "/static/js/settings-semantic.js"
+    )
+    assert body.index("/static/js/settings-semantic-coverage.js") < body.index(
+        "/static/js/settings-semantic.js"
+    )

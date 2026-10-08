@@ -201,3 +201,75 @@
 .keys-list[hidden] {
   display: none;
 }
+
+/* ---------- Semantic search (section 5) ---------- */
+
+.semantic-pull {
+  margin: var(--space-sm) 0;
+  padding: var(--space-sm) var(--space-md);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.semantic-pull__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.semantic-pull__command {
+  flex: 1 1 16rem;
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: var(--radius-input);
+  background: var(--color-paper-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.semantic-rebuild {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.semantic-rebuild[hidden] {
+  display: none;
+}
+
+.semantic-coverage__title {
+  margin-top: var(--space-md);
+}
+
+.semantic-coverage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.semantic-coverage__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  padding: var(--space-sm);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.semantic-coverage__label {
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.semantic-coverage__item .btn {
+  margin-left: auto;
+}

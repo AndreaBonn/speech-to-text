@@ -42,6 +42,16 @@
     return li;
   }
 
+  // "Ricerca per significato" vs "solo parole chiave: <motivo>" (T053);
+  // absent on records saved before retrieval_mode existed.
+  function appendRetrievalLine(li, message) {
+    var retrievalMode = window.SbobinaRetrievalMode;
+    if (!retrievalMode || !message.retrieval_mode) {
+      return;
+    }
+    li.appendChild(el("p", "field__helper", retrievalMode.phrase(message.retrieval_mode)));
+  }
+
   function renderAssistantMessage(message) {
     var li = el("li", "chat__message chat__message--assistant");
     var sentences = message.sentences || [];
@@ -49,6 +59,7 @@
       li.appendChild(
         el("p", "chat__message-text", "Non trovo la risposta nel materiale di questo corso.")
       );
+      appendRetrievalLine(li, message);
       return li;
     }
     sentences.forEach(function (sentence) {
@@ -62,6 +73,7 @@
       var models = Object.keys(message.served_by).join(", ");
       li.appendChild(el("p", "field__helper", "Risposta da " + models));
     }
+    appendRetrievalLine(li, message);
     return li;
   }
 

@@ -61,6 +61,7 @@
   <div id="corsi-detail" class="courses__detail" hidden>
     <a id="corsi-detail-back" class="btn btn--ghost" href="/corsi">&larr; Tutti i corsi</a>
     <h2 id="corsi-detail-title" class="section-title"></h2>
+    <p id="corsi-detail-retrieval" class="field__helper" role="status" aria-live="polite" hidden></p>
 {% include "_corso-export.html" %}
 
     <div id="corsi-detail-status" class="history__status" role="alert" hidden></div>
@@ -260,6 +261,8 @@
 {% block scripts %}
 {% include "_math-assets.html" %}
 <script src="/static/js/dom.js" defer></script>
+<script src="/static/js/retrieval-mode.js" defer></script>
+<script src="/static/js/corso-retrieval-status.js" defer></script>
 <script src="/static/js/corso-frasi-esame-render.js" defer></script>
 <script src="/static/js/corso-frasi-esame.js" defer></script>
 <script src="/static/js/card-dialog.js" defer></script>

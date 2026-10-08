@@ -106,6 +106,74 @@
     <div id="transcription-error" class="queue__error" role="alert" hidden></div>
   </section>
 
+  <section aria-labelledby="settings-semantic-heading" class="settings-section">
+    <h2 id="settings-semantic-heading" class="section-title">Ricerca semantica</h2>
+    <p class="field__helper">
+      Trova lezioni e materiali per significato oltre che per parola esatta. Richiede Ollama
+      e un modello di embedding installato.
+    </p>
+    <div id="semantic-skeleton" class="skeleton-row"></div>
+    <div id="semantic-load-error" class="queue__error" role="alert" hidden></div>
+
+    <div id="semantic-body" hidden>
+      <div class="checkbox-field">
+        <input type="checkbox" id="semantic-search-toggle" />
+        <label for="semantic-search-toggle">Attiva la ricerca semantica</label>
+      </div>
+      <p id="semantic-locked-note" class="field__helper" hidden>
+        Impostato da variabile d'ambiente.
+      </p>
+
+      <div class="field">
+        <label class="field__label" for="semantic-model-select">Modello di embedding</label>
+        <select id="semantic-model-select" class="select-input"></select>
+        <p id="semantic-model-helper" class="field__helper"></p>
+      </div>
+
+      <div id="semantic-pull" class="semantic-pull" hidden>
+        <p id="semantic-pull-reason" class="field__helper"></p>
+        <div class="semantic-pull__row">
+          <code id="semantic-pull-command" class="semantic-pull__command"></code>
+          <button type="button" id="semantic-pull-copy" class="btn btn--secondary">
+            Copia
+          </button>
+        </div>
+        <p id="semantic-pull-copied" class="field__helper" role="status" aria-live="polite" hidden>
+          Copiato.
+        </p>
+      </div>
+
+      <div id="semantic-rebuild-banner" class="banner banner--warning semantic-rebuild" role="status" hidden>
+        <span id="semantic-rebuild-text"></span>
+        <button type="button" id="semantic-rebuild-button" class="btn btn--secondary">
+          Ricostruisci l'indice
+        </button>
+      </div>
+
+      <div id="semantic-action-error" class="queue__error" role="alert" hidden></div>
+
+      <h3 class="section-title semantic-coverage__title">Copertura per corso</h3>
+      <div id="semantic-coverage-empty" class="empty-state" hidden>
+        <p class="empty-state__text">Nessun corso ancora.</p>
+      </div>
+      <ul id="semantic-coverage-list" class="semantic-coverage" hidden></ul>
+    </div>
+  </section>
+
+  <dialog id="semantic-rebuild-dialog" class="card-dialog" aria-labelledby="semantic-rebuild-title">
+    <h3 id="semantic-rebuild-title" class="card-dialog__title">Ricostruire l'indice semantico</h3>
+    <p class="field__helper">
+      Il modello è cambiato: ogni lezione e materiale va indicizzato di nuovo con il nuovo
+      modello. Può richiedere tempo.
+    </p>
+    <div class="card-dialog__actions">
+      <button type="button" id="semantic-rebuild-cancel" class="btn btn--ghost">Annulla</button>
+      <button type="button" id="semantic-rebuild-confirm" class="btn btn--primary">
+        Ricostruisci
+      </button>
+    </div>
+  </dialog>
+
   <dialog id="cloud-ack-dialog" class="card-dialog" aria-labelledby="cloud-ack-title">
     <h3 id="cloud-ack-title" class="card-dialog__title">Invio dei testi al cloud</h3>
     <p class="field__helper">
@@ -137,4 +205,7 @@
 <script src="/static/js/settings-chain.js" defer></script>
 <script src="/static/js/settings-keys.js" defer></script>
 <script src="/static/js/impostazioni.js" defer></script>
+<script src="/static/js/retrieval-mode.js" defer></script>
+<script src="/static/js/settings-semantic-coverage.js" defer></script>
+<script src="/static/js/settings-semantic.js" defer></script>
 {% endblock %}

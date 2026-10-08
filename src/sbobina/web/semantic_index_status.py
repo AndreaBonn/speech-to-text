@@ -110,7 +110,10 @@ def semantic_index_status(
     vectors: VectorStore,
 ) -> dict[str, JsonValue]:
     view, key = _model_view(settings=settings)
+    # data_version() refreshes the rebuild marker another process may have cleared.
+    vectors.data_version()
     return view | {
+        "rebuild_needed": vectors.rebuild_needed,
         "model_change_pending": None
         if key is None
         else vectors.has_other_models(model_key=key),
