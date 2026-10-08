@@ -11,7 +11,7 @@ from sbobina.settings import Settings
 from sbobina.web import api_exam_cues
 from sbobina.web.api_files import TRANSCRIPT_FILES
 from sbobina.web.app import create_app
-from sbobina.web.job_models import JobConfig
+from sbobina.web.job_models import JobConfig, JobStatus
 from sbobina.web.job_store import JobStore
 
 URL = "/api/v1/courses/diritto/exam-cues"
@@ -39,10 +39,12 @@ def _write_transcript(path: Path, text: str) -> None:
 
 
 def _lecture(store: JobStore, text: str, subject: str = "Diritto") -> str:
-    job_id = str(store.create(config=JobConfig(subject=subject)).id)
+    record = store.create(config=JobConfig(subject=subject))
+    job_id = str(record.id)
     _write_transcript(
         path=store.jobs_dir / job_id / TRANSCRIPT_FILES["original"], text=text
     )
+    store.update(record=record.model_copy(update={"status": JobStatus.DONE}))
     return job_id
 
 
