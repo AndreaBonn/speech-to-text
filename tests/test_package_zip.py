@@ -30,6 +30,15 @@ def test_iter_member_bytes_decodes_stored_and_deflated(compression: int) -> None
         assert b"".join(iter_member_bytes(archive=archive, info=info)) == PAYLOAD
 
 
+def test_iter_member_bytes_closed_archive_raises_bad_zip_file() -> None:
+    archive = ZipFile(file=BytesIO(_archive_bytes(compression=ZIP_STORED)))
+    info = archive.getinfo(name="member.txt")
+    archive.close()
+
+    with pytest.raises(BadZipFile, match="Closed package archive"):
+        list(iter_member_bytes(archive=archive, info=info))
+
+
 def test_iter_member_bytes_local_header_method_mismatch_is_rejected() -> None:
     # The central directory says STORED while the local header says DEFLATED:
     # a reader trusting either one alone would decode the other's bytes.

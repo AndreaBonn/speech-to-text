@@ -18,11 +18,11 @@ HEADER_EXTRA_LENGTH_INDEX = 10
 def _payload_source(archive: ZipFile, info: ZipInfo) -> IO[bytes]:
     # Let zipfile check names, encryption and overlapping offsets, but never
     # read through ZipExtFile: it truncates output to the untrusted file_size.
-    with archive.open(name=info):
-        pass
     source = archive.fp
     if source is None:
         raise BadZipFile("Closed package archive")
+    with archive.open(name=info):
+        pass
     source.seek(info.header_offset)
     header = LOCAL_HEADER.unpack(source.read(LOCAL_HEADER.size))
     if (
