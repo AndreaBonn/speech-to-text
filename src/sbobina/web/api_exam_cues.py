@@ -13,6 +13,7 @@ from sbobina.web.course_retrieval import (
     course_scope,
 )
 from sbobina.web.errors import NotFoundError, ValidationError
+from sbobina.web.job_models import JobStatus
 from sbobina.web.job_store import JobStore
 from sbobina.web.search_schema import Variant
 from sbobina.web.search_service import PREFERRED_VARIANTS
@@ -105,9 +106,17 @@ def list_exam_cues(key: str, services: Services, query: QueryOptions) -> dict[st
     scope = course_scope(store=services, key=key)
     if scope.course_id == NO_REGISTERED_COURSE and not scope.job_ids:
         raise NotFoundError(entity="Corso", id=key)
+    # Only DONE jobs: a job interrupted after the transcript was already
+    # written (recover_record, work_items.py) still has a readable file on
+    # disk, and its stale cues must not surface alongside a finished lecture.
+    done_job_ids = [
+        job_id
+        for job_id in sorted(scope.job_ids)
+        if services.get(job_id=job_id).status == JobStatus.DONE
+    ]
     results = [
         (job_id, _cues_for_job(store=services, job_id=job_id))
-        for job_id in sorted(scope.job_ids)
+        for job_id in done_job_ids
     ]
     cues = [
         item

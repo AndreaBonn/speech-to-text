@@ -13,7 +13,7 @@ from sbobina.settings import Settings
 from sbobina.web.api_files import TRANSCRIPT_FILES
 from sbobina.web.app import create_app
 from sbobina.web.course_retrieval import lecture_revision
-from sbobina.web.job_models import JobConfig, LectureMeta
+from sbobina.web.job_models import JobConfig, JobStatus, LectureMeta
 from sbobina.web.job_store import JobStore
 
 URL = "/api/v1/courses/diritto/exam-cues"
@@ -47,10 +47,12 @@ def _write_transcript(path: Path, text: str) -> None:
 
 
 def _lecture(store: JobStore, text: str, subject: str = "Diritto") -> str:
-    job_id = str(store.create(config=JobConfig(subject=subject)).id)
+    record = store.create(config=JobConfig(subject=subject))
+    job_id = str(record.id)
     _write_transcript(
         path=store.jobs_dir / job_id / TRANSCRIPT_FILES["original"], text=text
     )
+    store.update(record=record.model_copy(update={"status": JobStatus.DONE}))
     return job_id
 
 
@@ -248,6 +250,24 @@ def test_list_exam_cues_missing_transcript_skips_lecture(
 ) -> None:
     good = _lecture(store=store, text="Segnatevelo")
     store.create(config=JobConfig(subject="Diritto"))
+    assert [cue["job_id"] for cue in client.get(url=URL).json()["data"]] == [good]
+
+
+def test_list_exam_cues_interrupted_job_does_not_duplicate_cues(
+    client: TestClient, store: JobStore
+) -> None:
+    """A job interrupted after the transcript was written (recover_record,
+    work_items.py) leaves a readable transcript file on disk even though the
+    pipeline never finished. Its cues must not double up with another
+    lecture's identical phrases.
+    """
+    good = _lecture(store=store, text="Segnatevelo")
+    interrupted_job_id = _lecture(store=store, text="Segnatevelo")
+    store.update(
+        record=store.get(job_id=interrupted_job_id).model_copy(
+            update={"status": JobStatus.INTERRUPTED}
+        )
+    )
     assert [cue["job_id"] for cue in client.get(url=URL).json()["data"]] == [good]
 
 
