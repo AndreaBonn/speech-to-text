@@ -53,6 +53,19 @@ dev = [
 testpaths = ["tests"]
 pythonpath = ["tests"]
 
+[tool.coverage.run]
+branch = true
+source = ["src/sbobina"]
+
+[tool.coverage.report]
+# Script entry points run only as `python -m`; their bodies are tested through main().
+# assert_never/AssertionError mark branches mypy proves unreachable.
+exclude_also = [
+    'if __name__ == "__main__":',
+    'case _ as unhandled:',
+    'raise AssertionError',
+]
+
 [tool.mypy]
 strict = true
 
