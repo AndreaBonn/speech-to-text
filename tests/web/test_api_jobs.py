@@ -227,6 +227,35 @@ def test_list_jobs_filters_effective_course(client: TestClient, tmp_path: Path) 
     assert client.get(url=JOBS_URL).json()["meta"]["total"] == 5
 
 
+def test_list_jobs_includes_effective_course(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """N4: the queue needs the course before it can show it in each card."""
+    store = JobStore(data_dir=tmp_path)
+    subject_only = store.create(config=JobConfig(subject="Fisica"))
+    with_meta = store.create(config=JobConfig(subject="Fisica"))
+    store.write_meta(job_id=str(with_meta.id), meta=LectureMeta(course="Diritto"))
+    no_course = store.create(config=JobConfig())
+
+    response = client.get(url=JOBS_URL)
+
+    assert response.status_code == 200
+    by_id = {item["id"]: item["course"] for item in response.json()["data"]}
+    assert by_id[str(subject_only.id)] == "Fisica"
+    assert by_id[str(with_meta.id)] == "Diritto"
+    assert by_id[str(no_course.id)] is None
+
+
+def test_get_job_includes_effective_course(client: TestClient, tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig(subject="Fisica"))
+
+    response = client.get(url=f"{JOBS_URL}/{record.id}")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["course"] == "Fisica"
+
+
 def test_cancel_job_done_returns_conflict(client: TestClient, tmp_path: Path) -> None:
     store = JobStore(data_dir=tmp_path)
     record = store.create(config=JobConfig())

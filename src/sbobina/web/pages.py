@@ -10,6 +10,7 @@ from sbobina.course_registry import find_by_key
 from sbobina.courses import MAX_COURSE_LABEL_LENGTH, course_key, effective_course
 from sbobina.document_models import CourseDocument
 from sbobina.model_catalog import ollama_options, whisper_options
+from sbobina.web.api_courses import course_labels
 from sbobina.web.document_store import read_document
 from sbobina.web.errors import NotFoundError
 from sbobina.web.job_models import JobRecord
@@ -92,6 +93,7 @@ def index(request: Request, store: JobStoreDep) -> HTMLResponse:
             is_ready=ollama["status"] == "ready",
         ),
         ollama_message=None if ollama["status"] == "ready" else ollama["message"],
+        course_labels=course_labels(store=store),
     )
 
 

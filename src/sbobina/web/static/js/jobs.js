@@ -49,6 +49,7 @@
 
   var jobsById = {};
   var jobOrder = [];
+  var queueTotal = 0;
   var progressById = {};
   var eventSources = {};
 
@@ -230,6 +231,8 @@
   }
 
   function syncOllamaModelDisabled() {
+    // N2: the model only matters once correction is on.
+    document.getElementById("ollama-field").hidden = !correctCheckbox.checked;
     ollamaModelSelect.disabled = !correctCheckbox.checked;
     ollamaModelOther.hidden = !isOtherOllamaModel();
     ollamaModelOther.disabled = !correctCheckbox.checked || !isOtherOllamaModel();
@@ -442,7 +445,15 @@
   }
 
   function renderJobRow(job) {
-    var created = new Date(job.created_at).toLocaleString("it-IT");
+    // N4 + L4: the course first, then a short date; the full one on hover.
+    var course = job.course || (job.config && job.config.subject) || "";
+    var created =
+      '<time datetime="' + escapeHtml(job.created_at) + '" title="' +
+      escapeHtml(window.SbobinaWhen.full(job.created_at)) + '">' +
+      window.SbobinaWhen.format(job.created_at) + "</time>";
+    if (course) {
+      created = escapeHtml(course) + " · " + created;
+    }
     return (
       '<article class="job-row" id="job-row-' + job.id + '" data-status="' + job.status + '">' +
       '<div class="job-row__head">' +
@@ -465,11 +476,25 @@
         "</p></div>";
       return;
     }
-    queueEl.innerHTML = jobOrder
-      .map(function (id) {
-        return renderJobRow(jobsById[id]);
+    // N3: active, actionable and the last few completed jobs; the rest is
+    // one link away in the history.
+    var visible = window.SbobinaQueueSelect.selectVisible(
+      jobOrder.map(function (id) {
+        return jobsById[id];
       })
-      .join("");
+    );
+    var hidden = Math.max(queueTotal, jobOrder.length) - visible.length;
+    queueEl.innerHTML =
+      visible
+        .map(function (id) {
+          return renderJobRow(jobsById[id]);
+        })
+        .join("") +
+      (hidden > 0
+        ? '<p class="queue__more">' +
+          (hidden === 1 ? "1 trascrizione non mostrata. " : hidden + " trascrizioni non mostrate. ") +
+          '<a class="table__link" href="/storico">Tutte nello storico</a></p>'
+        : "");
   }
 
   function attachRowHandlers() {
@@ -525,6 +550,7 @@
   }
 
   function addJob(job) {
+    queueTotal += 1;
     jobsById[job.id] = job;
     jobOrder.unshift(job.id);
     renderAndBind();
@@ -574,6 +600,7 @@
       .then(function (body) {
         jobOrder = [];
         jobsById = {};
+        queueTotal = body.meta ? body.meta.total : body.data.length;
         body.data.forEach(function (job) {
           jobsById[job.id] = job;
           jobOrder.push(job.id);

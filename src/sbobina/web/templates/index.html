@@ -43,10 +43,11 @@
 
     <div class="checkbox-field">
       <input id="correct" type="checkbox" name="correct" />
-      <label for="correct">Correggi con Ollama dopo la trascrizione</label>
+      <label for="correct">Correggi gli errori con l'AI locale</label>
     </div>
+    <p class="field__helper checkbox-field__helper">Aggiunge una fase dopo la trascrizione: la durata stimata compare sotto il modello.</p>
 
-    <div class="field">
+    <div class="field" id="ollama-field" hidden>
       <label class="field__label" for="ollama_model">Modello Ollama</label>
       <select
         id="ollama_model"
@@ -74,20 +75,26 @@
       {% if ollama_message %}
       <p class="field__helper">{{ ollama_message }}</p>
       {% endif %}
-      <p class="field__helper">Usato solo se la correzione è attiva.</p>
       <p id="ollama_model-error" class="field__error" hidden></p>
     </div>
 
     <div class="field">
-      <label class="field__label" for="subject">Materia</label>
+      <label class="field__label" for="subject">Corso</label>
       <input
         id="subject"
         class="text-input"
         type="text"
         name="subject"
         maxlength="100"
-        placeholder="Es. Analisi matematica"
+        list="subject-courses"
+        autocomplete="off"
+        placeholder="Scrivi o scegli un corso"
       />
+      <datalist id="subject-courses">
+        {% for label in course_labels %}
+        <option value="{{ label }}">
+        {% endfor %}
+      </datalist>
       <p id="subject-error" class="field__error" hidden></p>
     </div>
 
@@ -184,13 +191,14 @@
 </section>
 
 <section class="queue-section" aria-labelledby="queue-heading">
-  <h2 id="queue-heading" class="section-title">Coda</h2>
+  <h2 id="queue-heading" class="section-title">In corso e recenti</h2>
   <div id="queue" class="queue" aria-live="polite"></div>
 </section>
 </div>
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/queue-select.js" defer></script>
 <script src="/static/js/jobs.js" defer></script>
 <script src="/static/js/engine-form.js" defer></script>
 {% endblock %}

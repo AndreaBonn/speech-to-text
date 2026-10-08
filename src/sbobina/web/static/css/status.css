@@ -162,3 +162,10 @@
   font-size: var(--text-sm);
   color: var(--color-ink-3);
 }
+
+/* N3: what the short queue leaves out, one link away. */
+.queue__more {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}

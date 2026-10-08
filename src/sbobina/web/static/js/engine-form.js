@@ -17,7 +17,7 @@
     }
     var correctLabel = document.querySelector('label[for="correct"]');
     if (correctLabel) {
-      correctLabel.textContent = "Correggi con i modelli API dopo la trascrizione";
+      correctLabel.textContent = "Correggi gli errori con i modelli API";
     }
     var select = document.getElementById("ollama_model");
     var field = select ? select.closest(".field") : null;

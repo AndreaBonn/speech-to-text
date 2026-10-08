@@ -249,3 +249,12 @@
   accent-color: var(--color-accent);
 }
 
+
+/* N2: the AI model field stays out of the way until correction is on. */
+.field[hidden] {
+  display: none;
+}
+
+.checkbox-field__helper {
+  margin: calc(-1 * var(--space-xs)) 0 var(--space-md);
+}

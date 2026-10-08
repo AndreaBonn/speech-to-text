@@ -11,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError as PydanticValidationError
 from starlette.responses import Response
 
+from sbobina.courses import effective_course
 from sbobina.settings import Settings
 from sbobina.web.errors import AppError, ConflictError
 from sbobina.web.job_models import JobConfig, JobRecord, JobStatus, StudyStatus
@@ -156,7 +157,15 @@ async def create_job(
     record = await _save_upload(
         file=file, config=config, services=services, extension=extension
     )
-    return {"data": record.model_dump(mode="json")}
+    return {"data": _job_dict(record=record, store=services.store)}
+
+
+def _job_dict(record: JobRecord, store: JobStore) -> dict[str, Any]:
+    """Job data plus the effective course (N4): meta.json's course, or subject."""
+    data = record.model_dump(mode="json")
+    meta = store.read_meta(job_id=str(record.id))
+    data["course"] = effective_course(course=meta.course, subject=record.config.subject)
+    return data
 
 
 @router.get("")
@@ -169,7 +178,9 @@ def list_jobs(
     """Return jobs ordered by creation time with pagination metadata."""
     result = services.store.list(page=page, per_page=per_page, course_key=course)
     return {
-        "data": [record.model_dump(mode="json") for record in result.items],
+        "data": [
+            _job_dict(record=record, store=services.store) for record in result.items
+        ],
         "meta": {
             "page": result.page,
             "per_page": result.per_page,
@@ -182,7 +193,8 @@ def list_jobs(
 @router.get("/{job_id}")
 def get_job(job_id: str, services: Services) -> dict[str, Any]:
     """Return one job or raise NotFoundError."""
-    return {"data": services.store.get(job_id=job_id).model_dump(mode="json")}
+    record = services.store.get(job_id=job_id)
+    return {"data": _job_dict(record=record, store=services.store)}
 
 
 @router.post("/{job_id}/cancel")

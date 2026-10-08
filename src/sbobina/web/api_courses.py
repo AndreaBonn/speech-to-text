@@ -70,6 +70,11 @@ def _collect_courses(store: JobStore) -> list[CourseSummary]:
     )
 
 
+def course_labels(store: JobStore) -> list[str]:
+    """Labels of every known course, for the suggestions of a course field."""
+    return [course.label for course in _collect_courses(store=store)]
+
+
 def course_label(store: JobStore, key: str) -> str | None:
     """Label the lectures and registry already give the course with this key."""
     return next(
