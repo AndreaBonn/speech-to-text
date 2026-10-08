@@ -8,6 +8,7 @@ from threading import Event
 import pytest
 from test_supervisor import Harness, harness, wait_for
 
+from sbobina.settings import TranscriptionEngine
 from sbobina.user_preferences import (
     UserPreferences,
     preferences_path,
@@ -186,13 +187,18 @@ def test_cancel_during_lease_wait_does_not_deadlock(harness: Harness) -> None:
     harness.supervisor.stop()
 
 
-def test_assemblyai_transcription_leaves_the_gpu_to_chat(harness: Harness) -> None:
+@pytest.mark.parametrize(
+    ("engine", "writer_active"), [("assemblyai", False), ("whisper", True)]
+)
+def test_execute_pipeline_action_engine_controls_gpu_writer(
+    harness: Harness, engine: TranscriptionEngine, writer_active: bool
+) -> None:
     config_dir = Path(os.environ["XDG_CONFIG_HOME"]) / "sbobina"
     config_dir.mkdir(parents=True, exist_ok=True)
     save_preferences(
         path=preferences_path(config_dir),
         preferences=UserPreferences(
-            transcription_engine="assemblyai", cloud_ack_audio=datetime.now(tz=UTC)
+            transcription_engine=engine, cloud_ack_audio=datetime.now(tz=UTC)
         ),
     )
     job_id = harness.create(hold=True)
@@ -201,8 +207,11 @@ def test_assemblyai_transcription_leaves_the_gpu_to_chat(harness: Harness) -> No
     harness.supervisor.submit(job_id=job_id)
     wait_for(predicate=harness.marker(job_id=job_id, name="transcribe.started").exists)
 
-    with arbiter.chat_turn():
-        pass  # no lease: chat runs while the audio is transcribed remotely
+    with arbiter._condition:
+        assert arbiter._writer_active is writer_active
+    if engine == "assemblyai":
+        with arbiter.chat_turn():
+            assert _reader_count(arbiter=arbiter) == 1
 
     harness.marker(job_id=job_id, name="hold").unlink()
     wait_for(predicate=lambda: harness.finished(job_id=job_id))

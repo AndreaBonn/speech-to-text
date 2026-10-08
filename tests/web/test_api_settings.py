@@ -74,11 +74,17 @@ def test_put_llm_back_to_local_keeps_consent_and_clears_warnings(
     client: TestClient,
 ) -> None:
     _put_api_engine(client=client, chain=API_CHAIN)
+    before = client.get(SETTINGS_URL).json()["data"]
+    consent = before["preferences"]["cloud_ack"]
+    assert isinstance(consent, str)
+    assert before["warnings"]["missing_keys"] == ["groq"]
 
     response = client.put(f"{SETTINGS_URL}/llm", json={"llm_engine": "local"})
 
+    assert response.status_code == 200
     data = response.json()["data"]
     assert data["preferences"]["llm_engine"] == "local"
+    assert data["preferences"]["cloud_ack"] == consent
     assert data["warnings"]["missing_keys"] == []
 
 
@@ -191,7 +197,14 @@ def test_no_get_route_ever_returns_a_saved_key(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(ollama_embed, "Client", lambda **kwargs: FakeClient())
-    client.put(f"{SETTINGS_URL}/keys/groq", json={"key": SENTINEL_KEY})
+    saved = client.put(f"{SETTINGS_URL}/keys/groq", json={"key": SENTINEL_KEY})
+    assert saved.status_code == 200
+    assert saved.json()["data"] == {
+        "provider": "groq",
+        "configured": True,
+        "last4": "cdef",
+        "source": "file",
+    }
     spec = cast(FastAPI, client.app).openapi()
     paths = [
         path

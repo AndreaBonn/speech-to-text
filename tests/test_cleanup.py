@@ -57,9 +57,10 @@ def test_keeps_longer_sentence_containing_grazie_next_to_pause() -> None:
         ]
     )
 
-    _, removed = remove_silence_fillers(transcript)
+    cleaned, removed = remove_silence_fillers(transcript)
 
     assert removed == []
+    assert cleaned == transcript
 
 
 def test_grazie_with_pause_exactly_at_threshold_is_removed() -> None:
@@ -85,6 +86,7 @@ def test_grazie_with_pause_just_below_threshold_is_kept() -> None:
         ]
     )
 
-    _, removed = remove_silence_fillers(transcript)
+    cleaned, removed = remove_silence_fillers(transcript)
 
     assert removed == []
+    assert cleaned == transcript

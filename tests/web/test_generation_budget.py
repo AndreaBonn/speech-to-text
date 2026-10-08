@@ -3,7 +3,6 @@ import pytest
 from sbobina.generation_models import MAX_QUESTION_COUNT, GenerationFormat
 from sbobina.web.generation_runner import (
     BUDGET_MIN_WORDS,
-    NUM_PREDICT_MIN,
     SUMMARY_NUM_PREDICT,
     compute_budget_words,
     compute_options,
@@ -16,8 +15,8 @@ def test_compute_options_scales_num_predict_with_count() -> None:
         count=MAX_QUESTION_COUNT, format_=GenerationFormat.MULTIPLE_CHOICE, model="m"
     )
 
-    assert many.num_predict > few.num_predict
-    assert few.num_predict >= NUM_PREDICT_MIN
+    assert few.num_predict == 516
+    assert many.num_predict == 2856
 
 
 def test_compute_options_summary_num_predict_is_fixed_regardless_of_count() -> None:

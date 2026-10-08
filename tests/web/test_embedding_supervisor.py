@@ -156,25 +156,56 @@ def test_cancel_queued_removes_item_and_allows_resubmit(
     assert len(harness.supervisor._queue) == 1
 
 
-def test_submit_unknown_course_and_cancel_without_run(
+def test_submit_embed_unknown_course_raises_not_found(
     embedding_harness: EmbeddingHarness,
 ) -> None:
-    supervisor = embedding_harness.supervisor
+    harness = embedding_harness
+
     with pytest.raises(NotFoundError):
-        course_actions.submit_embed(supervisor=supervisor, course_key="missing")
+        course_actions.submit_embed(supervisor=harness.supervisor, course_key="missing")
+
+    course_actions.submit_embed(supervisor=harness.supervisor, course_key="diritto")
+    assert harness.record().status is EmbeddingStatus.QUEUED
+    assert len(harness.supervisor._queue) == 1
+
+
+def test_cancel_embed_without_run_raises_not_cancellable(
+    embedding_harness: EmbeddingHarness,
+) -> None:
+    harness = embedding_harness
+
     with pytest.raises(JobNotCancellableError):
-        course_actions.cancel_embed(supervisor=supervisor, course_key="diritto")
+        course_actions.cancel_embed(supervisor=harness.supervisor, course_key="diritto")
+
+    course_actions.submit_embed(supervisor=harness.supervisor, course_key="diritto")
+    course_actions.cancel_embed(supervisor=harness.supervisor, course_key="diritto")
+    assert harness.record().status is EmbeddingStatus.CANCELLED
 
 
-def test_claim_only_once_and_recover_running_as_cancelled(
+def test_claim_embed_item_second_claim_is_rejected(
     embedding_harness: EmbeddingHarness,
 ) -> None:
     harness = embedding_harness
     course_actions.submit_embed(supervisor=harness.supervisor, course_key="diritto")
     item = harness.supervisor._queue[0]
-    assert embedding_supervisor.claim_embed_item(store=harness.store, item=item)
-    assert not embedding_supervisor.claim_embed_item(store=harness.store, item=item)
+    assert embedding_supervisor.claim_embed_item(store=harness.store, item=item) is True
+    assert (
+        embedding_supervisor.claim_embed_item(store=harness.store, item=item) is False
+    )
+
+
+def test_recover_on_boot_running_embed_is_cancelled(
+    embedding_harness: EmbeddingHarness,
+) -> None:
+    harness = embedding_harness
+    record = create_embed(course_dir=harness.course_dir)
+    save_embed(
+        course_dir=harness.course_dir,
+        record=replace(record, status=EmbeddingStatus.RUNNING),
+    )
+
     harness.supervisor.recover_on_boot()
+
     assert harness.record().status is EmbeddingStatus.CANCELLED
     assert list(harness.supervisor._queue) == []
 

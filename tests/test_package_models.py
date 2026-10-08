@@ -69,6 +69,13 @@ def test_manifest_round_trip_preserves_inventory_and_options() -> None:
     assert (
         Manifest.model_validate_json(json_data=manifest.model_dump_json()) == manifest
     )
+
+
+def test_export_options_default_excludes_no_documents() -> None:
+    assert ExportOptions(
+        excluded_document_ids=frozenset({"doc"})
+    ).excluded_document_ids == frozenset({"doc"})
+
     assert ExportOptions().excluded_document_ids == frozenset()
 
 

@@ -111,6 +111,8 @@ def test_render_exam_docx_never_leaks_solution_or_correct_option() -> None:
     document = _open(render_exam_docx(_record(questions=(question,))))
 
     full_text = "\n".join(p.text for p in document.paragraphs)
+    assert "1. Domanda riservata?" in full_text
+    assert "c) Opzione C" in full_text
     assert question.solution not in full_text
     assert "testo segreto" not in full_text
     assert "Risposta corretta" not in full_text
@@ -125,6 +127,7 @@ def test_render_exam_docx_open_question_has_no_lettered_options() -> None:
     )
 
     texts = [p.text for p in document.paragraphs]
+    assert "1. Spiega il principio." in texts
     assert not any(t.startswith("a) ") for t in texts)
 
 

@@ -94,23 +94,48 @@ def test_status_unavailability_is_data(
     assert data["dimensions"] is None and data["courses"][0]["coverage"] is None
 
 
-def test_post_course_queues_live_and_rejects_duplicate_or_missing(
+def test_post_course_index_available_course_returns_queued_run(
     semantic_harness: SemanticHarness,
 ) -> None:
     h = semantic_harness
     course = write_course(store=h.store)
     url = f"/api/v1/courses/{course.key}/semantic-index"
-    assert h.client.post(url).status_code == 202
-    assert [(item.action, item.course_id) for item in h.supervisor._queue] == [
-        ("embed", course.id)
-    ]
+
+    response = h.client.post(url=url)
+
+    assert response.status_code == 202
+    assert response.json()["data"]["status"] == "queued"
+    status = h.client.get(url=STATUS_URL)
+    assert status.status_code == 200
+    courses = status.json()["data"]["courses"]
+    assert [item["key"] for item in courses] == [course.key]
+    assert courses[0]["queued_action"] == "embed"
+    assert courses[0]["run"] == response.json()["data"]
+
+
+def test_post_course_index_duplicate_returns_conflict(
+    semantic_harness: SemanticHarness,
+) -> None:
+    h = semantic_harness
+    course = write_course(store=h.store)
+    url = f"/api/v1/courses/{course.key}/semantic-index"
+    accepted = h.client.post(url=url)
+    assert accepted.status_code == 202
+    assert accepted.json()["data"]["status"] == "queued"
+
     duplicate = h.client.post(url)
-    assert (
-        duplicate.status_code == 409
-        and duplicate.json()["error"]["code"] == "EMBED_ALREADY_QUEUED"
-    )
-    missing = h.client.post("/api/v1/courses/absent/semantic-index")
-    assert missing.status_code == 404 and missing.json()["error"]["code"] == "NOT_FOUND"
+
+    assert duplicate.status_code == 409
+    assert duplicate.json()["error"]["code"] == "EMBED_ALREADY_QUEUED"
+
+
+def test_post_course_index_missing_course_returns_not_found(
+    semantic_harness: SemanticHarness,
+) -> None:
+    response = semantic_harness.client.post(url="/api/v1/courses/absent/semantic-index")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
 @pytest.mark.parametrize(

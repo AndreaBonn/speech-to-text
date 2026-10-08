@@ -171,11 +171,20 @@ def test_practice_attempt_invalid_uuid_rejected(field: str, value: str) -> None:
         )
 
 
-def test_open_answer_invalid_id_and_question_index_rejected() -> None:
+def test_open_answer_invalid_id_rejected() -> None:
+    answer = OpenAnswer(answer_id=str(uuid4()), question_index=0, text="Answer")
+    assert answer.question_index == 0
+
     with pytest.raises(ValueError, match="UUID4"):
-        OpenAnswer(answer_id="bad", question_index=0, text="Answer")
+        replace(answer, answer_id="bad")
+
+
+def test_open_answer_negative_question_index_rejected() -> None:
+    answer = OpenAnswer(answer_id=str(uuid4()), question_index=0, text="Answer")
+    assert answer.question_index == 0
+
     with pytest.raises(ValueError, match="question_index"):
-        OpenAnswer(answer_id=str(uuid4()), question_index=-1, text="Answer")
+        replace(answer, question_index=-1)
 
 
 @pytest.mark.parametrize("field", ("created_at", "updated_at"))
@@ -224,14 +233,30 @@ def test_practice_attempt_question_index_out_of_range_rejected() -> None:
         replace(make_attempt(), answers=(answer,))
 
 
-def test_practice_attempt_summary_and_mismatched_options_rejected() -> None:
-    attempt = make_attempt()
+def test_practice_attempt_summary_format_rejected() -> None:
+    attempt = make_attempt(format=GenerationFormat.OPEN)
+    assert attempt.format == GenerationFormat.OPEN
+
     with pytest.raises(ValueError, match="summary"):
         replace(attempt, format=GenerationFormat.SUMMARY)
+
+
+@pytest.mark.parametrize(
+    ("attempt_format", "question_format"),
+    [
+        (GenerationFormat.OPEN, GenerationFormat.MULTIPLE_CHOICE),
+        (GenerationFormat.MULTIPLE_CHOICE, GenerationFormat.OPEN),
+    ],
+)
+def test_practice_attempt_mismatched_question_options_rejected(
+    attempt_format: GenerationFormat, question_format: GenerationFormat
+) -> None:
+    attempt = make_attempt(format=attempt_format)
+    assert attempt.format == attempt_format
+    questions = make_attempt(format=question_format).questions
+
     with pytest.raises(ValueError, match="options"):
-        replace(attempt, format=GenerationFormat.OPEN)
-    with pytest.raises(ValueError, match="options"):
-        replace(attempt, questions=make_attempt(format=GenerationFormat.OPEN).questions)
+        replace(attempt, questions=questions)
 
 
 def test_open_answer_forged_discriminator_rejected() -> None:
@@ -242,15 +267,31 @@ def test_open_answer_forged_discriminator_rejected() -> None:
     assert answer.kind == "open"
 
 
-def test_practice_attempt_invalid_enum_values_rejected() -> None:
-    invalid: Any = "invalid"
+def test_open_answer_invalid_status_rejected() -> None:
     answer = OpenAnswer(answer_id=str(uuid4()), question_index=0, text="Answer")
+    assert answer.status == AnswerStatus.UNGRADED
+    invalid: Any = "invalid"
+
     with pytest.raises(ValueError, match="AnswerStatus"):
         replace(answer, status=invalid)
+
+
+def test_practice_attempt_invalid_status_rejected() -> None:
+    attempt = make_attempt()
+    assert attempt.status == PracticeStatus.IN_PROGRESS
+    invalid: Any = "invalid"
+
     with pytest.raises(ValueError, match="PracticeStatus"):
-        replace(make_attempt(), status=invalid)
+        replace(attempt, status=invalid)
+
+
+def test_practice_attempt_invalid_format_rejected() -> None:
+    attempt = make_attempt()
+    assert attempt.format == GenerationFormat.MULTIPLE_CHOICE
+    invalid: Any = "invalid"
+
     with pytest.raises(ValueError, match="GenerationFormat"):
-        replace(make_attempt(), format=invalid)
+        replace(attempt, format=invalid)
 
 
 def test_multiple_choice_answer_forged_discriminator_rejected() -> None:

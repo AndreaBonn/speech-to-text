@@ -9,6 +9,7 @@ import pytest
 
 from sbobina.embedding_prompts import EMBEDDING_PROMPT_VERSION
 from sbobina.embedding_units import content_hash
+from sbobina.web.search_index import open_index
 from sbobina.web.vector_store import Coverage, StoredVector, VectorStore
 
 DIMENSIONS = 4096
@@ -221,15 +222,18 @@ def test_vector_store_reader_writer_threads_complete_200_operations(
     )
 
 
-def test_vector_store_search_database_deletion_keeps_vectors(tmp_path: Path) -> None:
+def test_vector_store_search_index_rebuild_keeps_vectors(tmp_path: Path) -> None:
     path = tmp_path / "vectors.sqlite3"
-    store = VectorStore(path=path)
-    store.put_vectors(model_key=MODEL, vectors=[VECTOR])
+    VectorStore(path=path).put_vectors(model_key=MODEL, vectors=[VECTOR])
     search_path = tmp_path / "search.sqlite3"
-    with closing(sqlite3.connect(database=search_path)) as connection:
-        connection.execute("CREATE TABLE passages (id INTEGER PRIMARY KEY)")
-    search_path.unlink()
-    assert path.exists()
+    search_path.write_bytes(bytes(range(256)) * 16)
+
+    with closing(open_index(path=search_path)) as index:
+        rebuilt_total = index.search(
+            match='"causa"', job_ids=None, limit=1, offset=0
+        ).total
+
+    assert rebuilt_total == 0
     assert VectorStore(path=path).vectors_for_units(
         model_key=MODEL, units={"a": HASH}
     ) == {"a": VECTOR}

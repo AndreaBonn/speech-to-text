@@ -67,9 +67,40 @@ def test_list_course_filter_counts_matches_before_pagination(tmp_path: Path) -> 
     assert (first.items, second.items) == ([records[1]], [records[0]])
     assert (first.total, first.total_pages, first.page, first.per_page) == (2, 2, 1, 1)
     assert second.total == 2
-    assert store.list(course_key="").items == [records[3]]
-    assert store.list(course_key="inesistente").total == 0
-    assert store.list().total == 5
+
+
+def test_list_empty_course_key_selects_unassigned_jobs(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    unassigned = store.create(config=JobConfig())
+    store.create(config=JobConfig(subject="Fisica"))
+
+    result = store.list(course_key="")
+
+    assert result.items == [unassigned]
+    assert result.total == 1
+
+
+def test_list_unknown_course_key_excludes_existing_jobs(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    job = store.create(config=JobConfig(subject="Fisica"))
+
+    result = store.list(course_key="inesistente")
+
+    assert (result.items, result.total) == ([], 0)
+    assert store.list(course_key="fisica").items == [job]
+
+
+def test_list_without_course_filter_includes_all_courses(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    jobs = [
+        store.create(config=JobConfig(subject=subject))
+        for subject in [None, "Fisica", "Diritto"]
+    ]
+
+    result = store.list()
+
+    assert result.items == list(reversed(jobs))
+    assert result.total == 3
 
 
 def test_write_meta_round_trip_preserves_job_and_null_restores_fallback(

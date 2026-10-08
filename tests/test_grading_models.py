@@ -1,4 +1,3 @@
-import json
 from dataclasses import FrozenInstanceError
 from typing import Any
 
@@ -32,28 +31,27 @@ def proposed(
     )
 
 
-def test_proposed_ignores_model_outcome_and_schema_excludes_it() -> None:
+def test_proposed_judgement_model_outcome_is_ignored() -> None:
     raw = {
         "punti_coperti": [],
         "punti_mancanti": list(POINTS),
         "errori": [],
         "esito": "corretta",
     }
-    assert json.loads(json.dumps(raw))["esito"] == "corretta"
-    response = ProposedJudgement.model_validate(raw)
-    judgement, _ = validate_judgement(
-        proposed=response,
-        solution=SOLUTION,
-        answer=ANSWER,
-        format=GenerationFormat.ORAL,
-    )
-    assert (judgement.outcome, judgement.score) == ("errata", 0)
-    assert set(response.model_dump(by_alias=True)) == {
-        "punti_coperti",
-        "punti_mancanti",
-        "errori",
+
+    response = ProposedJudgement.model_validate(obj=raw)
+
+    assert response.model_dump(by_alias=True) == {
+        "punti_coperti": [],
+        "punti_mancanti": list(POINTS),
+        "errori": [],
     }
-    assert set(ProposedJudgement.model_json_schema()["properties"]) == {
+
+
+def test_proposed_judgement_schema_contains_only_evidence_fields() -> None:
+    schema = ProposedJudgement.model_json_schema()
+
+    assert set(schema["properties"]) == {
         "punti_coperti",
         "punti_mancanti",
         "errori",

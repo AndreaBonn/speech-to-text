@@ -145,6 +145,12 @@ def test_get_keys_on_a_corrupted_file_warns_and_returns_empty_without_rewriting(
 
     assert keys == {}
     assert store.path.read_text(encoding="utf-8") == "{not json"
+    assert any(
+        record.name == "sbobina.credential_store"
+        and record.levelno == logging.WARNING
+        and "illeggibile" in record.getMessage()
+        for record in caplog.records
+    )
 
 
 def test_set_key_an_interrupted_write_leaves_the_previous_file_intact(
@@ -176,10 +182,12 @@ def test_set_key_refuses_to_write_through_a_symlink(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         store.set_key(provider="groq", key=SENTINEL)
 
+    assert real_target.read_text(encoding="utf-8") == "{}"
 
-def test_secret_providers_constant_covers_all_four_llm_providers_and_assemblyai() -> (
-    None
-):
+
+def test_secret_providers_are_the_documented_cloud_providers() -> None:
+    # CLAUDE.md: text to Groq/Gemini/OpenAI/Anthropic, audio to AssemblyAI.
+    # A provider added here must also get a consent path and a key check.
     assert set(SECRET_PROVIDERS) == {
         "groq",
         "gemini",
@@ -187,6 +195,19 @@ def test_secret_providers_constant_covers_all_four_llm_providers_and_assemblyai(
         "anthropic",
         "assemblyai",
     }
+
+
+@pytest.mark.parametrize(
+    "provider", ["groq", "gemini", "openai", "anthropic", "assemblyai"]
+)
+def test_set_key_supported_provider_persists_across_store_instances(
+    tmp_path: Path, provider: str
+) -> None:
+    store = CredentialStore(config_dir=tmp_path)
+
+    store.set_key(provider=provider, key=SENTINEL)
+
+    assert CredentialStore(config_dir=tmp_path).get_keys() == {provider: SENTINEL}
 
 
 def test_get_keys_symlinked_file_is_ignored_and_target_mode_untouched(

@@ -9,7 +9,7 @@ from sbobina.correction import CorrectorUnavailableError
 from sbobina.generation_models import GenerationFormat
 from sbobina.grading_models import Judgement, JudgementOutcome
 from sbobina.ollama_chat import ChatRequest
-from sbobina.practice_models import AnswerStatus, OpenAnswer
+from sbobina.practice_models import AnswerStatus, MultipleChoiceAnswer, OpenAnswer
 from sbobina.settings import Settings
 from sbobina.web.errors import ValidationError
 from sbobina.web.gpu_lock import GpuArbiter
@@ -21,7 +21,9 @@ from sbobina.web.practice_grading import PracticeServices, grade_answer
 @pytest.mark.parametrize("choice", [-1, 4, True], ids=["negative", "past-end", "bool"])
 def test_apply_choice_outside_the_four_options_is_rejected(choice: Any) -> None:
     attempt = make_attempt()
-    assert apply_choice(attempt=attempt, question_index=0, choice=3).answers
+    accepted = apply_choice(attempt=attempt, question_index=0, choice=3)
+    assert isinstance(accepted.answers[0], MultipleChoiceAnswer)
+    assert accepted.answers[0].chosen_index == 3
     with pytest.raises(ValidationError, match="quattro opzioni"):
         apply_choice(attempt=attempt, question_index=0, choice=choice)
 

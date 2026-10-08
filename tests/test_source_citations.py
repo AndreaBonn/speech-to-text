@@ -132,16 +132,20 @@ def test_resolve_rejects_a_long_quote_that_is_not_in_the_passage() -> None:
     assert result == SourceRejection(reason=SourceRejectionReason.QUOTE_NOT_FOUND)
 
 
-def test_resolve_accepts_quote_at_three_word_boundary() -> None:
+def test_resolve_citation_three_word_quote_resolves_passage() -> None:
     passages = [_doc_passage()]
     citation = ProposedSourceCitation(label="P1", quote="la causa del")
 
     result = resolve_citation(passages=passages, citation=citation)
 
-    assert isinstance(result, SourceCitation)
+    assert result == SourceCitation(
+        passage_id="manuale:p214:c0",
+        quote="la causa del",
+        location=DocumentCitation(doc_id="manuale", page=214),
+    )
 
 
-def test_resolve_accepts_quote_at_forty_word_boundary() -> None:
+def test_resolve_citation_forty_word_quote_resolves_passage() -> None:
     text = " ".join(["causa"] * 40)
     passages = [
         RetrievedPassage(
@@ -154,16 +158,24 @@ def test_resolve_accepts_quote_at_forty_word_boundary() -> None:
 
     result = resolve_citation(passages=passages, citation=citation)
 
-    assert isinstance(result, SourceCitation)
+    assert result == SourceCitation(
+        passage_id="manuale:p1:c0",
+        quote=text,
+        location=DocumentCitation(doc_id="manuale", page=1),
+    )
 
 
-def test_resolve_normalizes_case_and_punctuation_like_study_citations() -> None:
+def test_resolve_citation_normalized_match_preserves_original_quote() -> None:
     passages = [_doc_passage()]
     citation = ProposedSourceCitation(label="P1", quote="LA CAUSA, del Contratto!")
 
     result = resolve_citation(passages=passages, citation=citation)
 
-    assert isinstance(result, SourceCitation)
+    assert result == SourceCitation(
+        passage_id="manuale:p214:c0",
+        quote="LA CAUSA, del Contratto!",
+        location=DocumentCitation(doc_id="manuale", page=214),
+    )
 
 
 def test_resolve_does_not_match_quote_split_across_non_contiguous_words() -> None:

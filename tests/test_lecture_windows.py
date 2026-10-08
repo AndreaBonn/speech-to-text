@@ -51,10 +51,13 @@ def test_expand_window_keeps_citation_anchored_to_matched_segment() -> None:
     assert windows[0].passage_id == hit.passage_id
 
 
-def test_expand_window_merges_two_nearby_segments_into_one() -> None:
+def test_expand_lecture_windows_nearby_hits_merge_with_first_anchor() -> None:
     # Transcript too short (150 words) to ever reach the 250-word target: both
     # hits grow to the full transcript and must collapse to one window.
-    segments = _segments(count=15, words_per_segment=10)
+    segments = [
+        Passage(segment_index=i, start=float(i), text=" ".join([f"word{i}"] * 10))
+        for i in range(15)
+    ]
     hits = [
         _lecture_hit(job_id="job-1", segment_index=5, text=segments[5].text),
         _lecture_hit(job_id="job-1", segment_index=7, text=segments[7].text),
@@ -65,6 +68,9 @@ def test_expand_window_merges_two_nearby_segments_into_one() -> None:
     )
 
     assert len(windows) == 1
+    assert windows[0].text == " ".join(segment.text for segment in segments)
+    assert windows[0].passage_id == "Ljob-1-S5"
+    assert len(windows[0].text.split()) == 150
 
 
 def test_expand_window_truncates_at_transcript_start_without_error() -> None:

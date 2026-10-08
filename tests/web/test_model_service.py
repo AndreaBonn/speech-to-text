@@ -88,9 +88,28 @@ def test_whisper_models_propagate_unexpected_cache_error() -> None:
         model_service.list_whisper_models(settings=Settings())
 
 
-def test_whisper_models_empty_catalog() -> None:
+def test_whisper_models_empty_catalog(tmp_path: Path) -> None:
+    (tmp_path / "model.bin").write_bytes(b"weights")
     with patch.object(model_service, "available_models", return_value=[]):
         assert model_service.list_whisper_models(settings=Settings()) == []
+    with (
+        patch.object(model_service, "available_models", return_value=["tiny"]),
+        patch.object(model_service, "download_model", return_value=str(tmp_path)),
+    ):
+        models = model_service.list_whisper_models(
+            settings=Settings(whisper_model_gpu="tiny", whisper_model_cpu="tiny")
+        )
+    assert models == [
+        {
+            "name": "tiny",
+            "repo_id": "Systran/faster-whisper-tiny",
+            "aliases": [],
+            "downloaded": True,
+            "size_bytes": 7,
+            "recommended_gpu": True,
+            "recommended_cpu": True,
+        }
+    ]
 
 
 @pytest.mark.parametrize("platform", ["linux", "win32", "darwin"])

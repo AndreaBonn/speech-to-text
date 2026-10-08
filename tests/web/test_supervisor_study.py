@@ -175,13 +175,24 @@ def test_study_unavailable_preserves_material_and_continues_queue(
     assert material.read_text() == "previous material"
 
 
-def test_work_item_is_typed_and_frozen() -> None:
+def test_work_item_valid_action_preserves_fields() -> None:
     item = WorkItem(job_id="job", action="study")
-    assert item.action == "study" and item.job_id == "job"
-    with pytest.raises(ValueError):
-        WorkItem.model_validate({"job_id": "job", "action": "other"})
-    with pytest.raises(ValueError):
+
+    assert item.model_dump() == {"job_id": "job", "action": "study", "course_id": None}
+
+
+def test_work_item_invalid_action_raises_validation_error() -> None:
+    with pytest.raises(ValueError, match="literal_error"):
+        WorkItem.model_validate(obj={"job_id": "job", "action": "other"})
+
+
+def test_work_item_action_assignment_raises_frozen_error() -> None:
+    item = WorkItem(job_id="job", action="study")
+
+    with pytest.raises(ValueError, match="frozen_instance"):
         item.action = "pipeline"
+
+    assert item.action == "study"
 
 
 def test_cancel_running_study_then_resubmit_is_not_overwritten(

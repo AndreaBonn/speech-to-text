@@ -70,11 +70,20 @@ def test_add_attempt_done_persists_and_hides_solutions(
     assert attempt.questions == generation.questions
 
 
-@pytest.mark.parametrize("status", tuple(GenerationStatus))
-def test_add_attempt_unready_or_summary_returns_expected_error(
+@pytest.mark.parametrize(
+    ("status", "format"),
+    [
+        (GenerationStatus.QUEUED, GenerationFormat.MULTIPLE_CHOICE),
+        (GenerationStatus.RUNNING, GenerationFormat.MULTIPLE_CHOICE),
+        (GenerationStatus.INTERRUPTED, GenerationFormat.MULTIPLE_CHOICE),
+        (GenerationStatus.DONE, GenerationFormat.SUMMARY),
+    ],
+)
+def test_add_attempt_unready_or_summary_returns_validation_error(
     client: TestClient,
     tmp_path: Path,
     status: GenerationStatus,
+    format: GenerationFormat,
 ) -> None:
     course_id = _register_course(tmp_path=tmp_path)
     courses_dir = _store(tmp_path=tmp_path).courses_dir
@@ -83,17 +92,29 @@ def test_add_attempt_unready_or_summary_returns_expected_error(
         generation,
         status=status,
         questions=(),
-        format=GenerationFormat.SUMMARY
-        if status == GenerationStatus.DONE
-        else generation.format,
-        error="Failure" if status == GenerationStatus.FAILED else None,
+        format=format,
     )
     save_generation(courses_dir=courses_dir, course_id=course_id, record=record)
     response = client.post(url=make_url(generation=record))
-    assert response.status_code == (409 if status == GenerationStatus.FAILED else 422)
-    assert response.json()["error"]["code"] == (
-        "GENERATION_FAILED" if status == GenerationStatus.FAILED else "VALIDATION_ERROR"
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_add_attempt_failed_generation_returns_conflict(
+    client: TestClient, tmp_path: Path
+) -> None:
+    course_id = _register_course(tmp_path=tmp_path)
+    courses_dir = _store(tmp_path=tmp_path).courses_dir
+    generation = make_generation(courses_dir=courses_dir, course_id=course_id)
+    record = replace(
+        generation, status=GenerationStatus.FAILED, questions=(), error="Failure"
     )
+    save_generation(courses_dir=courses_dir, course_id=course_id, record=record)
+
+    response = client.post(url=make_url(generation=record))
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "GENERATION_FAILED"
 
 
 def test_get_attempt_deleted_generation_still_readable_and_hidden(
@@ -118,10 +139,9 @@ def test_get_attempt_deleted_generation_still_readable_and_hidden(
     )
 
 
-def test_get_attempt_only_answered_question_reveals_solution(
-    client: TestClient,
+def partially_answered_attempt(
     tmp_path: Path,
-) -> None:
+) -> tuple[GenerationRecord, PracticeAttempt]:
     course_id = _register_course(tmp_path=tmp_path)
     courses_dir = _store(tmp_path=tmp_path).courses_dir
     generation = make_generation(courses_dir=courses_dir, course_id=course_id)
@@ -138,26 +158,34 @@ def test_get_attempt_only_answered_question_reveals_solution(
         course_id=course_id,
         attempt=replace(attempt, answers=(answer,)),
     )
-    response = client.get(url=f"{make_url(generation=generation)}/{attempt.id}")
+    return generation, attempt
+
+
+def test_get_attempt_only_answered_question_reveals_solution(
+    client: TestClient, tmp_path: Path
+) -> None:
+    generation, attempt = partially_answered_attempt(tmp_path=tmp_path)
+    url = f"{make_url(generation=generation)}/{attempt.id}"
+
+    response = client.get(url=url)
+
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["questions"][1]["solution"] == generation.questions[1].solution
     assert data["questions"][1]["correct_index"] == 2
     citation = data["questions"][1]["citations"][0]
     assert citation["quote"] == "Original source"
-    # Resolved like the mistakes list: a link and the anchor state, so the
-    # page can say "fonte modificata" instead of linking to a moved quote.
-    assert citation["status"] in {
-        "ok",
-        "moved",
-        "source_modified",
-        "source_removed",
-        "unavailable",
-    }
-    assert "href" in citation
+    assert citation["status"] == "source_removed"
+    doc_id = generation.questions[1].citations[0].doc_id
+    assert citation["href"] == f"/corsi/fisica/documenti/{doc_id}?p=1"
     assert "solution" not in data["questions"][0]
     assert "correct_index" not in data["questions"][0]
     assert "Hidden explanation" not in response.text
+    submitted = client.post(url=f"{url}/answers/0", json={"choice": 2})
+    assert submitted.status_code == 200
+    revealed = client.get(url=url)
+    assert revealed.status_code == 200
+    assert revealed.json()["data"]["questions"][0]["solution"] == "Hidden explanation"
 
 
 def test_get_attempts_filters_before_pagination_and_hides_solutions(
@@ -259,32 +287,32 @@ def test_get_attempt_wrong_generation_and_course_not_found(
     )
 
 
-def test_get_attempt_invalid_ids_and_page_rejected(
-    client: TestClient, tmp_path: Path
+@pytest.mark.parametrize(
+    "case",
+    [
+        ("GET", "/{generation_id}/attempts/invalid", 404, "NOT_FOUND"),
+        ("GET", "/{generation_id}/attempts?page=0", 422, "VALIDATION_ERROR"),
+        ("POST", "/invalid/attempts", 404, "NOT_FOUND"),
+        ("POST", "/{missing_id}/attempts", 404, "NOT_FOUND"),
+    ],
+    ids=["invalid-attempt", "invalid-page", "invalid-generation", "missing-generation"],
+)
+def test_attempts_invalid_request_returns_expected_error(
+    client: TestClient, tmp_path: Path, case: tuple[str, str, int, str]
 ) -> None:
+    method, path, status, code = case
     course_id = _register_course(tmp_path=tmp_path)
     generation = make_generation(
         courses_dir=_store(tmp_path=tmp_path).courses_dir, course_id=course_id
     )
-    assert (
-        client.get(url=f"{make_url(generation=generation)}/invalid").status_code == 404
+    url = "/api/v1/courses/fisica/generations" + path.format(
+        generation_id=generation.id, missing_id=str(uuid4())
     )
-    assert (
-        client.get(url=make_url(generation=generation), params={"page": 0}).status_code
-        == 422
-    )
-    assert (
-        client.post(
-            url="/api/v1/courses/fisica/generations/invalid/attempts"
-        ).status_code
-        == 404
-    )
-    assert (
-        client.post(
-            url=make_url(generation=replace(generation, id=str(uuid4())))
-        ).status_code
-        == 404
-    )
+
+    response = client.request(method=method, url=url)
+
+    assert response.status_code == status
+    assert response.json()["error"]["code"] == code
 
 
 def test_get_attempts_empty_page_has_meta(client: TestClient, tmp_path: Path) -> None:

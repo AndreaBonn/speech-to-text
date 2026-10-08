@@ -131,7 +131,7 @@ def test_generate_does_not_log_a_readable_reply(
     request = GenerationRequest.model_validate({"format": "oral", "count": 1})
     chat = FakeChat(responses=[json.dumps({"domande": [_question(0)]})])
 
-    generate(
+    result = generate(
         request=request,
         passages=[_passage()],
         chat=chat,
@@ -139,6 +139,9 @@ def test_generate_does_not_log_a_readable_reply(
     )
 
     assert caplog.text == ""
+    assert [question.question for question in result.questions] == [
+        "Domanda 0 sulla presunzione?"
+    ]
 
 
 def _summary_reply() -> str:

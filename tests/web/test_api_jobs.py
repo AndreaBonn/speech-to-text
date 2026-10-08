@@ -181,8 +181,20 @@ def test_list_jobs_pagination_returns_correct_meta(
         "total_pages": 2,
     }
     assert [item["id"] for item in response.json()["data"]] == [str(records[0].id)]
-    assert client.get(url=JOBS_URL).json()["meta"]["per_page"] == 20
-    assert client.get(url=JOBS_URL, params={"page": 0}).status_code == 422
+
+
+def test_list_jobs_default_page_size_is_twenty(client: TestClient) -> None:
+    response = client.get(url=JOBS_URL)
+
+    assert response.status_code == 200
+    assert response.json()["meta"]["per_page"] == 20
+
+
+def test_list_jobs_zero_page_returns_validation_error(client: TestClient) -> None:
+    response = client.get(url=JOBS_URL, params={"page": 0})
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_get_job_missing_id_returns_404(client: TestClient) -> None:
@@ -215,20 +227,28 @@ def test_list_jobs_filters_effective_course(client: TestClient, tmp_path: Path) 
     assert client.get(url=JOBS_URL).json()["meta"]["total"] == 5
 
 
-@pytest.mark.parametrize("status", [JobStatus.DONE, JobStatus.QUEUED])
-def test_cancel_job_returns_conflict_or_cancelled(
-    client: TestClient, tmp_path: Path, status: JobStatus
-) -> None:
+def test_cancel_job_done_returns_conflict(client: TestClient, tmp_path: Path) -> None:
     store = JobStore(data_dir=tmp_path)
     record = store.create(config=JobConfig())
-    store.update(record=record.model_copy(update={"status": status}))
+    store.update(record=record.model_copy(update={"status": JobStatus.DONE}))
 
     response = client.post(url=f"{JOBS_URL}/{record.id}/cancel")
 
-    assert response.status_code == (409 if status == JobStatus.DONE else 200)
-    if status == JobStatus.QUEUED:
-        assert response.json()["data"]["status"] == "cancelled"
-        assert store.get(job_id=str(record.id)).status == JobStatus.CANCELLED
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "JOB_NOT_CANCELLABLE"
+
+
+def test_cancel_job_queued_returns_cancelled(
+    client: TestClient, tmp_path: Path
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+    record = store.create(config=JobConfig())
+
+    response = client.post(url=f"{JOBS_URL}/{record.id}/cancel")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["status"] == "cancelled"
+    assert store.get(job_id=str(record.id)).status == JobStatus.CANCELLED
 
 
 @pytest.mark.parametrize("status", list(JobStatus))

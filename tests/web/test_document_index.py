@@ -1,3 +1,4 @@
+import sqlite3
 from collections.abc import Iterator
 from contextlib import closing
 from pathlib import Path
@@ -7,7 +8,7 @@ import pytest
 from sbobina.document_passages import DocumentPassage
 from sbobina.search_text import SnippetPart
 from sbobina.web.document_index import DocumentScope, DocumentState
-from sbobina.web.search_index import SCHEMA_VERSION, SearchIndex, open_index
+from sbobina.web.search_index import SearchIndex, open_index
 
 STATE = DocumentState(course_id="course-1", text_mtime_ns=111, text_size=222)
 PASSAGE = DocumentPassage(
@@ -21,8 +22,36 @@ def index(tmp_path: Path) -> Iterator[SearchIndex]:
         yield index
 
 
-def test_schema_version_bumped_for_documents() -> None:
-    assert SCHEMA_VERSION == 2
+def test_open_index_v1_rebuilds_for_document_search(tmp_path: Path) -> None:
+    path = tmp_path / "search.sqlite3"
+    with closing(sqlite3.connect(database=path)) as connection:
+        connection.execute(
+            "CREATE TABLE lectures (job_id TEXT PRIMARY KEY, variant TEXT NOT NULL, "
+            "path_mtime_ns INTEGER NOT NULL, path_size INTEGER NOT NULL, "
+            "indexed_at TEXT NOT NULL)"
+        )
+        connection.execute(
+            "CREATE VIRTUAL TABLE passages USING fts5("
+            "text, job_id UNINDEXED, segment_index UNINDEXED, start UNINDEXED, "
+            "tokenize='unicode61 remove_diacritics 2', prefix='3')"
+        )
+        connection.execute(
+            "INSERT INTO lectures VALUES ('legacy', 'original', 1, 10, '2026-01-01')"
+        )
+        connection.execute("INSERT INTO passages VALUES ('causa', 'legacy', 0, 0.0)")
+        connection.execute("PRAGMA user_version = 1")
+        connection.commit()
+
+    with closing(open_index(path=path)) as index:
+        index.replace_document(doc_id="doc1", state=STATE, passages=[PASSAGE])
+        page = index.search_documents(
+            match='"causa"*', course_id="course-1", limit=10, offset=0
+        )
+        assert [hit.doc_id for hit in page.items] == ["doc1"]
+    with closing(sqlite3.connect(database=path)) as connection:
+        assert connection.execute("SELECT job_id FROM lectures").fetchall() == []
+        assert connection.execute("SELECT text FROM passages").fetchall() == []
+        assert connection.execute("PRAGMA user_version").fetchone() == (2,)
 
 
 def test_search_documents_returns_page_and_chunk_with_highlight(
@@ -91,6 +120,8 @@ def test_remove_document_deletes_passages_and_state(index: SearchIndex) -> None:
 
 def test_indexed_documents_empty_on_fresh_index(index: SearchIndex) -> None:
     assert index.indexed_documents() == {}
+    index.replace_document(doc_id="doc1", state=STATE, passages=[PASSAGE])
+    assert index.indexed_documents() == {"doc1": STATE}
 
 
 def test_search_documents_returns_a_short_snippet_of_a_long_page(
@@ -155,6 +186,9 @@ def test_course_document_passages_filters_to_selected_doc_ids(
 def test_course_document_passages_empty_course_returns_nothing(
     index: SearchIndex,
 ) -> None:
+    index.replace_document(doc_id="doc1", state=STATE, passages=[PASSAGE])
     assert (
         index.course_document_passages(scope=DocumentScope(course_id="nessuno")) == []
     )
+    rows = index.course_document_passages(scope=DocumentScope(course_id="course-1"))
+    assert [row.passage_id for row in rows] == [PASSAGE.passage_id]

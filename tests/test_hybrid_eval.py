@@ -73,7 +73,7 @@ class TestPoolTopN:
 
         assert sorted(unit.passage_id for unit in pooled) == ["D1", "D2"]
 
-    def test_truncates_to_n_per_system(self) -> None:
+    def test_pool_top_n_single_system_keeps_first_n_ids(self) -> None:
         units = [
             DocUnit(
                 passage_id=f"D{i}",
@@ -86,6 +86,7 @@ class TestPoolTopN:
         pooled = pool_top_n(ranked_by_system={"bm25": units}, n=2, seed=0)
 
         assert len(pooled) == 2
+        assert {unit.passage_id for unit in pooled} == {"D0", "D1"}
 
     def test_same_seed_is_deterministic(self) -> None:
         units = [

@@ -9,7 +9,7 @@ from pypdfium2 import PdfiumError
 from sbobina.pdf_text import MAX_RENDER_SIDE_PX, render_pdf_page
 
 
-def test_render_pdf_page_returns_a_valid_png(tmp_path: Path) -> None:
+def test_render_pdf_page_unit_scale_matches_mediabox_pixels(tmp_path: Path) -> None:
     pdf_path = tmp_path / "doc.pdf"
     write_pdf(path=pdf_path, texts=("First page", "Second page"))
 
@@ -17,7 +17,7 @@ def test_render_pdf_page_returns_a_valid_png(tmp_path: Path) -> None:
 
     image = Image.open(io.BytesIO(png))
     assert image.format == "PNG"
-    assert image.size[0] > 0 and image.size[1] > 0
+    assert image.size == (612, 792)
 
 
 def test_render_pdf_page_scale_doubles_pixel_dimensions(tmp_path: Path) -> None:

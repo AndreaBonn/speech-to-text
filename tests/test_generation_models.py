@@ -52,8 +52,25 @@ def test_generation_question_accepts_open_question_without_options() -> None:
     question = GenerationQuestion(
         question="q", options=(), correct_index=None, solution="s", citations=()
     )
-    assert question.options == ()
-    assert question.correct_index is None
+    record = replace(
+        _base_record(),
+        format=GenerationFormat.OPEN,
+        status=GenerationStatus.DONE,
+        questions=(question,),
+    )
+
+    serialized = dump_generation(record=record)
+
+    assert json.loads(s=serialized)["questions"] == [
+        {
+            "question": "q",
+            "options": [],
+            "correct_index": None,
+            "solution": "s",
+            "citations": [],
+        }
+    ]
+    assert load_generation(content=serialized) == record
 
 
 def test_generation_source_used_rejects_both_doc_and_job_id() -> None:
@@ -68,12 +85,26 @@ def test_generation_source_used_rejects_neither_doc_nor_job_id() -> None:
 
 def test_generation_source_used_accepts_document_source() -> None:
     source = GenerationSourceUsed(doc_id="d1", sha256="abc", job_id=None, revision=None)
-    assert source.doc_id == "d1"
+    record = replace(_base_record(), sources=(source,))
+
+    serialized = dump_generation(record=record)
+
+    assert json.loads(s=serialized)["sources"] == [
+        {"doc_id": "d1", "sha256": "abc", "job_id": None, "revision": None}
+    ]
+    assert load_generation(content=serialized) == record
 
 
 def test_generation_source_used_accepts_lecture_source() -> None:
     source = GenerationSourceUsed(doc_id=None, sha256=None, job_id="j1", revision="r1")
-    assert source.job_id == "j1"
+    record = replace(_base_record(), sources=(source,))
+
+    serialized = dump_generation(record=record)
+
+    assert json.loads(s=serialized)["sources"] == [
+        {"doc_id": None, "sha256": None, "job_id": "j1", "revision": "r1"}
+    ]
+    assert load_generation(content=serialized) == record
 
 
 def _base_record() -> GenerationRecord:
@@ -163,26 +194,44 @@ def test_generation_record_rejects_mc_options_for_open_format() -> None:
         )
 
 
+def _document_citation() -> GenerationCitation:
+    return GenerationCitation(
+        passage_id="manuale:p214:c0",
+        quote="testo citato qui",
+        doc_id="manuale",
+        page=214,
+        job_id=None,
+        timestamp=None,
+    )
+
+
 def test_generation_record_accepts_done_status_with_matching_content() -> None:
     record = replace(
         _base_record(),
         status=GenerationStatus.DONE,
-        questions=(
-            _mc_question(
-                citations=(
-                    GenerationCitation(
-                        passage_id="manuale:p214:c0",
-                        quote="testo citato qui",
-                        doc_id="manuale",
-                        page=214,
-                        job_id=None,
-                        timestamp=None,
-                    ),
-                )
-            ),
-        ),
+        questions=(_mc_question(citations=(_document_citation(),)),),
     )
-    assert record.questions[0].question == "q"
+    serialized = dump_generation(record=record)
+
+    assert json.loads(s=serialized)["questions"] == [
+        {
+            "question": "q",
+            "options": ["a", "b", "c", "d"],
+            "correct_index": 0,
+            "solution": "s",
+            "citations": [
+                {
+                    "passage_id": "manuale:p214:c0",
+                    "quote": "testo citato qui",
+                    "doc_id": "manuale",
+                    "page": 214,
+                    "job_id": None,
+                    "timestamp": None,
+                }
+            ],
+        }
+    ]
+    assert load_generation(content=serialized) == record
 
 
 def test_generation_record_json_round_trip_is_identical() -> None:

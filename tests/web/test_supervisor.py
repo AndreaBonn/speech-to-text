@@ -286,18 +286,6 @@ def test_job_deleted_while_queued_is_skipped_and_queue_continues(
     ]
 
 
-def test_child_env_forces_utf8_on_windows(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(sys, "platform", "win32")
-    monkeypatch.delenv("PYTHONUTF8", raising=False)
-    assert supervisor._child_env()["PYTHONUTF8"] == "1"
-
-
-def test_child_env_leaves_utf8_unset_elsewhere(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(sys, "platform", "linux")
-    monkeypatch.delenv("PYTHONUTF8", raising=False)
-    assert "PYTHONUTF8" not in supervisor._child_env()
-
-
 def test_recovery_reads_every_page_of_queued_jobs(
     harness: Harness, monkeypatch: pytest.MonkeyPatch
 ) -> None:

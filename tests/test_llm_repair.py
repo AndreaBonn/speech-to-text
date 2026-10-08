@@ -138,6 +138,20 @@ def test_repair_json_reply_warns_once_when_closing_brackets(
 ) -> None:
     caplog.set_level("WARNING", logger="sbobina")
 
-    repair_json_reply(raw='{"a": 1}', truncated=False)
+    repaired = repair_json_reply(raw='{"a": 1', truncated=False)
 
-    assert not [r for r in caplog.records if r.levelname == "WARNING"]
+    assert repaired == '{"a": 1}'
+    assert [r.getMessage() for r in caplog.records if r.levelname == "WARNING"] == [
+        "Risposta del modello con parentesi non chiuse: chiuse in coda"
+    ]
+
+
+def test_repair_json_reply_valid_json_emits_no_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("WARNING", logger="sbobina")
+
+    repaired = repair_json_reply(raw='{"a": 1}', truncated=False)
+
+    assert repaired == '{"a": 1}'
+    assert [r for r in caplog.records if r.levelname == "WARNING"] == []

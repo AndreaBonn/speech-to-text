@@ -68,12 +68,23 @@ def test_build_sources_collects_one_entry_per_distinct_doc_and_lecture() -> None
 
 def test_build_sources_drops_a_source_whose_lookup_finds_nothing() -> None:
     sources = build_sources(
-        passages=[_doc_passage("doc-gone")],
-        doc_sha256=lambda _doc_id: None,
-        find_lecture_revision=lambda _job_id: None,
+        passages=[
+            _doc_passage(doc_id="doc-gone"),
+            _doc_passage(doc_id="doc-found"),
+            _lecture_passage(job_id="job-gone"),
+            _lecture_passage(job_id="job-found"),
+        ],
+        doc_sha256={"doc-found": "sha-found"}.get,
+        find_lecture_revision={"job-found": "rev-found"}.get,
     )
 
-    assert sources == ()
+    assert [
+        (source.doc_id, source.job_id, source.sha256, source.revision)
+        for source in sources
+    ] == [
+        ("doc-found", None, "sha-found", None),
+        (None, "job-found", None, "rev-found"),
+    ]
 
 
 def _write_lecture(store: JobStore, job_id: str) -> str:

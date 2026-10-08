@@ -114,13 +114,25 @@ def test_document_anchor_rejects_empty_ids_negative_page_and_empty_quote() -> No
 
 
 def test_lecture_anchor_empty_revision_is_rejected() -> None:
-    assert LectureAnchor(job_id=JOB_ID, revision="r", segment_index=0, quote="q")
+    anchor = LectureAnchor(job_id=JOB_ID, revision="r", segment_index=0, quote="q")
+    assert (anchor.job_id, anchor.revision, anchor.segment_index, anchor.quote) == (
+        JOB_ID,
+        "r",
+        0,
+        "q",
+    )
     with pytest.raises(ValueError, match="revision"):
         LectureAnchor(job_id=JOB_ID, revision="", segment_index=0, quote="q")
 
 
 def test_document_anchor_empty_sha256_is_rejected() -> None:
-    assert DocumentAnchor(doc_id=DOC_ID, sha256="s", page=0, quote="q")
+    anchor = DocumentAnchor(doc_id=DOC_ID, sha256="s", page=0, quote="q")
+    assert (anchor.doc_id, anchor.sha256, anchor.page, anchor.quote) == (
+        DOC_ID,
+        "s",
+        0,
+        "q",
+    )
     with pytest.raises(ValueError, match="sha256"):
         DocumentAnchor(doc_id=DOC_ID, sha256="", page=0, quote="q")
 
@@ -155,8 +167,17 @@ def test_anchor_ids_reject_non_uuid4_and_accept_uuid4(
 ) -> None:
     with pytest.raises(ValueError, match="UUID4"):
         build(invalid_id)
-    valid = build(str(uuid4()))
-    assert isinstance(valid, (LectureAnchor, DocumentAnchor, GenerationAnchor))
+    identifier = str(uuid4())
+    valid = build(identifier)
+    match valid:
+        case LectureAnchor(job_id=value):
+            assert value == identifier
+        case DocumentAnchor(doc_id=value):
+            assert value == identifier
+        case GenerationAnchor(generation_id=value):
+            assert value == identifier
+        case _:
+            pytest.fail("Expected a supported anchor with the supplied UUID4")
 
 
 def test_require_uuid4_rejects_non_canonical_form() -> None:

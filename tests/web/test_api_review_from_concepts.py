@@ -84,22 +84,27 @@ def test_from_concepts_twelve_then_zero_with_effective_course(
     assert cards[0].anchor.revision == lecture_revision(store=store, job_id=job_id)
 
 
-def test_from_concepts_missing_study_and_uncategorized_errors(
+def test_from_concepts_uncategorized_returns_course_required(
     client: TestClient, store: JobStore
 ) -> None:
     job_id = _material(store=store, subject=None)
+
     response = client.post(url=_concept_url(job_id=job_id))
-    assert (
-        response.status_code == 409
-        and response.json()["error"]["code"] == "COURSE_REQUIRED"
-    )
-    store.write_meta(job_id=job_id, meta=LectureMeta(course="Diritto"))
-    assert client.post(url=_concept_url(job_id=job_id)).status_code == 201
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "COURSE_REQUIRED"
+
+
+def test_from_concepts_missing_study_returns_not_found(
+    client: TestClient, store: JobStore
+) -> None:
+    job_id = _material(store=store)
     (store.jobs_dir / job_id / "audio.studio.json").unlink()
+
     response = client.post(url=_concept_url(job_id=job_id))
-    assert (
-        response.status_code == 404 and response.json()["error"]["code"] == "NOT_FOUND"
-    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
 def test_from_concepts_concurrent_import_counts_only_own_creations(

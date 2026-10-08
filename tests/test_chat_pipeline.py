@@ -6,7 +6,6 @@ from study_fixtures import FakeChat
 from sbobina.chat_pipeline import (
     MAX_HISTORY_TURNS,
     MAX_PASSAGES,
-    NOT_FOUND_ANSWER,
     ChatOptions,
     ChatOutcome,
     ChatQuery,
@@ -198,12 +197,11 @@ def test_answer_only_last_two_exchanges_reach_the_prompt() -> None:
 
 
 def test_build_retrieval_question_expands_short_back_reference() -> None:
-    history = (ChatTurn(question="che cos'e' il possesso?", sentences=()),)
+    history = (ChatTurn(question="che cos’è il possesso?", sentences=()),)
 
     expanded = build_retrieval_question(question="e quella di prima?", history=history)
 
-    assert "possesso" in expanded
-    assert "e quella di prima?" in expanded
+    assert expanded == "che cos’è il possesso? e quella di prima?"
 
 
 def test_build_retrieval_question_keeps_long_self_contained_question() -> None:
@@ -255,8 +253,32 @@ def test_prompt_only_includes_budgeted_passages() -> None:
     assert f"[P{MAX_PASSAGES + 1}]" not in sent_message
 
 
-def test_not_found_answer_constant_is_the_user_facing_message() -> None:
-    assert NOT_FOUND_ANSWER == "Non trovo la risposta nel materiale di questo corso."
+def test_answer_not_found_history_renders_course_message() -> None:
+    question = "Che cos’è la causa?"
+    chat = FakeChat(responses=[json.dumps({"frasi": []}), json.dumps({"frasi": []})])
+    missing = answer(
+        query=ChatQuery(question=question),
+        passages=[_passage()],
+        chat=chat,
+        options=_options(),
+    )
+    assert missing.outcome == ChatOutcome.NOT_FOUND
+
+    answer(
+        query=ChatQuery(
+            question="E il possesso?",
+            history=(ChatTurn(question=question, sentences=missing.sentences),),
+        ),
+        passages=[_passage()],
+        chat=chat,
+        options=_options(),
+    )
+
+    assert chat.requests[1].user_message.splitlines()[:3] == [
+        "Domanda: Che cos’è la causa?",
+        "Risposta: Non trovo la risposta nel materiale di questo corso.",
+        "Domanda: E il possesso?",
+    ]
 
 
 def test_answer_keeps_sentence_dropping_only_its_fabricated_citation() -> None:

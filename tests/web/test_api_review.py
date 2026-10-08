@@ -127,16 +127,30 @@ def test_review_naive_observed_due_returns_field_error(
     )
 
 
-def test_summary_two_registered_courses_and_unknown_course(
-    client: TestClient, store: JobStore
+def test_today_unknown_course_returns_not_found(
+    client: TestClient,
 ) -> None:
-    _fixed_clock(client=client)
-    assert client.get(url=TODAY_URL).status_code == 404
+    response = client.get(url=TODAY_URL)
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
+def _two_courses(store: JobStore) -> None:
     for key, count in (("diritto", 2), ("fisica", 1)):
         course_id = _course(store=store, key=key)
         for _ in range(count):
             _card(store=store, course_id=course_id)
+
+
+def test_summary_registered_courses_returns_due_counts(
+    client: TestClient, store: JobStore
+) -> None:
+    _fixed_clock(client=client)
+    _two_courses(store=store)
+
     response = client.get(url=SUMMARY_URL)
+
     assert response.status_code == 200
     assert response.json()["meta"] == {
         "page": 1,
@@ -148,7 +162,34 @@ def test_summary_two_registered_courses_and_unknown_course(
         {"course_key": "diritto", "label": "Diritto", "due": 2},
         {"course_key": "fisica", "label": "Fisica", "due": 1},
     ]
-    second = client.get(url=SUMMARY_URL, params={"page": 2, "per_page": 1}).json()
-    assert [item["course_key"] for item in second["data"]] == ["fisica"]
-    assert second["meta"]["total_pages"] == 2
-    assert len(client.get(url=TODAY_URL).json()["data"]) == 2
+
+
+def test_summary_second_page_returns_second_course(
+    client: TestClient, store: JobStore
+) -> None:
+    _fixed_clock(client=client)
+    _two_courses(store=store)
+
+    response = client.get(url=SUMMARY_URL, params={"page": 2, "per_page": 1})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "data": [{"course_key": "fisica", "label": "Fisica", "due": 1}],
+        "meta": {"page": 2, "per_page": 1, "total": 2, "total_pages": 2},
+    }
+
+
+def test_today_registered_course_returns_its_due_cards(
+    client: TestClient, store: JobStore
+) -> None:
+    _fixed_clock(client=client)
+    course_id = _course(store=store)
+    cards = [_card(store=store, course_id=course_id) for _ in range(2)]
+    _card(store=store, course_id=_course(store=store, key="fisica"))
+
+    response = client.get(url=TODAY_URL)
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["data"]] == [
+        card.id for card in cards
+    ]

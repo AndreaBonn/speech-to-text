@@ -147,19 +147,17 @@ def test_wait_unauthorized_is_not_retried() -> None:
     assert SENTINEL_KEY not in str(excinfo.value)
 
 
-def test_sentences_and_delete_hit_the_transcript_endpoints() -> None:
+def test_sentences_transcript_id_requests_sentence_endpoint() -> None:
     seen: list[httpx.Request] = []
-    handler = _poll_handler(
-        [httpx.Response(200, json=SENTENCES), httpx.Response(200, json={})], seen
-    )
-    client = _client(handler)
+    sentences = {"sentences": [{"text": "Buongiorno.", "start": 0, "end": 900}]}
+    handler = _poll_handler(statuses=[httpx.Response(200, json=sentences)], seen=seen)
+    client = _client(handler=handler)
 
-    assert client.sentences(transcript_id="t1") == SENTENCES
-    client.delete(transcript_id="t1")
+    result = client.sentences(transcript_id="t1")
 
+    assert result == sentences
     assert [(r.method, r.url.path) for r in seen] == [
-        ("GET", "/v2/transcript/t1/sentences"),
-        ("DELETE", "/v2/transcript/t1"),
+        ("GET", "/v2/transcript/t1/sentences")
     ]
 
 
@@ -226,3 +224,13 @@ def test_wait_on_poll_receives_elapsed_seconds() -> None:
     assert reply == {"status": "completed"}
     assert elapsed == [0.0, 5.0, 10.0]
     assert len(seen) == 3
+
+
+def test_delete_transcript_id_requests_delete_endpoint() -> None:
+    seen: list[httpx.Request] = []
+    handler = _poll_handler(statuses=[httpx.Response(200, json={})], seen=seen)
+    client = _client(handler=handler)
+
+    client.delete(transcript_id="t1")
+
+    assert [(r.method, r.url.path) for r in seen] == [("DELETE", "/v2/transcript/t1")]

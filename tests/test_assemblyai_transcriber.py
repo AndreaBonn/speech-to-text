@@ -1,13 +1,16 @@
+import json
 import logging
 from pathlib import Path
 from typing import Any, ClassVar
 
+import httpx
 import pytest
 from pydantic import SecretStr
 
 from sbobina import assemblyai_transcriber, pipeline
 from sbobina.assemblyai_client import ClientConfig, RemoteTranscriptionError
 from sbobina.llm_errors import FailureKind, ProviderUnavailableError
+from sbobina.models import load_transcript
 from sbobina.notices import USER_NOTICE
 from sbobina.settings import Settings
 
@@ -83,23 +86,101 @@ def _config() -> Settings:
     )
 
 
-def test_transcribe_file_converts_and_deletes_the_remote_copy(
-    fake_client: type[FakeClient], tmp_path: Path
+@pytest.fixture
+def remote_http(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[list[httpx.Request], list[str]]:
+    requests: list[httpx.Request] = []
+    events: list[str] = []
+    replies = {
+        ("POST", "/v2/upload"): {"upload_url": "https://cdn/up"},
+        ("POST", "/v2/transcript"): {"id": "t1"},
+        ("GET", "/v2/transcript/t1"): {
+            "status": "completed",
+            "audio_duration": 1,
+            "speech_model_used": "u3",
+        },
+        ("GET", "/v2/transcript/t1/sentences"): SENTENCES,
+        ("DELETE", "/v2/transcript/t1"): {},
+    }
+
+    def handle_request(
+        self: httpx.HTTPTransport, request: httpx.Request
+    ) -> httpx.Response:
+        request.read()
+        requests.append(request)
+        events.append(request.method)
+        return httpx.Response(200, json=replies[(request.method, request.url.path)])
+
+    def close(self: httpx.HTTPTransport) -> None:
+        events.append("close")
+
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", handle_request)
+    monkeypatch.setattr(httpx.HTTPTransport, "close", close)
+    return requests, events
+
+
+def test_transcribe_file_completed_response_converts_transcript(
+    remote_http: tuple[list[httpx.Request], list[str]], tmp_path: Path
 ) -> None:
-    progress: list[float] = []
+    audio_path = tmp_path / "a.m4a"
+    audio_path.write_bytes(b"audio")
 
     transcript = assemblyai_transcriber.transcribe_file(
-        tmp_path / "a.m4a",
-        config=_config(),
-        on_progress=lambda d, t: progress.append(d),
+        audio_path=audio_path, config=_config()
     )
 
-    client = fake_client.instances[0]
     assert transcript.model == "assemblyai:u3"
     assert transcript.segments[0].text == "Buongiorno."
-    assert client.calls[-2:] == ["delete", "close"]
-    assert "submit:it" in client.calls
-    assert progress[-1] == 1.0
+
+
+def test_transcribe_file_completed_response_deletes_and_closes(
+    remote_http: tuple[list[httpx.Request], list[str]], tmp_path: Path
+) -> None:
+    audio_path = tmp_path / "a.m4a"
+    audio_path.write_bytes(b"audio")
+
+    assemblyai_transcriber.transcribe_file(audio_path=audio_path, config=_config())
+
+    requests, events = remote_http
+    assert (requests[-1].method, requests[-1].url.path) == (
+        "DELETE",
+        "/v2/transcript/t1",
+    )
+    delete_index = events.index("DELETE")
+    assert events[delete_index + 1 :]
+    assert set(events[delete_index + 1 :]) == {"close"}
+
+
+def test_transcribe_file_completed_response_finishes_progress(
+    remote_http: tuple[list[httpx.Request], list[str]], tmp_path: Path
+) -> None:
+    audio_path = tmp_path / "a.m4a"
+    audio_path.write_bytes(b"audio")
+    progress: list[tuple[float, float]] = []
+
+    assemblyai_transcriber.transcribe_file(
+        audio_path=audio_path,
+        config=_config(),
+        on_progress=lambda done, total: progress.append((done, total)),
+    )
+
+    assert progress[-1] == (1.0, 1.0)
+
+
+def test_transcribe_file_italian_config_submits_language(
+    remote_http: tuple[list[httpx.Request], list[str]], tmp_path: Path
+) -> None:
+    audio_path = tmp_path / "a.m4a"
+    audio_path.write_bytes(b"audio")
+
+    assemblyai_transcriber.transcribe_file(audio_path=audio_path, config=_config())
+
+    requests, _ = remote_http
+    submission = next(
+        r for r in requests if r.method == "POST" and r.url.path == "/v2/transcript"
+    )
+    assert json.loads(submission.content)["language_code"] == "it"
 
 
 def test_transcribe_file_remote_error_still_deletes(
@@ -154,20 +235,18 @@ def test_transcribe_file_without_key_fails_before_any_upload(
     assert fake_client.instances == []
 
 
-def test_transcribe_to_dir_assemblyai_never_loads_whisper(
-    fake_client: type[FakeClient], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_transcribe_to_dir_assemblyai_persists_remote_model(
+    remote_http: tuple[list[httpx.Request], list[str]], tmp_path: Path
 ) -> None:
-    def whisper_must_not_run(*args: object, **kwargs: object) -> None:
-        raise AssertionError("faster-whisper called with the AssemblyAI engine")
-
-    monkeypatch.setattr("sbobina.transcriber.transcribe_file", whisper_must_not_run)
     audio = tmp_path / "lezione.m4a"
     audio.write_bytes(b"x")
 
-    json_path = pipeline.transcribe_to_dir(audio, tmp_path / "out", config=_config())
+    json_path = pipeline.transcribe_to_dir(
+        audio_path=audio, output_dir=tmp_path / "out", config=_config()
+    )
 
-    assert json_path.exists()
-    assert fake_client.instances[0].calls[0] == "upload"
+    transcript = load_transcript(path=json_path)
+    assert transcript.model == "assemblyai:u3"
 
 
 def test_transcribe_file_reports_progress_while_waiting_remotely(

@@ -61,6 +61,10 @@ def test_card_created_round_trip_preserves_anchor(anchor: Anchor) -> None:
     assert "fsrs" not in json.loads(content)
     assert "state" not in json.loads(content)["anchor"]
     assert "due" not in content
+
+
+@pytest.mark.parametrize("anchor", ANCHORS)
+def test_anchor_field_assignment_is_frozen(anchor: Anchor) -> None:
     with pytest.raises(FrozenInstanceError):
         setattr(anchor, fields(anchor)[0].name, "unknown")
 
@@ -78,6 +82,18 @@ def test_card_event_round_trip_preserves_lifecycle(event: CardEvent) -> None:
     content = dump_card_event(event=event)
     assert load_card_event(content=content) == event
     assert "fsrs" not in json.loads(content)
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        CardEdited(card_id="id", occurred_at=NOW, front="nuovo", back="retro"),
+        CardSuspended(card_id="id", occurred_at=NOW, suspended=True),
+        CardSuspended(card_id="id", occurred_at=NOW, suspended=False),
+        CardDeleted(card_id="id", occurred_at=NOW),
+    ],
+)
+def test_card_event_field_assignment_is_frozen(event: CardEvent) -> None:
     with pytest.raises(FrozenInstanceError):
         setattr(event, fields(event)[0].name, "other")
 
@@ -87,8 +103,15 @@ def test_review_event_round_trip_preserves_state() -> None:
         card_id="id", rating=Rating.GOOD, reviewed_at=NOW, duration_ms=700, fsrs=STATE
     )
     assert load_review(content=dump_review(event=event)) == event
+
+
+def test_review_event_field_assignment_is_frozen() -> None:
+    event = ReviewEvent(
+        card_id="id", rating=Rating.GOOD, reviewed_at=NOW, duration_ms=700, fsrs=STATE
+    )
+    field_name = "duration_ms"
     with pytest.raises(FrozenInstanceError):
-        setattr(event, fields(event)[0].name, 900)
+        setattr(event, field_name, 900)
 
 
 def test_card_event_json_round_trip_keeps_occurred_at_aware() -> None:
@@ -115,19 +138,27 @@ def test_review_event_json_round_trip_keeps_datetimes_aware() -> None:
     assert loaded.reviewed_at == NOW
 
 
-def test_card_and_draft_are_frozen() -> None:
-    draft = CardDraft(front="f", back="b", source="s", anchor=ANCHORS[0])
-    card = Card(
-        id="id",
-        front=draft.front,
-        back=draft.back,
-        source=draft.source,
-        anchor=draft.anchor,
-        fsrs=None,
+@pytest.mark.parametrize(
+    "record",
+    [
+        CardDraft(front="f", back="b", source="s", anchor=ANCHORS[0]),
+        Card(id="id", front="f", back="b", source="s", anchor=ANCHORS[0], fsrs=None),
+    ],
+    ids=["draft", "card"],
+)
+def test_card_and_draft_front_assignment_is_frozen(record: Card | CardDraft) -> None:
+    field_name = "front"
+    with pytest.raises(FrozenInstanceError):
+        setattr(record, field_name, "other")
+
+    assert record.front == "f"
+
+
+def test_card_draft_omitted_dedup_key_defaults_to_none() -> None:
+    default = CardDraft(front="f", back="b", source="s", anchor=ANCHORS[0])
+    explicit = CardDraft(
+        front="f", back="b", source="s", anchor=ANCHORS[0], dedup_key="key"
     )
-    assert card.front == "f"
-    assert draft.dedup_key is None
-    with pytest.raises(FrozenInstanceError):
-        setattr(card, fields(card)[0].name, "other")
-    with pytest.raises(FrozenInstanceError):
-        setattr(draft, fields(draft)[0].name, "other")
+
+    assert explicit.dedup_key == "key"
+    assert default.dedup_key is None

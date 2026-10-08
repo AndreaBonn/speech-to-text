@@ -96,15 +96,19 @@ def test_create_card_oversized_body_returns_413_without_creating(
 def test_edit_card_oversized_body_returns_413_without_writing(
     client: TestClient, store: JobStore
 ) -> None:
-    _course(store=store)
+    course_id = _course(store=store)
     card = client.post(url=CARDS_URL, json=_body()).json()["data"]
+    path = cards_path(courses_dir=store.courses_dir, course_id=course_id)
+    before = path.read_bytes()
     url = f"{CARDS_URL}/{card['id']}"
     oversized = {"front": "x" * (65 * 1024), "back": "Risposta"}
     response = client.patch(url=url, json=oversized)
     assert response.status_code == 413
     assert response.json()["error"]["code"] == "PAYLOAD_TOO_LARGE"
+    assert path.read_bytes() == before
     text = {"front": "Nuova domanda", "back": "Nuova risposta"}
     assert client.patch(url=url, json=text).status_code == 200
+    assert path.read_bytes() != before
 
 
 @pytest.mark.parametrize("method", ["PATCH", "DELETE"])

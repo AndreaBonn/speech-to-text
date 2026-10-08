@@ -37,7 +37,7 @@ def test_start_ocr_queues_it_and_status_reads_back(
     assert status.json()["data"]["status"] == "queued"
 
 
-def test_start_ocr_twice_or_on_a_document_with_text_is_a_conflict(
+def test_start_ocr_twice_returns_already_queued(
     client: TestClient, tmp_path: Path
 ) -> None:
     add_scanned_document(courses_dir=tmp_path / "courses")
@@ -47,6 +47,26 @@ def test_start_ocr_twice_or_on_a_document_with_text_is_a_conflict(
 
     assert again.status_code == 409
     assert again.json()["error"]["code"] == "OCR_ALREADY_QUEUED"
+
+
+def test_start_ocr_document_with_text_returns_not_eligible(
+    client: TestClient, tmp_path: Path
+) -> None:
+    _, doc_dir = add_scanned_document(
+        courses_dir=tmp_path / "courses", status=DocumentStatus.READY
+    )
+    write_text(
+        doc_dir=doc_dir,
+        extracted=ExtractedText(
+            pages=(Page(text="Testo nativo", no_text=False),),
+            status=DocumentStatus.READY,
+        ),
+    )
+
+    response = client.post(f"{DOC_URL}/ocr")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "OCR_NOT_ELIGIBLE"
 
 
 def test_ocr_status_without_a_run_is_not_found(

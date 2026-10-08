@@ -64,7 +64,7 @@ def test_concept_cards_twelve_concepts_copy_first_citation() -> None:
         )
 
 
-def test_concept_cards_normalizes_term_and_separates_origin_and_source() -> None:
+def test_concept_cards_normalized_term_preserves_dedup_key() -> None:
     result = study_fixture(count=1)
     concept = replace(result.chapters[0].concepts[0], term="  CONCETTO0  ")
     chapter = replace(result.chapters[0], concepts=(concept,))
@@ -76,27 +76,79 @@ def test_concept_cards_normalizes_term_and_separates_origin_and_source() -> None
         result=changed, job_id=JOB_ID, revision="b", source="concept"
     )[0]
     assert original.dedup_key == normalized.dedup_key
+
+
+def test_concept_cards_distinct_jobs_have_distinct_dedup_keys() -> None:
+    result = study_fixture(count=1)
+    original = concept_cards(
+        result=result, job_id=JOB_ID, revision="a", source="concept"
+    )[0]
+
     other_job = concept_cards(
         result=result, job_id=OTHER_JOB_ID, revision="a", source="concept"
     )[0]
+
+    assert (
+        other_job.dedup_key
+        == sha256(f"{OTHER_JOB_ID}:concept:concetto0".encode()).hexdigest()
+    )
+    assert original.dedup_key != other_job.dedup_key
+
+
+def test_concept_cards_distinct_sources_have_distinct_dedup_keys() -> None:
+    result = study_fixture(count=1)
+    original = concept_cards(
+        result=result, job_id=JOB_ID, revision="a", source="concept"
+    )[0]
+
     other_source = concept_cards(
         result=result, job_id=JOB_ID, revision="a", source="manual"
     )[0]
-    assert len({original.dedup_key, other_job.dedup_key, other_source.dedup_key}) == 3
+
+    assert (
+        other_source.dedup_key
+        == sha256(f"{JOB_ID}:manual:concetto0".encode()).hexdigest()
+    )
+    assert original.dedup_key != other_source.dedup_key
+
+
+def test_concept_cards_normalized_term_preserves_display_text() -> None:
+    result = study_fixture(count=1)
+    concept = replace(result.chapters[0].concepts[0], term="  CONCETTO0  ")
+    chapter = replace(result.chapters[0], concepts=(concept,))
+
+    normalized = concept_cards(
+        result=replace(result, chapters=(chapter,)),
+        job_id=JOB_ID,
+        revision="a",
+        source="concept",
+    )[0]
+
     assert normalized.front == "  CONCETTO0  "
 
 
-def test_concept_cards_empty_and_multiple_chapters_keep_order() -> None:
-    result = study_fixture(count=1)
-    combined = replace(result, chapters=result.chapters * 2)
-    assert (
-        len(
-            concept_cards(
-                result=combined, job_id=JOB_ID, revision="a", source="concept"
-            )
-        )
-        == 2
+def test_concept_cards_multiple_chapters_preserve_chapter_and_concept_order() -> None:
+    result = study_fixture(count=2)
+    second = replace(
+        result.chapters[0],
+        concepts=(replace(result.chapters[0].concepts[0], term="secondo capitolo"),),
     )
+    combined = replace(result, chapters=(*result.chapters, second))
+
+    drafts = concept_cards(
+        result=combined, job_id=JOB_ID, revision="a", source="concept"
+    )
+
+    assert [draft.front for draft in drafts] == [
+        "concetto0",
+        "concetto1",
+        "secondo capitolo",
+    ]
+
+
+def test_concept_cards_empty_chapters_return_no_cards() -> None:
+    result = study_fixture(count=1)
+
     assert (
         concept_cards(
             result=replace(result, chapters=()),

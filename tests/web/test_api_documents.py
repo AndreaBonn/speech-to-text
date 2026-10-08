@@ -2,6 +2,7 @@ import io
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import docx
 import pytest
@@ -144,8 +145,24 @@ def test_list_documents_unregistered_course_is_empty(client: TestClient) -> None
 
 
 def test_get_document_not_found(client: TestClient) -> None:
-    response = client.get(f"{COURSES_URL}/fisica/documents/missing")
+    uploaded = upload(
+        client=client, key="fisica", filename="uno.pdf", content=PDF_BYTES
+    )
+    assert uploaded.status_code == 202
+
+    response = client.get(f"{COURSES_URL}/fisica/documents/{uuid4()}")
+
     assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_get_document_of_an_unregistered_course_is_not_found(
+    client: TestClient,
+) -> None:
+    response = client.get(f"{COURSES_URL}/fisica/documents/{uuid4()}")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
 def test_get_document_page_not_found_while_extracting(client: TestClient) -> None:
@@ -251,21 +268,27 @@ def test_upload_registers_the_lecture_label_not_the_url_key(tmp_path: Path) -> N
     assert course.label == "Diritto Privato"
 
 
-@pytest.mark.parametrize("doc_id", ["..", "..%2F..", "not-a-uuid"])
+@pytest.mark.parametrize("doc_id", ["%2E%2E", "..%2F..", "not-a-uuid"])
+@pytest.mark.parametrize(
+    ("method", "suffix"), [("GET", ""), ("GET", "/file"), ("DELETE", "")]
+)
 def test_document_routes_reject_ids_that_are_not_generated_ids(
-    client: TestClient, tmp_path: Path, doc_id: str
+    client: TestClient, doc_id: str, method: str, suffix: str
 ) -> None:
-    upload(client, "fisica", "manuale.pdf", PDF_BYTES)
+    uploaded = upload(
+        client=client, key="fisica", filename="manuale.pdf", content=PDF_BYTES
+    )
     base = f"{COURSES_URL}/fisica/documents/{doc_id}"
 
-    statuses = {
-        client.get(base).status_code,
-        client.get(f"{base}/file").status_code,
-        client.delete(base).status_code,
-    }
+    rejected = client.request(method=method, url=f"{base}{suffix}")
 
-    assert statuses <= {404, 405}
-    assert list((tmp_path / "courses").glob("*/course.json")) != []
+    assert rejected.status_code == 404
+    assert rejected.json()["error"]["code"] == "NOT_FOUND"
+    response = client.get(
+        f"{COURSES_URL}/fisica/documents/{uploaded.json()['data']['id']}"
+    )
+    assert response.status_code == 200
+    assert response.json() == {"data": uploaded.json()["data"]}
 
 
 def test_create_document_office_archive_within_limits_is_accepted(

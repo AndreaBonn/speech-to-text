@@ -198,26 +198,30 @@ def test_model_status_absent_from_tags(client: FakeClient) -> None:
         {"x.embedding_length": 0},
         {"x.embedding_length": "4096"},
         {"x.embedding_length": True},
-        ValueError("internal dimensions bug"),
     ],
 )
-def test_model_status_rejects_invalid_dimensions(
-    client: FakeClient, info: Any, monkeypatch: pytest.MonkeyPatch
+def test_model_status_invalid_dimensions_raise_bad_response(
+    client: FakeClient, info: Any
 ) -> None:
-    if isinstance(info, ValueError):
-
-        def fail(**kwargs: object) -> int:
-            raise info
-
-        monkeypatch.setattr(boundary, "_dimensions", fail)
-        with pytest.raises(ValueError, match="internal dimensions bug"):
-            model_status(host=HOST, model=MODEL, timeout_s=TIMEOUT_S)
-        return
     client.info = ShowResponse(model_info=info)
+
     with pytest.raises(EmbeddingUnavailableError) as caught:
         model_status(host=HOST, model=MODEL, timeout_s=TIMEOUT_S)
+
     assert caught.value.reason == "bad_response"
     assert f"show:{MODEL}" in client.probes
+
+
+def test_model_status_show_value_error_raises_bad_response(client: FakeClient) -> None:
+    failure = ValueError("invalid response JSON")
+    client.failure, client.fail_at = failure, "show"
+
+    with pytest.raises(EmbeddingUnavailableError) as caught:
+        model_status(host=HOST, model=MODEL, timeout_s=TIMEOUT_S)
+
+    assert caught.value.reason == "bad_response"
+    assert caught.value.__cause__ is failure
+    assert client.probes == ["list", f"show:{MODEL}"]
 
 
 @pytest.mark.parametrize("digest", [None, ""])

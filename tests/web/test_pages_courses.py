@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -53,10 +54,13 @@ def test_corsi_page_has_the_semantic_retrieval_status_line(tmp_path: Path) -> No
 def test_corsi_page_marks_its_rail_entry_active(tmp_path: Path) -> None:
     app = create_app(settings=Settings(), data_dir=tmp_path)
     with TestClient(app=app, base_url=BASE_URL) as client:
-        body = client.get("/corsi").text
+        body = client.get(url="/corsi").text
 
-    assert ">Corsi<" in body
-    assert 'class="rail__link rail__link--active"' in body
+    link = re.search(pattern=r"<a\b[^>]*>Corsi</a>", string=body)
+    assert link is not None
+    assert 'href="/corsi"' in link.group()
+    assert 'class="rail__link rail__link--active"' in link.group()
+    assert 'aria-current="page"' in link.group()
 
 
 def test_corsi_page_has_the_search_form(tmp_path: Path) -> None:

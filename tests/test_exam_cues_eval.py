@@ -112,7 +112,7 @@ def test_redetect_leaves_rows_of_unmeasured_jobs_untouched() -> None:
     assert unlabeled == []
 
 
-def test_redetect_repeated_cue_in_one_segment_is_counted_twice() -> None:
+def test_redetect_repeated_cue_returns_extra_occurrence_as_unlabeled() -> None:
     row = {
         "job_id": "a",
         "segment_index": 0,
@@ -128,4 +128,6 @@ def test_redetect_repeated_cue_in_one_segment_is_counted_twice() -> None:
     fresh, unlabeled = redetect(rows=[row], cues={"a": (repeated, repeated)})
 
     assert [r["predicted"] for r in fresh] == ["weak"]
-    assert len(unlabeled) == 1
+    assert unlabeled == [
+        {"job_id": "a", "segment_index": 0, "quote": "ma attenzione", "level": "weak"}
+    ]

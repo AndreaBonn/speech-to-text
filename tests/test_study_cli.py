@@ -51,6 +51,9 @@ def test_cmd_studio_unavailable_keeps_both_previous_files(tmp_path: Path) -> Non
     )
     assert json_path.read_text() == "previous json"
     assert md_path.read_text() == "previous markdown"
+
+
+def test_main_studio_missing_transcript_returns_failure(tmp_path: Path) -> None:
     assert main(argv=["studio", str(tmp_path / "missing.json")]) == 1
 
 

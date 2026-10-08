@@ -69,11 +69,16 @@ def test_fallback_chain_uses_the_first_eligible_link_that_succeeds() -> None:
 
 
 def test_fallback_chain_raises_chain_exhausted_with_every_cause_and_no_key() -> None:
+    def leaking_client(request: ChatRequest) -> str:
+        # Transport errors quote the URL, and Gemini carries the key in `?key=`.
+        transport_error = ConnectionError(f"GET /models?key={SENTINEL} refused")
+        raise ProviderUnavailableError(
+            kind=FailureKind.AUTH, provider="p1/m", retry_after_s=None
+        ) from transport_error
+
     chain = FallbackChain(
         links=[
-            ChainLink(
-                provider="p1", model="m", client=failing_client(FailureKind.AUTH)
-            ),
+            ChainLink(provider="p1", model="m", client=leaking_client),
             ChainLink(
                 provider="p2",
                 model="m",
@@ -90,6 +95,7 @@ def test_fallback_chain_raises_chain_exhausted_with_every_cause_and_no_key() -> 
 
     error = exc_info.value
     assert len(error.causes) == 3
+    assert SENTINEL in str(error.causes[0].__cause__)
     assert SENTINEL not in str(error)
 
 

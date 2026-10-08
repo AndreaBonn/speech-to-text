@@ -80,10 +80,14 @@ def test_open_browser_when_ready_opens_once_after_server_answers(
 
 def test_open_browser_when_ready_server_never_answers_does_not_open(
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     opened: list[str] = []
 
+    attempts: list[str] = []
+
     def fake_get(url: str, timeout: float) -> httpx.Response:
+        attempts.append(url)
         raise httpx.ConnectError("down")
 
     monkeypatch.setattr(httpx, "get", fake_get)
@@ -93,6 +97,10 @@ def test_open_browser_when_ready_server_never_answers_does_not_open(
     launcher.open_browser_when_ready(url="http://127.0.0.1:8765")
 
     assert opened == []
+    assert attempts == ["http://127.0.0.1:8765/api/v1/system"] * 100
+    assert [(record.levelno, record.getMessage()) for record in caplog.records] == [
+        (logging.WARNING, "Il server non risponde: apri a mano http://127.0.0.1:8765")
+    ]
 
 
 def test_run_server_busy_port_exits_1_without_starting(

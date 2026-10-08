@@ -57,11 +57,16 @@ def test_report_shows_served_by_when_given() -> None:
     )
 
 
-def test_report_omits_served_by_line_when_not_given() -> None:
+def test_render_corrections_report_without_recorder_omits_served_by_line() -> None:
     result = CorrectionResult(transcript=TRANSCRIPT, applied=[], rejected=[])
+    with_recorder = render_corrections_report(
+        result=result, model="qwen3.5:9b", removed=[], served_by={"groq/llama-x": 1}
+    )
 
-    report = render_corrections_report(result, model="qwen3.5:9b", removed=[])
+    report = render_corrections_report(result=result, model="qwen3.5:9b", removed=[])
 
+    assert "Modelli usati: groq/llama-x 1 blocchi." in with_recorder
+    assert "Modello qwen3.5:9b." in report
     assert "Modelli usati" not in report
 
 

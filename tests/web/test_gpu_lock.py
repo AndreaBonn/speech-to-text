@@ -152,13 +152,18 @@ def test_cancel_wait_unblocks_pending_transcription_lease() -> None:
 def test_cancel_wait_without_a_pending_lease_is_a_noop() -> None:
     arbiter = GpuArbiter()
     arbiter.cancel_wait()
-    with arbiter.transcription_lease(stage="transcribing"):
-        pass
+    assert arbiter.status() == (None, None)
+    with arbiter.transcription_lease(stage="transcribing", estimate_s=12.0):
+        assert arbiter.status() == ("transcribing", 12.0)
+    assert arbiter.status() == (None, None)
 
 
 def test_chat_possible_again_after_stage_ends() -> None:
     arbiter = GpuArbiter()
-    with arbiter.transcription_lease(stage="transcribing"):
-        pass
+    with arbiter.transcription_lease(stage="transcribing", estimate_s=12.0):
+        assert arbiter.status() == ("transcribing", 12.0)
     with arbiter.chat_turn():
-        pass
+        assert arbiter.status() == (None, None)
+        assert _reader_count(arbiter=arbiter) == 1
+    assert arbiter.status() == (None, None)
+    assert _reader_count(arbiter=arbiter) == 0

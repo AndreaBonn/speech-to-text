@@ -95,14 +95,17 @@ def test_generation_page_corrupted_record_says_damaged_and_is_logged(
     assert any(generation_id in message for message in page_logs)
 
 
-def test_generation_page_non_uuid_id_is_not_logged(
+def test_generation_page_non_uuid_id_returns_404_without_warning(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     make_generation_on_disk(tmp_path=tmp_path)
     caplog.set_level("WARNING", logger="sbobina")
     app = create_app(settings=Settings(), data_dir=tmp_path)
     with TestClient(app=app, base_url=BASE_URL) as client:
-        client.get("/corsi/fisica/generazioni/non-un-uuid")
+        response = client.get(url="/corsi/fisica/generazioni/non-un-uuid")
 
+    assert response.status_code == 404
+    assert "Generazione non trovata" in response.text
+    # The corrupted-record test pairs this absence with an actual page warning.
     page_logs = [r for r in caplog.records if r.module == "pages_generazione"]
     assert page_logs == []

@@ -28,18 +28,19 @@ def _cause(provider: str, kind: FailureKind) -> ProviderUnavailableError:
 
 
 def test_ollama_error_exhausted_chain_returns_503_with_provider_names() -> None:
+    leaking = _cause(provider="groq/llama-x", kind=FailureKind.RATE_LIMIT)
+    leaking.__cause__ = ConnectionError(f"Authorization: Bearer {SENTINEL_KEY}")
     error = ChainExhaustedError(
-        causes=(
-            _cause(provider="groq/llama-x", kind=FailureKind.RATE_LIMIT),
-            _cause(provider="ollama/qwen", kind=FailureKind.NETWORK),
-        )
+        causes=(leaking, _cause(provider="ollama/qwen", kind=FailureKind.NETWORK))
     )
+    error.__cause__ = leaking
 
     app_error = _ollama_error(error=error, arbiter=GpuArbiter())
 
     assert app_error.code == "LLM_UNAVAILABLE"
     assert "groq/llama-x" in app_error.message
     assert "ollama/qwen" in app_error.message
+    assert SENTINEL_KEY in str(error.causes[0].__cause__)
     assert SENTINEL_KEY not in app_error.message
 
 
@@ -112,10 +113,10 @@ def test_check_outcome_exhausted_chain_reports_its_causes() -> None:
         causes=(_cause(provider="groq/llama-x", kind=FailureKind.AUTH),)
     )
 
-    try:
+    with pytest.raises(CorrectorUnavailableError) as raised:
         _check_outcome(outcome=_interrupted(error=error))
-    except CorrectorUnavailableError as raised:
-        message = str(raised)
+
+    message = str(raised.value)
     assert "groq/llama-x" in message
     assert "Ollama irraggiungibile" not in message
 
@@ -123,11 +124,8 @@ def test_check_outcome_exhausted_chain_reports_its_causes() -> None:
 def test_check_outcome_local_engine_keeps_historic_message() -> None:
     error = CorrectorUnavailableError("ConnectError: refused")
 
-    try:
+    with pytest.raises(CorrectorUnavailableError, match="Ollama irraggiungibile$"):
         _check_outcome(outcome=_interrupted(error=error))
-    except CorrectorUnavailableError as raised:
-        message = str(raised)
-    assert message.endswith("Ollama irraggiungibile")
 
 
 def test_chat_client_is_rebuilt_when_a_key_is_replaced(

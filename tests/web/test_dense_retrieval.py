@@ -6,7 +6,6 @@ import pytest
 from dense_retrieval_fixtures import (
     COURSE,
     MODEL,
-    STATUS,
     document,
     lecture,
     populate,
@@ -15,8 +14,7 @@ from dense_retrieval_fixtures import (
 
 from sbobina.embedding_units import content_hash
 from sbobina.ollama_embed import EmbeddingUnavailableError
-from sbobina.web.vector_reconcile import embedding_model_key
-from sbobina.web.vector_store import Coverage, StoredVector, VectorStore
+from sbobina.web.vector_store import Coverage, VectorStore
 
 
 def test_rank_highest_cosine_is_first_after_fusion(tmp_path: Path) -> None:
@@ -241,7 +239,7 @@ def test_rank_manifest_commit_during_read_falls_back(
     assert report.coverage == Coverage(embedded=1, total=2, truncated=0)
 
 
-def test_rank_other_model_has_no_index_and_empty_scope_has_no_hits(
+def test_rank_other_model_returns_not_indexed(
     tmp_path: Path,
 ) -> None:
     dense, vectors, client = ranker(tmp_path=tmp_path)
@@ -249,12 +247,17 @@ def test_rank_other_model_has_no_index_and_empty_scope_has_no_hits(
     populate(vectors=vectors, passages=[passage], values=[(1.0, 0.0)], model="other")
     result, report = dense.rank(course=COURSE, passages=[passage], question="x")
     assert (result, report.reason) == ([], "not_indexed")
-    vectors.put_vectors(
-        model_key=embedding_model_key(model=MODEL, status=STATUS),
-        vectors=[
-            StoredVector(text_sha256="unused", vector=(1.0, 0.0), truncated=False)
-        ],
-    )
+    assert client.calls == []
+    populate(vectors=vectors, passages=[passage], values=[(1.0, 0.0)])
+    found, report = dense.rank(course=COURSE, passages=[passage], question="x")
+    assert found == [passage]
+    assert report.mode == "dense"
+
+
+def test_rank_empty_scope_returns_no_hits(tmp_path: Path) -> None:
+    dense, vectors, client = ranker(tmp_path=tmp_path)
+    passage = document(number=0)
+    populate(vectors=vectors, passages=[passage], values=[(1.0, 0.0)])
     empty, report = dense.rank(course="empty", passages=[], question="x")
     assert (empty, report.reason, report.coverage) == (
         [],

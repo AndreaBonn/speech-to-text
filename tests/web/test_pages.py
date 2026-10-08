@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -152,10 +153,10 @@ def test_rail_has_the_theme_toggle_button(tmp_path: Path) -> None:
 def test_static_theme_script_is_served(tmp_path: Path) -> None:
     app = create_app(settings=Settings(), data_dir=tmp_path)
     with TestClient(app=app, base_url=BASE_URL) as client:
-        response = client.get("/static/js/theme.js")
+        response = client.get(url="/static/js/theme.js")
 
     assert response.status_code == 200
-    assert "data-theme" in response.text or "dataset.theme" in response.text
+    assert 'root.setAttribute("data-theme", theme);' in response.text
 
 
 def test_ripasso_page_returns_shell(tmp_path: Path) -> None:
@@ -170,15 +171,25 @@ def test_ripasso_page_returns_shell(tmp_path: Path) -> None:
     assert "/static/js/ripasso.js" in body
 
 
-def test_ripasso_page_marks_its_rail_entry_active_after_corsi(tmp_path: Path) -> None:
+def test_ripasso_page_marks_its_rail_entry_active(tmp_path: Path) -> None:
     app = create_app(settings=Settings(), data_dir=tmp_path)
     with TestClient(app=app, base_url=BASE_URL) as client:
-        body = client.get("/ripasso").text
+        body = client.get(url="/ripasso").text
+
+    link = re.search(pattern=r"<a\b[^>]*>Ripasso</a>", string=body)
+    assert link is not None
+    assert 'href="/ripasso"' in link.group()
+    assert 'aria-current="page"' in link.group()
+
+
+def test_ripasso_page_places_its_rail_entry_after_corsi(tmp_path: Path) -> None:
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get(url="/ripasso").text
 
     assert ">Ripasso<" in body
     rail = body.split('class="rail__list"')[1].split("</ul>")[0]
     assert rail.index(">Corsi<") < rail.index(">Ripasso<")
-    assert 'class="rail__link rail__link--active"' in body
 
 
 def test_index_explains_beam_size_with_the_recommended_value(tmp_path: Path) -> None:

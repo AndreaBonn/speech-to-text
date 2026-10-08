@@ -83,9 +83,15 @@ def test_job_config_uses_settings_and_runtime_defaults() -> None:
     job = JobConfig.from_settings(config=config, runtime=runtime)
     assert (job.beam_size, job.vad_filter, job.ollama_model) == (8, True, "local:test")
     assert (job.device, job.compute_type, job.whisper_model) == ("cpu", "int8", "tiny")
-    assert (
-        JobConfig(subject="x" * 100, beam_size=10, uncertain_threshold=1).subject
-        == "x" * 100
+
+
+@pytest.mark.parametrize("beam_size", [1, 10])
+def test_job_config_boundary_values_are_accepted(beam_size: int) -> None:
+    job = JobConfig(subject="x" * 100, beam_size=beam_size, uncertain_threshold=1)
+    assert (job.subject, job.beam_size, job.uncertain_threshold) == (
+        "x" * 100,
+        beam_size,
+        1,
     )
 
 
@@ -151,6 +157,24 @@ def test_work_item_course_id_only_for_course_scoped_actions(
 ) -> None:
     with pytest.raises(ValidationError, match="course-scoped"):
         WorkItem(job_id="j1", action=action, course_id=course_id)
+
+
+@pytest.mark.parametrize(
+    "action,course_id",
+    [
+        ("pipeline", None),
+        ("study", None),
+        ("generation", "c1"),
+        ("ocr", "c1"),
+        ("embed", "c1"),
+    ],
+)
+def test_work_item_valid_scope_is_accepted(
+    action: Literal["pipeline", "study", "generation", "ocr", "embed"],
+    course_id: str | None,
+) -> None:
+    item = WorkItem(job_id="j1", action=action, course_id=course_id)
+    assert (item.job_id, item.action, item.course_id) == ("j1", action, course_id)
 
 
 IMPORT_RECORD = {

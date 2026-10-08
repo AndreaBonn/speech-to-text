@@ -49,12 +49,24 @@ def _lecture(store: JobStore, text: str, subject: str = "Diritto") -> str:
 def test_list_exam_cues_all_readable_reports_no_unavailable_jobs(
     client: TestClient, store: JobStore
 ) -> None:
-    _lecture(store=store, text="Segnatevelo")
+    job_id = _lecture(store=store, text="Segnatevelo")
 
     response = client.get(url=URL)
 
     assert response.status_code == 200
     assert response.json()["meta"]["unavailable_jobs"] == []
+    [cue] = response.json()["data"]
+    assert (cue["job_id"], cue["quote"], cue["level"], cue["segment_index"]) == (
+        job_id,
+        "Segnatevelo",
+        "strong",
+        0,
+    )
+    path = store.jobs_dir / job_id / TRANSCRIPT_FILES["original"]
+    path.write_text(data="{", encoding="utf-8")
+    unavailable = client.get(url=URL)
+    assert unavailable.status_code == 200
+    assert unavailable.json()["meta"]["unavailable_jobs"] == [job_id]
 
 
 def test_list_exam_cues_detector_type_error_is_not_swallowed(

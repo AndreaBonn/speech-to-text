@@ -63,63 +63,98 @@ def _moved_transcript() -> Transcript:
     return replace(transcript, segments=(transcript.segments[0],) * 3 + (moved,))
 
 
-def test_resolve_lecture_same_revision_uses_segment_without_matching(
+def test_resolve_lecture_same_revision_returns_original_segment(
     store: JobStore,
 ) -> None:
     anchor = replace(_lecture(store=store), quote="short")
-    before = _snapshot(directory=store.jobs_dir.parent)
+
     result = _resolve(store=store, anchor=anchor)
+
     assert result == AnchorResolution(
         href=f"/lettore/{anchor.job_id}?t=10.0&variant=original", status="ok"
     )
-    assert _snapshot(directory=store.jobs_dir.parent) == before
+
+
+def test_anchor_resolution_status_assignment_is_frozen() -> None:
+    result = AnchorResolution(href="/lettore/job", status="ok")
     field_name = "status"
+
     with pytest.raises(FrozenInstanceError):
         setattr(result, field_name, "moved")
 
+    assert result.status == "ok"
 
-def test_resolve_lecture_changed_quote_relocates_and_disappears(
-    store: JobStore,
+
+@pytest.mark.parametrize(
+    ("moved", "status"), [(False, "ok"), (True, "moved")], ids=["original", "moved"]
+)
+def test_resolve_lecture_existing_source_preserves_files(
+    store: JobStore, moved: bool, status: str
+) -> None:
+    anchor = _lecture(store=store)
+    if moved:
+        save_transcript(
+            transcript=_moved_transcript(),
+            path=store.jobs_dir / anchor.job_id / TRANSCRIPT_FILES["corrected"],
+        )
+    before = _snapshot(directory=store.jobs_dir.parent)
+
+    result = _resolve(store=store, anchor=anchor)
+
+    assert result.status == status
+    assert before
+    assert _snapshot(directory=store.jobs_dir.parent) == before
+
+
+@pytest.mark.parametrize(
+    ("transcript", "status", "suffix"),
+    [
+        (_moved_transcript(), "moved", "?t=90.0&variant=corrected"),
+        (
+            replace(transcript_fixture(), segments=transcript_fixture().segments[:1]),
+            "source_modified",
+            "?variant=corrected",
+        ),
+    ],
+    ids=["moved", "removed-quote"],
+)
+def test_resolve_lecture_changed_source_returns_expected_location(
+    store: JobStore, transcript: Transcript, status: str, suffix: str
 ) -> None:
     anchor = _lecture(store=store)
     corrected = store.jobs_dir / anchor.job_id / TRANSCRIPT_FILES["corrected"]
-    save_transcript(transcript=_moved_transcript(), path=corrected)
-    before = _snapshot(directory=store.jobs_dir.parent)
+    save_transcript(transcript=transcript, path=corrected)
+
     result = _resolve(store=store, anchor=anchor)
-    assert result == AnchorResolution(
-        href=f"/lettore/{anchor.job_id}?t=90.0&variant=corrected", status="moved"
-    )
-    assert _snapshot(directory=store.jobs_dir.parent) == before
-    transcript = transcript_fixture()
-    save_transcript(
-        transcript=replace(transcript, segments=transcript.segments[:1]), path=corrected
-    )
-    assert _resolve(store=store, anchor=anchor).status == "source_modified"
+
+    assert result.status == status
+    assert result.href == f"/lettore/{anchor.job_id}{suffix}"
 
 
-def test_resolve_lecture_invalid_index_relocates_without_io() -> None:
+@pytest.mark.parametrize(
+    ("quote", "status", "suffix"),
+    [
+        (QUOTE, "moved", "?t=10.0&variant=original"),
+        ("questa citazione è assente", "source_modified", "?variant=original"),
+    ],
+    ids=["found-quote", "missing-quote"],
+)
+def test_resolve_lecture_invalid_index_returns_quote_location(
+    quote: str, status: str, suffix: str
+) -> None:
     anchor = LectureAnchor(
-        job_id=str(uuid4()), revision="old", segment_index=999, quote=QUOTE
+        job_id=str(uuid4()), revision="old", segment_index=999, quote=quote
     )
-    assert (
-        resolve_lecture(
-            anchor=anchor,
-            transcript=transcript_fixture(),
-            revision="old",
-            variant="original",
-        ).status
-        == "moved"
+
+    result = resolve_lecture(
+        anchor=anchor,
+        transcript=transcript_fixture(),
+        revision="old",
+        variant="original",
     )
-    missing = replace(anchor, quote="questa citazione è assente")
-    assert (
-        resolve_lecture(
-            anchor=missing,
-            transcript=transcript_fixture(),
-            revision="old",
-            variant="original",
-        ).status
-        == "source_modified"
-    )
+
+    assert result.status == status
+    assert result.href == f"/lettore/{anchor.job_id}{suffix}"
 
 
 @pytest.mark.parametrize("content", ["{", "{}", '{"segments": null}', None])
@@ -160,38 +195,77 @@ def _document() -> CourseDocument:
     )
 
 
-def test_resolve_document_hash_changes_and_removal(store: JobStore) -> None:
+@pytest.mark.parametrize(
+    ("state", "status"),
+    [("same", "ok"), ("changed", "source_modified"), ("removed", "source_removed")],
+)
+def test_resolve_document_source_state_returns_expected_status(
+    store: JobStore, state: str, status: str
+) -> None:
+    document = _document()
+    write_document(courses_dir=store.courses_dir, document=document)
+    anchor = DocumentAnchor(
+        doc_id=document.id, sha256=document.sha256, page=2, quote=QUOTE
+    )
+    if state == "changed":
+        write_document(
+            courses_dir=store.courses_dir, document=replace(document, sha256="def")
+        )
+    elif state == "removed":
+        (
+            document_dir(
+                courses_dir=store.courses_dir, course_id=COURSE_ID, doc_id=document.id
+            )
+            / "document.json"
+        ).unlink()
+
+    result = resolve_anchor(anchor=anchor, store=store, course_id=COURSE_ID, key=KEY)
+
+    assert result.status == status
+    assert result.href == f"/corsi/diritto/documenti/{document.id}?p=2"
+
+
+def test_resolve_document_existing_source_preserves_files(store: JobStore) -> None:
     document = _document()
     write_document(courses_dir=store.courses_dir, document=document)
     anchor = DocumentAnchor(
         doc_id=document.id, sha256=document.sha256, page=2, quote=QUOTE
     )
     before = _snapshot(directory=store.jobs_dir.parent)
+
     result = resolve_anchor(anchor=anchor, store=store, course_id=COURSE_ID, key=KEY)
+
     assert result == AnchorResolution(
         href=f"/corsi/diritto/documenti/{document.id}?p=2", status="ok"
     )
+    assert before
     assert _snapshot(directory=store.jobs_dir.parent) == before
-    write_document(
-        courses_dir=store.courses_dir, document=replace(document, sha256="def")
-    )
-    assert (
-        resolve_anchor(anchor=anchor, store=store, course_id=COURSE_ID, key=KEY).status
-        == "source_modified"
-    )
-    (
-        document_dir(
-            courses_dir=store.courses_dir, course_id=COURSE_ID, doc_id=document.id
-        )
-        / "document.json"
-    ).unlink()
-    assert (
-        resolve_anchor(anchor=anchor, store=store, course_id=COURSE_ID, key=KEY).status
-        == "source_removed"
-    )
 
 
-def test_resolve_generation_existence_and_removal(store: JobStore) -> None:
+@pytest.mark.parametrize(
+    ("removed", "status"), [(False, "ok"), (True, "source_removed")]
+)
+def test_resolve_generation_source_state_returns_expected_status(
+    store: JobStore, removed: bool, status: str
+) -> None:
+    generation = create_generation(
+        courses_dir=store.courses_dir,
+        course_id=COURSE_ID,
+        request=GenerationRequest(format=GenerationFormat.OPEN, count=1),
+    )
+    anchor = GenerationAnchor(generation_id=generation.id, question_index=0)
+    if removed:
+        generation_path(
+            courses_dir=store.courses_dir, course_id=COURSE_ID, gen_id=generation.id
+        ).unlink()
+
+    result = resolve_anchor(anchor=anchor, store=store, course_id=COURSE_ID, key=KEY)
+
+    assert result.status == status
+    assert result.href == f"/corsi/{KEY}/generazioni/{generation.id}"
+
+
+def test_resolve_generation_existing_source_preserves_files(store: JobStore) -> None:
     generation = create_generation(
         courses_dir=store.courses_dir,
         course_id=COURSE_ID,
@@ -199,18 +273,14 @@ def test_resolve_generation_existence_and_removal(store: JobStore) -> None:
     )
     anchor = GenerationAnchor(generation_id=generation.id, question_index=0)
     before = _snapshot(directory=store.jobs_dir.parent)
+
     result = resolve_anchor(anchor=anchor, store=store, course_id=COURSE_ID, key=KEY)
+
     assert result == AnchorResolution(
         href=f"/corsi/{KEY}/generazioni/{generation.id}", status="ok"
     )
+    assert before
     assert _snapshot(directory=store.jobs_dir.parent) == before
-    generation_path(
-        courses_dir=store.courses_dir, course_id=COURSE_ID, gen_id=generation.id
-    ).unlink()
-    assert (
-        resolve_anchor(anchor=anchor, store=store, course_id=COURSE_ID, key=KEY).status
-        == "source_removed"
-    )
 
 
 def test_resolve_document_corrupted_record_returns_unavailable(

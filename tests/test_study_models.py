@@ -63,10 +63,37 @@ def test_proposed_citation_rejects_malformed_segment_reference(passage: object) 
         )
 
 
-def test_study_response_requires_all_item_fields_and_accepts_empty_chapters() -> None:
-    assert StudyResponse.model_validate({"capitoli": []}).chapters == []
-    with pytest.raises(ValidationError):
-        StudyResponse.model_validate({"capitoli": [{"titolo": "Incomplete"}]})
+def test_study_response_empty_chapters_accepted(
+    response_payload: dict[str, object],
+) -> None:
+    assert len(StudyResponse.model_validate(obj=response_payload).chapters) == 1
+
+    response = StudyResponse.model_validate(obj={"capitoli": []})
+
+    assert response.chapters == []
+
+
+@pytest.mark.parametrize(
+    "field", ["titolo", "inizio", "riassunto", "concetti", "domande"]
+)
+def test_study_response_missing_item_fields_rejected(
+    response_payload: dict[str, object],
+    field: str,
+) -> None:
+    assert (
+        StudyResponse.model_validate(obj=response_payload).chapters[0].title
+        == "Il contratto"
+    )
+
+    payload = json.loads(json.dumps(response_payload))
+    del payload["capitoli"][0][field]
+
+    with pytest.raises(ValidationError) as error:
+        StudyResponse.model_validate(obj=payload)
+
+    assert [(item["loc"], item["type"]) for item in error.value.errors()] == [
+        (("capitoli", 0, field), "missing")
+    ]
 
 
 @pytest.fixture

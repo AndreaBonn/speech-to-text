@@ -14,8 +14,7 @@ from sbobina.generation_models import (
     GenerationRequest,
     GenerationStatus,
 )
-from sbobina.practice_models import PracticeAttempt, PracticeStatus
-from sbobina.web import practice_store
+from sbobina.practice_models import PracticeStatus
 from sbobina.web.errors import NotFoundError
 from sbobina.web.generation_store import (
     create_generation,
@@ -223,18 +222,19 @@ def test_list_attempts_file_deleted_between_glob_and_read_is_not_reported(
     gone = replace(make_attempt(), course_id=kept.course_id)
     for attempt in (kept, gone):
         save_attempt(courses_dir=tmp_path, course_id=kept.course_id, attempt=attempt)
-    real_load = practice_store.load_attempt
+    gone_path = practice_path(
+        courses_dir=tmp_path, course_id=kept.course_id, attempt_id=gone.id
+    )
+    real_read = Path.read_text
 
-    def load_after_delete(
-        courses_dir: Path, course_id: str, attempt_id: str
-    ) -> PracticeAttempt:
-        if attempt_id == gone.id:
-            raise NotFoundError(entity="Tentativo", id=attempt_id)
-        return real_load(
-            courses_dir=courses_dir, course_id=course_id, attempt_id=attempt_id
-        )
+    def read_after_delete(
+        self: Path, encoding: str | None = None, errors: str | None = None
+    ) -> str:
+        if self == gone_path:
+            self.unlink()
+        return real_read(self, encoding=encoding, errors=errors)
 
-    monkeypatch.setattr(practice_store, "load_attempt", load_after_delete)
+    monkeypatch.setattr(Path, "read_text", read_after_delete)
 
     scan = list_attempts(courses_dir=tmp_path, course_id=kept.course_id)
 

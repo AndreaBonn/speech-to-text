@@ -65,8 +65,16 @@ def test_read_parsed_errors_propagate_and_are_not_cached(tmp_path: Path) -> None
         with pytest.raises(ValueError):
             read_parsed(path=path, parse=failing)
     assert len(attempts) == 2
+
+
+def test_read_parsed_missing_file_propagates_file_not_found(tmp_path: Path) -> None:
+    path = tmp_path / "missing.json"
+
     with pytest.raises(FileNotFoundError):
-        read_parsed(path=tmp_path / "missing.json", parse=str.upper)
+        read_parsed(path=path, parse=str.upper)
+
+    path.write_text(data="present", encoding="utf-8")
+    assert read_parsed(path=path, parse=str.upper) == "PRESENT"
 
 
 def test_read_parsed_version_and_text_come_from_the_same_open_file(

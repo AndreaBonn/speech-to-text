@@ -137,8 +137,11 @@ def test_citation_anchor_skips_sources_of_other_lectures(tmp_path: Path) -> None
 def test_lecture_anchor_passage_id_not_of_this_lecture_returns_none(
     passage_id: str,
 ) -> None:
-    assert lecture_anchor(
+    valid = lecture_anchor(
         citation=_lecture_citation(job_id=JOB, passage_id=f"L{JOB}-S2"), revision="r"
+    )
+    assert valid == LectureAnchor(
+        job_id=JOB, revision="r", segment_index=2, quote=QUOTE
     )
     citation = _lecture_citation(job_id=JOB, passage_id=passage_id)
 

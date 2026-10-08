@@ -227,15 +227,42 @@ def test_create_card_missing_lecture_returns_not_found(
         DocumentAnchor(doc_id=GONE_DOC_ID, sha256="old", page=0, quote=QUOTE),
     ],
 )
-def test_create_card_other_anchors_and_duplicates_are_accepted(
+def test_create_card_other_anchors_are_accepted(
     client: TestClient, store: JobStore, anchor: Anchor
 ) -> None:
-    course_id = _course(store=store)
+    _course(store=store)
+
+    response = client.post(url=CARDS_URL, json=_body(anchor=anchor))
+
+    assert response.status_code == 201
+    assert response.json()["data"]["anchor"] == jsonable_encoder(obj=anchor)
+
+
+@pytest.mark.parametrize(
+    "anchor",
+    [GENERATION, DocumentAnchor(doc_id=GONE_DOC_ID, sha256="old", page=0, quote=QUOTE)],
+)
+def test_create_card_duplicate_gets_distinct_id(
+    client: TestClient, store: JobStore, anchor: Anchor
+) -> None:
+    _course(store=store)
     first = client.post(url=CARDS_URL, json=_body(anchor=anchor))
+    assert first.status_code == 201
+
     second = client.post(url=CARDS_URL, json=_body(anchor=anchor))
-    assert first.status_code == second.status_code == 201
-    assert first.json()["data"]["anchor"] == jsonable_encoder(obj=anchor)
+
+    assert second.status_code == 201
     assert len({first.json()["data"]["id"], second.json()["data"]["id"]}) == 2
+
+
+def test_create_card_persists_review_clock_timestamp(
+    client: TestClient, store: JobStore
+) -> None:
+    course_id = _course(store=store)
+
+    response = client.post(url=CARDS_URL, json=_body())
+
+    assert response.status_code == 201
     path = cards_path(courses_dir=store.courses_dir, course_id=course_id)
     assert NOW.isoformat().replace("+00:00", "Z") in path.read_text(encoding="utf-8")
 

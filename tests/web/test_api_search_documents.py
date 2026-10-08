@@ -123,6 +123,9 @@ def test_search_document_respects_course_filter(
 
     assert response.status_code == 200
     assert response.json()["data"] == []
+    matching = client.get(url=SEARCH_URL, params={"q": "causa", "course": "fisica"})
+    assert matching.status_code == 200
+    assert [item["doc_id"] for item in matching.json()["data"]] == ["doc-1"]
 
 
 def test_search_omits_documents_of_an_unregistered_course(

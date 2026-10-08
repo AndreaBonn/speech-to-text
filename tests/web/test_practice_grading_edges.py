@@ -41,7 +41,7 @@ def test_conflicting_submission_preserves_original(
 
 
 @pytest.mark.parametrize("action", ["grade", "self-grade"])
-def test_missing_or_invalid_grade_rejected(
+def test_grade_answer_missing_answer_returns_not_found(
     client: TestClient,
     attempt_url: str,
     action: str,
@@ -51,15 +51,38 @@ def test_missing_or_invalid_grade_rejected(
         client.post(url=f"{url}/{action}", json={"outcome": "errata"}).status_code
         == 404
     )
+
+
+def test_self_grade_answer_invalid_outcome_returns_unprocessable_entity(
+    client: TestClient,
+    attempt_url: str,
+) -> None:
+    url = f"{attempt_url}/answers/0"
     assert client.post(url=url, json=submission()).status_code == 200
-    assert (
-        client.post(url=f"{url}/self-grade", json={"outcome": "invalid"}).status_code
-        == 422
-    )
-    assert (
-        client.post(url=f"{url}/{action}", json={"outcome": "errata"}).status_code
-        == 200
-    )
+
+    response = client.post(url=f"{url}/self-grade", json={"outcome": "invalid"})
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("action", "expected"),
+    [("grade", ("graded", "corretta")), ("self-grade", ("self_graded", "errata"))],
+)
+def test_grade_answer_existing_answer_returns_expected_grade(
+    client: TestClient,
+    attempt_url: str,
+    action: str,
+    expected: tuple[str, str],
+) -> None:
+    url = f"{attempt_url}/answers/0"
+    assert client.post(url=url, json=submission()).status_code == 200
+
+    response = client.post(url=f"{url}/{action}", json={"outcome": "errata"})
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert (data["status"], data["outcome"]) == expected
 
 
 def test_concurrent_questions_preserve_all_answers(

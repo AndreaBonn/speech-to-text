@@ -1,9 +1,11 @@
 from dataclasses import FrozenInstanceError, asdict, replace
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
 from sbobina.document_models import CourseDocument, DocumentKind, DocumentStatus
+from sbobina.web.document_store import read_document, write_document
 
 CREATED = datetime(2026, 10, 2, 10, 0, tzinfo=UTC)
 
@@ -57,9 +59,16 @@ def test_course_document_metadata_is_frozen() -> None:
     ],
 )
 def test_course_document_accepts_consistent_states(
-    status: DocumentStatus, error: str | None, pages: int | None
+    tmp_path: Path, status: DocumentStatus, error: str | None, pages: int | None
 ) -> None:
-    assert _document(status=status, error=error, pages=pages).status == status
+    document = _document(status=status, error=error, pages=pages)
+
+    write_document(courses_dir=tmp_path, document=document)
+    loaded = read_document(courses_dir=tmp_path, course_id="course-id", doc_id="doc-id")
+
+    assert loaded == document
+    assert (loaded.status, loaded.error, loaded.pages) == (status, error, pages)
+    assert loaded.created_at == CREATED
 
 
 @pytest.mark.parametrize(

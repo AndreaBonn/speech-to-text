@@ -1,5 +1,6 @@
 import json
 import logging
+from importlib import resources
 
 import httpx
 import ollama
@@ -58,11 +59,24 @@ def test_build_system_prompt_includes_subject_when_given() -> None:
     assert "{materia}" not in prompt
 
 
-def test_build_system_prompt_without_subject_leaves_no_placeholder() -> None:
-    prompt = build_system_prompt(None)
+def test_build_system_prompt_without_subject_removes_template_placeholder() -> None:
+    template_path = resources.files(anchor="sbobina.prompts") / "correzione-v1.md"
+    template = template_path.read_text(encoding="utf-8")
 
+    prompt = build_system_prompt(subject=None)
+
+    assert "{materia}" in template
     assert "{materia}" not in prompt
-    assert "Materia della lezione" not in prompt
+    assert 'Formato. Rispondi con un oggetto JSON con la chiave "correzioni"' in prompt
+
+
+def test_build_system_prompt_without_subject_omits_subject_line() -> None:
+    with_subject = build_system_prompt(subject="diritto privato")
+
+    without_subject = build_system_prompt(subject=None)
+
+    assert "Materia della lezione: diritto privato." in with_subject
+    assert "Materia della lezione" not in without_subject
 
 
 def test_build_user_message_marks_start_of_lecture_without_context() -> None:

@@ -1,14 +1,24 @@
 import json
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 from study_fixtures import FakeChat, response_fixture, transcript_fixture
 
 from sbobina.correction import CorrectorUnavailableError, InvalidResponseError
+from sbobina.models import Transcript
 from sbobina.settings import Settings
 from sbobina.study_blocks import build_study_blocks
-from sbobina.study_models import DiscardCount, FailedBlock, RejectionReason
+from sbobina.study_models import (
+    Citation,
+    DiscardCount,
+    FailedBlock,
+    QuestionItem,
+    RejectionReason,
+    StudyChapter,
+    SummaryItem,
+)
 from sbobina.study_pipeline import StudyOptions, generate_study
 from sbobina.study_validation import validate_chapter
 
@@ -63,12 +73,16 @@ def test_generate_study_retries_invalid_json_then_records_failed_times(
     assert progress == [(1, 1)]
 
 
-def test_generate_study_retry_can_recover_and_unavailable_propagates() -> None:
+def test_generate_study_invalid_json_retry_recovers_chapter() -> None:
     chat = FakeChat(responses=["{", "```json\n" + response_fixture() + "\n```"])
     result = generate_study(
         transcript=transcript_fixture(), chat=chat, options=StudyOptions(model="test")
     )
     assert result.chapters[0].title == "Contratto"
+    assert len(chat.requests) == 2
+
+
+def test_generate_study_unavailable_chat_propagates_error() -> None:
     with pytest.raises(CorrectorUnavailableError, match="down"):
         generate_study(
             transcript=transcript_fixture(),
@@ -77,7 +91,7 @@ def test_generate_study_retry_can_recover_and_unavailable_propagates() -> None:
         )
 
 
-def test_build_study_blocks_respects_budget_and_hides_unseen_segment_words() -> None:
+def test_build_study_blocks_three_word_budget_preserves_passage_indices() -> None:
     transcript = transcript_fixture()
     blocks = build_study_blocks(transcript=transcript, max_words=3)
     assert [len(block.text.split()) - 2 * len(block.allowed) for block in blocks] == [
@@ -90,6 +104,10 @@ def test_build_study_blocks_respects_budget_and_hides_unseen_segment_words() -> 
         frozenset({1}),
         frozenset({1}),
     ]
+
+
+def test_generate_study_hidden_words_rejects_unsupported_items() -> None:
+    transcript = transcript_fixture()
     chat = FakeChat(responses=[response_fixture(quote="contratto è illecita")])
     result = generate_study(
         transcript=transcript,
@@ -118,54 +136,119 @@ def test_build_study_blocks_selects_longest_pause_in_last_twenty_percent() -> No
     blocks = build_study_blocks(transcript=transcript, max_words=10)
     assert blocks[0].text.endswith("w7")
     assert blocks[1].text.startswith("[S0] 00:18 w8")
+
+
+def test_build_study_blocks_empty_transcript_returns_empty() -> None:
+    transcript = transcript_fixture()
+    assert len(build_study_blocks(transcript=transcript, max_words=10)) == 1
+
     assert (
         build_study_blocks(transcript=replace(transcript, segments=()), max_words=10)
         == ()
     )
+
+
+def test_build_study_blocks_zero_budget_raises_value_error() -> None:
+    transcript = transcript_fixture()
+    assert len(build_study_blocks(transcript=transcript, max_words=10)) == 1
+
     with pytest.raises(ValueError, match="positive"):
         build_study_blocks(transcript=transcript, max_words=0)
 
 
+@pytest.mark.parametrize(
+    ("field", "expected"), [("study_block_words", 1200), ("study_num_predict", 2048)]
+)
+def test_settings_study_limits_default_matches_contract(
+    field: str, expected: int, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv(name=f"SBOBINA_{field.upper()}", raising=False)
+
+    monkeypatch.chdir(path=tmp_path)
+    config = Settings()
+
+    assert getattr(config, field) == expected
+
+
 @pytest.mark.parametrize("field", ["study_block_words", "study_num_predict"])
-def test_settings_study_limits_require_positive_values(field: str) -> None:
-    assert getattr(Settings(), field) > 0
+def test_settings_study_limits_zero_rejected(field: str) -> None:
+    assert getattr(Settings.model_validate({field: 1}), field) == 1
+
     with pytest.raises(ValidationError):
         Settings.model_validate({field: 0})
 
 
-@pytest.mark.parametrize("is_later_occurrence", [False, True])
-def test_generate_study_rejects_ambiguous_repeat_outside_visible_fragment(
-    is_later_occurrence: bool,
-) -> None:
+@pytest.fixture
+def repeated_transcript() -> Transcript:
     template = transcript_fixture()
     words = tuple(
         replace(template.words[0], text=" " + token, start=float(i), end=i + 0.5)
         for i, token in enumerate(["alfa", "beta", "gamma", "alfa", "beta", "gamma"])
     )
-    transcript = replace(
+    return replace(
         template, segments=(replace(template.segments[0], words=words, end=5.5),)
     )
-    response = response_fixture(quote="alfa beta gamma", passage="S0")
-    responses: list[str | Exception] = (
-        ['{"capitoli": []}', response]
-        if is_later_occurrence
-        else [response, '{"capitoli": []}']
+
+
+@pytest.fixture
+def repeated_chapter() -> StudyChapter:
+    citation = Citation(segment_index=0, quote="alfa beta gamma")
+    return StudyChapter(
+        title="Contratto",
+        start=0.0,
+        summary=(SummaryItem(text="La causa è illecita.", citations=(citation,)),),
+        concepts=(),
+        questions=(QuestionItem(question="Com'è la causa?", citations=(citation,)),),
     )
-    chat = FakeChat(responses=responses)
+
+
+def test_generate_study_first_repeat_keeps_grounded_chapter(
+    repeated_transcript: Transcript, repeated_chapter: StudyChapter
+) -> None:
+    chat = FakeChat(
+        responses=[
+            response_fixture(quote="alfa beta gamma", passage="S0"),
+            '{"capitoli": []}',
+        ]
+    )
+
     result = generate_study(
-        transcript=transcript,
+        transcript=repeated_transcript,
         chat=chat,
         options=StudyOptions(model="test", block_words=3),
     )
-    if is_later_occurrence:
-        assert result.chapters == ()
-        # The fixture's concept term "causa" is not in the quote: rejected first.
-        assert set(result.discarded) == {
-            DiscardCount(reason=RejectionReason.AMBIGUOUS_QUOTE, count=2),
-            DiscardCount(reason=RejectionReason.TERM_NOT_IN_QUOTE, count=1),
-        }
-    else:
-        assert result.chapters[0].start == 0.0
+
+    assert result.chapters == (repeated_chapter,)
+    assert result.discarded == (
+        DiscardCount(reason=RejectionReason.TERM_NOT_IN_QUOTE, count=1),
+    )
+    assert result.failed_blocks == ()
+
+
+def test_generate_study_later_repeat_rejects_ambiguous_items(
+    repeated_transcript: Transcript, repeated_chapter: StudyChapter
+) -> None:
+    response = response_fixture(quote="alfa beta gamma", passage="S0")
+    options = StudyOptions(model="test", block_words=3)
+    first = generate_study(
+        transcript=repeated_transcript,
+        chat=FakeChat(responses=[response, '{"capitoli": []}']),
+        options=options,
+    )
+    assert first.chapters == (repeated_chapter,)
+
+    result = generate_study(
+        transcript=repeated_transcript,
+        chat=FakeChat(responses=['{"capitoli": []}', response]),
+        options=options,
+    )
+
+    assert result.chapters == ()
+    assert result.discarded == (
+        DiscardCount(reason=RejectionReason.AMBIGUOUS_QUOTE, count=2),
+        DiscardCount(reason=RejectionReason.TERM_NOT_IN_QUOTE, count=1),
+    )
+    assert result.failed_blocks == ()
 
 
 def test_build_study_blocks_counts_lexical_words_and_preserves_input() -> None:
@@ -184,7 +267,7 @@ def test_build_study_blocks_counts_lexical_words_and_preserves_input() -> None:
     assert transcript.segments[0].text == "uno due tre quattro cinque"
 
 
-def test_generate_study_orders_chapters_and_reports_every_block() -> None:
+def test_generate_study_unsorted_chapters_orders_by_citation_time() -> None:
     payload = json.loads(response_fixture())
     later = payload["capitoli"][0]
     earlier = json.loads(response_fixture(quote="inizio della lezione", passage="S0"))[
@@ -202,6 +285,9 @@ def test_generate_study_orders_chapters_and_reports_every_block() -> None:
         ("Introduzione", 0.0),
         ("Contratto", 10.0),
     ]
+
+
+def test_generate_study_multiple_blocks_reports_each_completion() -> None:
     progress: list[tuple[int, int]] = []
     generate_study(
         transcript=transcript_fixture(),

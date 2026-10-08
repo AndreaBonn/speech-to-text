@@ -85,25 +85,55 @@ def test_lock_for_shares_registry_with_chat(tmp_path: Path) -> None:
     assert path_locks.lock_for(path=tmp_path / "second") is not first
 
 
-def test_create_card_deduplicates_live_cards_and_isolates_courses(
+def test_create_card_new_card_persists_at_course_path(tmp_path: Path) -> None:
+    assert card_store.load_cards(courses_dir=tmp_path, course_id=COURSE) == []
+
+    card = _create(root=tmp_path)
+
+    assert UUID(hex=card.id).version == 4
+    assert card_store.load_cards(courses_dir=tmp_path, course_id=COURSE) == [card]
+    path = card_store.cards_path(courses_dir=tmp_path, course_id=COURSE)
+    assert path == tmp_path / COURSE / "cards" / "cards.jsonl"
+    assert len(path.read_text().splitlines()) == 1
+
+
+def test_create_card_same_key_returns_existing_card(tmp_path: Path) -> None:
+    first = _create(root=tmp_path)
+
+    duplicate = _create(root=tmp_path)
+
+    assert duplicate == first
+    path = card_store.cards_path(courses_dir=tmp_path, course_id=COURSE)
+    assert len(path.read_text().splitlines()) == 1
+
+
+def test_create_card_same_key_in_other_course_creates_separate_card(
     tmp_path: Path,
 ) -> None:
-    assert card_store.load_cards(courses_dir=tmp_path, course_id=COURSE) == []
     first = _create(root=tmp_path)
-    assert UUID(hex=first.id).version == 4
-    assert _create(root=tmp_path) == first
+
     other = card_store.create_card(
         courses_dir=tmp_path, course_id="other", draft=DRAFT, now=NOW
     )
+
     assert other.id != first.id
+    assert card_store.load_cards(courses_dir=tmp_path, course_id=COURSE) == [first]
+    assert card_store.load_cards(courses_dir=tmp_path, course_id="other") == [other]
+
+
+def test_create_card_without_key_preserves_identical_manual_cards(
+    tmp_path: Path,
+) -> None:
     manual = replace(DRAFT, dedup_key=None)
-    assert (
-        _create(root=tmp_path, draft=manual).id
-        != _create(root=tmp_path, draft=manual).id
-    )
-    path = card_store.cards_path(courses_dir=tmp_path, course_id=COURSE)
-    assert path == tmp_path / COURSE / "cards" / "cards.jsonl"
-    assert len(path.read_text().splitlines()) == 3
+
+    first = _create(root=tmp_path, draft=manual)
+    second = _create(root=tmp_path, draft=manual)
+
+    assert first.id != second.id
+    assert card_store.load_cards(courses_dir=tmp_path, course_id=COURSE) == [
+        first,
+        second,
+    ]
 
 
 def test_create_card_parallel_dedup_writes_once(tmp_path: Path) -> None:

@@ -1,3 +1,5 @@
+import hashlib
+
 from sbobina.embedding_units import (
     LectureUnit,
     aggregate_lecture_hits_to_windows,
@@ -23,9 +25,11 @@ class TestContentHash:
         assert content_hash("testo a") != content_hash("testo b")
 
     def test_returns_hex_sha256(self) -> None:
-        digest = content_hash("x")
-        assert len(digest) == 64
-        int(digest, 16)  # raises ValueError if not hex
+        text = "Perché è un diritto"
+
+        digest = content_hash(text=text)
+
+        assert digest == hashlib.sha256(text.encode(encoding="utf-8")).hexdigest()
 
 
 class TestSegmentPositions:

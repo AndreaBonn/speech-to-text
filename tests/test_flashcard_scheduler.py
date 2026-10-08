@@ -34,15 +34,31 @@ def test_review_fixed_sequence_matches_library(ratings: tuple[int, ...]) -> None
         assert state.last_review == log.review_datetime == now
 
 
-@pytest.mark.parametrize("rating", list(Rating))
-def test_review_new_card_has_future_due(rating: Rating) -> None:
+@pytest.mark.parametrize(
+    ("rating", "library_rating"),
+    [
+        (Rating.AGAIN, fsrs.Rating.Again),
+        (Rating.HARD, fsrs.Rating.Hard),
+        (Rating.GOOD, fsrs.Rating.Good),
+        (Rating.EASY, fsrs.Rating.Easy),
+    ],
+)
+def test_review_new_card_due_matches_rating(
+    rating: Rating, library_rating: fsrs.Rating
+) -> None:
+    scheduler = fsrs.Scheduler(enable_fuzzing=False)
+    expected, _ = scheduler.review_card(
+        card=fsrs.Card(card_id=0, due=NOW), rating=library_rating, review_datetime=NOW
+    )
+
     state = review(
         state=None,
         rating=rating,
         now=NOW,
-        scheduler=fsrs.Scheduler(enable_fuzzing=False),
+        scheduler=scheduler,
     )
-    assert state.due > NOW
+
+    assert state.due == expected.due
     assert state.last_review == NOW
     with pytest.raises(FrozenInstanceError):
         setattr(state, fields(state)[0].name, NOW)

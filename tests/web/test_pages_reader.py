@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -48,10 +49,13 @@ def test_reader_page_exposes_audio_availability(
 def test_rail_disables_reader_link_without_a_done_job(tmp_path: Path) -> None:
     app = create_app(settings=Settings(), data_dir=tmp_path)
     with TestClient(app=app, base_url=BASE_URL) as client:
-        response = client.get("/")
+        response = client.get(url="/")
 
-    assert 'aria-disabled="true"' in response.text
-    assert ">Lettore<" in response.text
+    assert response.status_code == 200
+    link = re.search(pattern=r"<span\b[^>]*>Lettore</span>", string=response.text)
+    assert link is not None
+    assert 'aria-disabled="true"' in link.group()
+    assert 'class="rail__link rail__link--disabled"' in link.group()
 
 
 def test_reader_page_returns_shell_for_an_existing_job(tmp_path: Path) -> None:
@@ -170,10 +174,10 @@ def test_studio_page_returns_shell_for_an_existing_job(tmp_path: Path) -> None:
     assert body.index("/static/js/dom.js") < body.index("/static/js/studio.js")
 
 
-def test_studio_script_is_served_and_mounts_text_only(tmp_path: Path) -> None:
+def test_studio_script_is_served_with_job_api_endpoint(tmp_path: Path) -> None:
     app = create_app(settings=Settings(), data_dir=tmp_path)
     with TestClient(app=app, base_url=BASE_URL) as client:
-        response = client.get("/static/js/studio.js")
+        response = client.get(url="/static/js/studio.js")
 
     assert response.status_code == 200
     assert "/api/v1/jobs/" in response.text

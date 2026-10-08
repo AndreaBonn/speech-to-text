@@ -4,6 +4,9 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "bench_review_fold.py"
 SMALL_CARDS = 20
@@ -49,14 +52,26 @@ def test_main_text_mode_prints_fold_and_append_lines() -> None:
     assert "append (reviews.jsonl)" in result.stdout
 
 
-def test_run_benchmark_leaves_no_temporary_directory_behind() -> None:
-    system_tmp = Path(tempfile.gettempdir())
+def test_run_benchmark_leaves_no_temporary_directory_behind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A private temp root: the shared system one may hold other runs' dirs.
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    created: list[str] = []
+    real_temporary_directory = tempfile.TemporaryDirectory
+
+    def tracking_temporary_directory(**kwargs: Any) -> Any:
+        directory = real_temporary_directory(**kwargs)
+        created.append(directory.name)
+        return directory
+
+    monkeypatch.setattr(tempfile, "TemporaryDirectory", tracking_temporary_directory)
     run_benchmark = runpy.run_path(path_name=str(SCRIPT))["run_benchmark"]
-    before = sorted(system_tmp.glob("bench-review-fold-*"))
 
     report = run_benchmark(
         num_cards=SMALL_CARDS, num_reviews=SMALL_REVIEWS, runs=SMALL_RUNS
     )
 
     assert report.runs == SMALL_RUNS
-    assert sorted(system_tmp.glob("bench-review-fold-*")) == before
+    assert [Path(name).parent for name in created] == [tmp_path]
+    assert list(tmp_path.iterdir()) == []

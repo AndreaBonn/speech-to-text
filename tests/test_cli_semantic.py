@@ -82,26 +82,49 @@ def test_command_missing_model_returns_two_with_pull_command(
     assert caplog.records[-1].exc_info is not None
 
 
-@pytest.mark.parametrize(
-    "failure",
-    [EmbeddingUnavailableError(reason="bad_response"), OSError("disk failure")],
-)
 def test_cmd_indicizza_semantico_failure_logs_traceback(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
-    failure: Exception,
 ) -> None:
-    def fail(**kwargs: object) -> None:
-        raise failure
-
-    monkeypatch.setattr(cli_semantic, "_course_keys", fail)
+    context = make_context(tmp_path=tmp_path, fake=FakeEmbedder())
+    course = write_course(store=context.store)
+    record_path = context.store.courses_dir / course.id / "course.json"
+    record_path.unlink()
+    record_path.mkdir()
+    monkeypatch.setattr(cli_semantic, "settings", Settings(data_dir=tmp_path))
 
     with caplog.at_level(logging.ERROR):
         code = cli_semantic.cmd_indicizza_semantico(args=Namespace(tutti=True))
 
     assert code == 1
     record = caplog.records[-1]
-    assert str(failure) in record.getMessage()
+    assert str(record_path) in record.getMessage()
+    assert record.levelno == logging.ERROR
+    assert record.exc_info is not None
+    assert isinstance(record.exc_info[1], IsADirectoryError)
+
+
+def test_cmd_indicizza_semantico_bad_embedding_response_logs_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    context = make_context(tmp_path=tmp_path, fake=FakeEmbedder())
+    write_course(store=context.store)
+    monkeypatch.setattr(cli_semantic, "settings", Settings(data_dir=tmp_path))
+    failure = EmbeddingUnavailableError(reason="bad_response")
+
+    def fail(**kwargs: object) -> None:
+        raise failure
+
+    monkeypatch.setattr(cli_semantic, "model_status", fail)
+
+    with caplog.at_level(logging.ERROR):
+        code = cli_semantic.cmd_indicizza_semantico(args=Namespace(tutti=True))
+
+    assert code == 1
+    record = caplog.records[-1]
+    assert "bad_response" in record.getMessage()
+    assert record.levelno == logging.ERROR
     assert record.exc_info is not None
     assert record.exc_info[1] is failure
 

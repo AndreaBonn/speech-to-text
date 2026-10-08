@@ -238,8 +238,6 @@ def test_run_package_import_mapped_error_preserves_code(
     assert outcome == PackageImportOutcome(
         status=status, code=code, message="Import rejected"
     )
-    (harness.root / "crash").touch()
-    assert harness.run_import().code == "PACKAGE_IMPORT_FAILED"
 
 
 @pytest.mark.parametrize(

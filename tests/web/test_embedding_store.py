@@ -46,6 +46,16 @@ def test_embedding_run_rejects_invalid_progress(processed: int, total: int) -> N
         )
 
 
+@pytest.mark.parametrize("processed,total", [(0, 0), (0, 2), (2, 2)])
+def test_embedding_run_boundary_progress_is_accepted(
+    processed: int, total: int
+) -> None:
+    record = EmbeddingRun(
+        status=EmbeddingStatus.RUNNING, processed=processed, total=total, error=None
+    )
+    assert (record.processed, record.total) == (processed, total)
+
+
 def test_embedding_run_reserves_error_for_failure() -> None:
     with pytest.raises(ValueError, match="error"):
         EmbeddingRun(status=EmbeddingStatus.FAILED, processed=0, total=0, error=None)

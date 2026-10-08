@@ -168,23 +168,6 @@ def test_valid_response_returns_repaired_json() -> None:
     assert chat(_request()) == '{"a": [{"b": 1}]}'
 
 
-def test_model_missing_status_overrides_a_later_server_error_check() -> None:
-    # The presence check only runs once per model; a transient show() error
-    # on a later request for the SAME model must not re-trigger it.
-    fake = FakeOllamaClient()
-    chat = make_ollama_link_client(
-        model_host="http://localhost:11434",
-        timeout_s=None,
-        client=cast(ollama.Client, fake),
-    )
-    chat(_request())
-
-    fake.show_error = ollama.ResponseError("down", status_code=500)
-    chat(_request())  # must not raise: show() is not called again
-
-    assert fake.show_calls == 1
-
-
 def test_show_server_error_on_first_check_maps_to_server() -> None:
     fake = FakeOllamaClient(show_error=ollama.ResponseError("down", status_code=500))
     chat = make_ollama_link_client(

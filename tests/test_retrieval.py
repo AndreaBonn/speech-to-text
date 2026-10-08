@@ -101,7 +101,9 @@ def test_retrieve_returns_both_lecture_and_document_passages(
     assert sources == {LectureSource, DocumentSource}
 
 
-def test_retrieve_never_returns_another_courses_passages(index: SearchIndex) -> None:
+def test_retrieve_course_scope_returns_only_its_lecture_and_document(
+    index: SearchIndex,
+) -> None:
     index.replace_lecture(
         job_id="lecture-a", state=STATE, passages=[_passage("causa del contratto")]
     )
@@ -122,14 +124,18 @@ def test_retrieve_never_returns_another_courses_passages(index: SearchIndex) -> 
     results = retrieve(
         index=index, scope=scope, question="causa del contratto", budget_words=1000
     )
-    for result in results:
-        if isinstance(result.source, LectureSource):
-            assert result.source.job_id == "lecture-a"
-        else:
-            assert result.source.doc_id == "doc-a"
+    assert {
+        result.source.job_id
+        if isinstance(result.source, LectureSource)
+        else result.source.doc_id
+        for result in results
+    } == {"lecture-a", "doc-a"}
 
 
-def test_retrieve_respects_word_budget(index: SearchIndex) -> None:
+@pytest.mark.parametrize(("budget_words", "expected_count"), [(25, 1), (1000, 3)])
+def test_retrieve_word_budget_keeps_exactly_fitting_passages(
+    index: SearchIndex, budget_words: int, expected_count: int
+) -> None:
     index.replace_document(
         doc_id="doc-1",
         state=DOC_STATE_A,
@@ -140,12 +146,12 @@ def test_retrieve_respects_word_budget(index: SearchIndex) -> None:
         ],
     )
     scope = RetrievalScope(course_id="course-a", job_ids=frozenset())
-    tight = retrieve(index=index, scope=scope, question="causa", budget_words=25)
-    assert sum(len(r.text.split()) for r in tight) <= 25
-    assert len(tight) < 3
+    results = retrieve(
+        index=index, scope=scope, question="causa", budget_words=budget_words
+    )
 
-    generous = retrieve(index=index, scope=scope, question="causa", budget_words=1000)
-    assert len(generous) == 3
+    assert len(results) == expected_count
+    assert sum(len(result.text.split()) for result in results) == 20 * expected_count
 
 
 def test_retrieve_scope_selected_narrows_to_chosen_sources(index: SearchIndex) -> None:

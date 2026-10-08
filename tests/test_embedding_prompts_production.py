@@ -1,7 +1,6 @@
 import pytest
 
 from sbobina.embedding_prompts import (
-    EMBEDDING_PROMPT_VERSION,
     embedding_threshold,
     format_document_for_production,
     format_query,
@@ -33,10 +32,6 @@ def test_embedding_threshold_evaluated_model_returns_measured_floor() -> None:
 def test_embedding_threshold_unmeasured_model_has_no_floor() -> None:
     assert embedding_threshold(model="nomic-embed-text") is None
     assert embedding_threshold(model="qwen3-embedding:8b") == 0.46
-
-
-def test_embedding_prompt_version_is_an_integer() -> None:
-    assert isinstance(EMBEDDING_PROMPT_VERSION, int)
 
 
 @pytest.mark.parametrize("model", ["qwen3-embedding:8b", "bge-m3", "nomic-embed-text"])

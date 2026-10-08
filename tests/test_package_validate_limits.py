@@ -137,7 +137,7 @@ def test_validate_package_manifest_count_enforced(exported: bytes) -> None:
         validate_package(source=BytesIO(hostile))
 
 
-def test_validate_package_corrupt_crc_and_unsupported_compression_rejected(
+def test_validate_package_corrupt_crc_rejected(
     exported: bytes,
 ) -> None:
     valid_manifest(data=exported)
@@ -149,6 +149,11 @@ def test_validate_package_corrupt_crc_and_unsupported_compression_rejected(
     data[central + crc_offset] ^= 1
     with pytest.raises(PackageInvalidError, match="CRC"):
         validate_package(source=BytesIO(data))
+
+
+def test_validate_package_unsupported_compression_rejected(exported: bytes) -> None:
+    valid_manifest(data=exported)
+
     info = ZipInfo(filename=MANIFEST_PATH)
     info.compress_type = ZIP_BZIP2
     with pytest.raises(PackageInvalidError, match="compression"):

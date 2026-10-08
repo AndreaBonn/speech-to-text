@@ -38,16 +38,25 @@ def test_list_paginates_in_creation_order(tmp_path: Path) -> None:
     assert store.list(page=4, per_page=10).items == []
 
 
-def test_empty_store_and_invalid_pagination(tmp_path: Path) -> None:
+def test_list_empty_store_returns_empty_page(tmp_path: Path) -> None:
     store = JobStore(data_dir=tmp_path)
     result = store.list(page=1, per_page=10)
     assert (result.items, result.total, result.total_pages) == ([], 0, 0)
-    for page, size in [(0, 10), (1, 0)]:
-        with pytest.raises(ValidationError):
-            store.list(page=page, per_page=size)
+    job = store.create(config=JobConfig())
+    assert store.list(page=1, per_page=10).items == [job]
 
 
-def test_progress_round_trips_and_delete_removes_job(tmp_path: Path) -> None:
+@pytest.mark.parametrize("page,size", [(0, 10), (1, 0)])
+def test_list_invalid_pagination_raises_validation_error(
+    tmp_path: Path, page: int, size: int
+) -> None:
+    store = JobStore(data_dir=tmp_path)
+
+    with pytest.raises(ValidationError):
+        store.list(page=page, per_page=size)
+
+
+def test_write_progress_round_trips_values(tmp_path: Path) -> None:
     store = JobStore(data_dir=tmp_path)
     job = store.create(config=JobConfig())
     job_id = str(job.id)
@@ -60,7 +69,16 @@ def test_progress_round_trips_and_delete_removes_job(tmp_path: Path) -> None:
     }
     store.write_progress(job_id=job_id, progress=progress)
     assert store.read_progress(job_id=job_id) == progress
+
+
+def test_delete_existing_job_removes_record(tmp_path: Path) -> None:
+    store = JobStore(data_dir=tmp_path)
+    job = store.create(config=JobConfig())
+    job_id = str(job.id)
+    assert store.get(job_id=job_id) == job
+
     store.delete(job_id=job_id)
+
     with pytest.raises(NotFoundError):
         store.get(job_id=job_id)
 
@@ -141,15 +159,23 @@ def test_atomic_write_gives_up_after_max_permission_errors(tmp_path: Path) -> No
     assert store.get(job_id=str(job.id)) == job
 
 
-def test_update_preserves_creation_time_and_validates_record(tmp_path: Path) -> None:
+def test_update_changed_creation_time_preserves_original(tmp_path: Path) -> None:
     store = JobStore(data_dir=tmp_path)
     job = store.create(config=JobConfig())
     changed = job.model_copy(update={"created_at": job.created_at + timedelta(days=1)})
     assert store.update(record=changed).created_at == job.created_at
+
+
+def test_update_invalid_record_raises_validation_error(tmp_path: Path) -> None:
     from pydantic import ValidationError as PydanticValidationError
+
+    store = JobStore(data_dir=tmp_path)
+    job = store.create(config=JobConfig())
 
     with pytest.raises(PydanticValidationError):
         store.update(record=job.model_copy(update={"status": "unknown"}))
+
+    assert store.get(job_id=str(job.id)) == job
 
 
 def test_corrupt_json_is_not_silently_skipped(tmp_path: Path) -> None:

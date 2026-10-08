@@ -43,43 +43,49 @@ def linux_gpu() -> PlatformInfo:
 
 
 @pytest.mark.parametrize(
-    "system,machine",
+    ("scenario", "expected"),
     [
-        ("linux", "x86_64"),
-        ("windows", "AMD64"),
-        ("darwin", "x86_64"),
-        ("darwin", "arm64"),
-        ("other", "aarch64"),
+        (("linux", "x86_64", False, 1, True), ("cuda", "float16", "large-v3", None)),
+        (("linux", "x86_64", False, 1, False), ("cpu", "int8", "large-v3-turbo", 8)),
+        (("linux", "x86_64", False, 0, False), ("cpu", "int8", "large-v3-turbo", 8)),
+        (("windows", "AMD64", False, 1, True), ("cuda", "float16", "large-v3", None)),
+        (("windows", "AMD64", False, 1, False), ("cpu", "int8", "large-v3-turbo", 8)),
+        (("windows", "AMD64", False, 0, False), ("cpu", "int8", "large-v3-turbo", 8)),
+        (("darwin", "x86_64", False, 1, True), ("cpu", "int8", "large-v3-turbo", 8)),
+        (("darwin", "x86_64", False, 1, False), ("cpu", "int8", "large-v3-turbo", 8)),
+        (("darwin", "x86_64", False, 0, False), ("cpu", "int8", "large-v3-turbo", 8)),
+        (("darwin", "arm64", True, 1, True), ("cpu", "int8", "large-v3-turbo", 8)),
+        (("darwin", "arm64", True, 1, False), ("cpu", "int8", "large-v3-turbo", 8)),
+        (("darwin", "arm64", True, 0, False), ("cpu", "int8", "large-v3-turbo", 8)),
+        (("other", "aarch64", False, 1, True), ("cpu", "int8", "large-v3-turbo", 8)),
+        (("other", "aarch64", False, 1, False), ("cpu", "int8", "large-v3-turbo", 8)),
+        (("other", "aarch64", False, 0, False), ("cpu", "int8", "large-v3-turbo", 8)),
     ],
 )
-@pytest.mark.parametrize("hardware", [(1, True), (1, False), (0, False)])
-def test_resolve_runtime_auto_platform_matrix(
-    system: SystemName,
-    machine: str,
-    hardware: tuple[int, bool],
+def test_resolve_runtime_auto_platform_selects_expected_configuration(
+    scenario: tuple[SystemName, str, bool, int, bool],
+    expected: tuple[str, str, str, int | None],
     requested: RuntimeRequest,
 ) -> None:
+    system, machine, apple_silicon, devices, libraries = scenario
     info = PlatformInfo(
         system=system,
         machine=machine,
-        is_apple_silicon=system == "darwin" and machine == "arm64",
-        cuda_devices=hardware[0],
-        cuda_libs_available=hardware[1],
+        is_apple_silicon=apple_silicon,
+        cuda_devices=devices,
+        cuda_libs_available=libraries,
         cpu_compute_types=frozenset({"int8", "float32"}),
         cpu_count=8,
     )
-    choice = resolve_runtime(info, requested=requested)
-    uses_cuda = system in ("linux", "windows") and hardware == (1, True)
+
+    choice = resolve_runtime(info=info, requested=requested)
+
     assert (
         choice.device,
         choice.compute_type,
         choice.whisper_model,
         choice.cpu_threads,
-    ) == (
-        ("cuda", "float16", "large-v3", None)
-        if uses_cuda
-        else ("cpu", "int8", "large-v3-turbo", 8)
-    )
+    ) == expected
     assert choice.reason
 
 
@@ -158,13 +164,15 @@ def test_resolve_runtime_explicit_cuda_wins_without_wheels(
     )
 
 
-def test_settings_runtime_defaults_and_thread_validation(
+def test_settings_default_runtime_uses_auto_configuration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setitem(Settings.model_config, "env_file", None)
     for field in Settings.model_fields:
         monkeypatch.delenv(f"SBOBINA_{field.upper()}", raising=False)
+
     config = Settings()
+
     assert (
         config.device,
         config.compute_type,
@@ -173,7 +181,15 @@ def test_settings_runtime_defaults_and_thread_validation(
         config.whisper_model_gpu,
         config.whisper_model_cpu,
     ) == ("auto", "auto", 0, "auto", "large-v3", "large-v3-turbo")
-    assert Settings(cpu_threads=3).cpu_threads == 3
+
+
+def test_settings_positive_cpu_threads_preserves_override() -> None:
+    config = Settings(cpu_threads=3)
+
+    assert config.cpu_threads == 3
+
+
+def test_settings_negative_cpu_threads_raises_validation_error() -> None:
     with pytest.raises(ValidationError, match="cpu_threads"):
         Settings(cpu_threads=-1)
 

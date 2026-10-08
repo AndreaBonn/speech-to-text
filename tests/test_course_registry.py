@@ -19,23 +19,44 @@ from sbobina.course_registry import (
 
 
 def test_get_or_create_same_key_preserves_record(tmp_path: Path) -> None:
-    first = get_or_create(tmp_path, key="diritto privato", label="Diritto Privato")
-    second = get_or_create(tmp_path, key=first.key, label="DIRITTO PRIVATO")
+    first = get_or_create(
+        courses_dir=tmp_path, key="diritto privato", label="Diritto Privato"
+    )
+
+    second = get_or_create(courses_dir=tmp_path, key=first.key, label="DIRITTO PRIVATO")
 
     assert second == first
-    assert UUID(first.id).version == 4
-    assert list(iter_courses(tmp_path)) == [first]
-    raw = json.loads((tmp_path / first.id / "course.json").read_text("utf-8"))
+
+
+def test_get_or_create_new_course_assigns_uuid4(tmp_path: Path) -> None:
+    record = get_or_create(courses_dir=tmp_path, key="fisica", label="Fisica")
+
+    assert UUID(record.id).version == 4
+
+
+def test_get_or_create_new_course_persists_record(tmp_path: Path) -> None:
+    record = get_or_create(courses_dir=tmp_path, key="fisica", label="Fisica")
+
+    raw = json.loads((tmp_path / record.id / "course.json").read_text(encoding="utf-8"))
+
+    assert list(iter_courses(courses_dir=tmp_path)) == [record]
     assert raw == {
-        "id": first.id,
-        "key": first.key,
-        "label": first.label,
-        "created_at": first.created_at.isoformat(),
-        "updated_at": first.updated_at.isoformat(),
+        "id": record.id,
+        "key": "fisica",
+        "label": "Fisica",
+        "created_at": record.created_at.isoformat(),
+        "updated_at": record.updated_at.isoformat(),
     }
+
+
+def test_course_record_new_course_is_immutable(tmp_path: Path) -> None:
+    record = get_or_create(courses_dir=tmp_path, key="fisica", label="Fisica")
     attribute = "label"
+
     with pytest.raises(FrozenInstanceError):
-        setattr(first, attribute, "Altro")
+        setattr(record, attribute, "Altro")
+
+    assert record.label == "Fisica"
 
 
 def test_find_by_key_unknown_key_returns_none(tmp_path: Path) -> None:
@@ -119,8 +140,8 @@ def test_rename_key_callback_failure_keeps_new_registry(tmp_path: Path) -> None:
 
 
 def test_rename_key_existing_destination_rejects_merge(tmp_path: Path) -> None:
-    first = get_or_create(tmp_path, key="fisica", label="Fisica")
-    second = get_or_create(tmp_path, key="diritto", label="Diritto")
+    first = get_or_create(courses_dir=tmp_path, key="fisica", label="Fisica")
+    second = get_or_create(courses_dir=tmp_path, key="diritto", label="Diritto")
     calls: list[tuple[str, str]] = []
 
     def update_lectures(old: str, label: str) -> None:
@@ -128,16 +149,33 @@ def test_rename_key_existing_destination_rejects_merge(tmp_path: Path) -> None:
 
     with pytest.raises(CourseExistsError) as caught:
         rename_key(
-            tmp_path, old="fisica", new="Diritto", update_lectures=update_lectures
+            courses_dir=tmp_path,
+            old="fisica",
+            new="Diritto",
+            update_lectures=update_lectures,
         )
     assert caught.value.code == "COURSE_EXISTS"
-    assert find_by_key(tmp_path, key="fisica") == first
-    assert find_by_key(tmp_path, key="diritto") == second
+    assert find_by_key(courses_dir=tmp_path, key="fisica") == first
+    assert find_by_key(courses_dir=tmp_path, key="diritto") == second
     assert calls == []
+
+
+def test_rename_key_same_key_updates_label_and_calls_back(tmp_path: Path) -> None:
+    first = get_or_create(courses_dir=tmp_path, key="fisica", label="Fisica")
+    calls: list[tuple[str, str]] = []
+
+    def update_lectures(old: str, label: str) -> None:
+        calls.append((old, label))
+
     renamed = rename_key(
-        tmp_path, old="fisica", new="FISICA", update_lectures=update_lectures
+        courses_dir=tmp_path,
+        old="fisica",
+        new="FISICA",
+        update_lectures=update_lectures,
     )
+
     assert renamed.id == first.id
+    assert renamed.label == "FISICA"
     assert calls == [("fisica", "FISICA")]
 
 

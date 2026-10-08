@@ -4,6 +4,7 @@ import pytest
 from docx import Document
 from docx.document import Document as DocxDocument
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
 from docx.shared import Cm
 
 from sbobina.docx_export import render_book_docx
@@ -52,8 +53,8 @@ def test_render_book_docx_page_is_a4() -> None:
 def test_render_book_docx_footer_has_page_number_field() -> None:
     section = _open(render_book_docx(title="T", paragraphs=["x"])).sections[0]
 
-    footer_xml = section.footer.paragraphs[0]._p.xml
-    assert "PAGE" in footer_xml
+    fields = section.footer.paragraphs[0]._p.findall(path=qn(tag="w:fldSimple"))
+    assert [field.get(key=qn(tag="w:instr")) for field in fields] == ["PAGE"]
 
 
 def test_render_book_docx_text_is_marked_italian() -> None:
@@ -66,7 +67,8 @@ def test_render_book_docx_text_is_marked_italian() -> None:
 def test_render_book_docx_title_uses_body_serif_not_word_default() -> None:
     document = _open(render_book_docx(title="T", paragraphs=["x"]))
 
-    assert document.styles["Title"].font.name == document.styles["Normal"].font.name
+    assert document.styles["Title"].font.name == "Cambria"
+    assert document.styles["Normal"].font.name == "Cambria"
 
 
 def test_render_book_docx_without_paragraphs_keeps_only_the_title() -> None:

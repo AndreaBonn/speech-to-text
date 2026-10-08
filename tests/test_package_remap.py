@@ -207,7 +207,7 @@ def test_remap_package_same_id_in_five_namespaces_stays_distinct(
     assert_references(content=result.content)
 
 
-def test_remap_package_source_course_inferred_or_absent(
+def test_remap_package_document_course_infers_source_identity(
     request_data: RemapRequest,
 ) -> None:
     inferred = remap_package(
@@ -216,6 +216,16 @@ def test_remap_package_source_course_inferred_or_absent(
         )
     )
     assert set(inferred.imported_from.ids.courses) == {request_data.content.course_id}
+
+
+def test_remap_package_absent_source_course_allocates_identity(
+    request_data: RemapRequest,
+) -> None:
+    populated = remap_package(request=request_data)
+    assert populated.imported_from.ids.courses == {
+        request_data.content.course_id: populated.course.id
+    }
+
     empty = remap_package(request=replace(request_data, content=PackageContent()))
     assert empty.imported_from.ids.courses == {}
     assert UUID(empty.course.id).version == 4

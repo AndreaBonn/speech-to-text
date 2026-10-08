@@ -102,24 +102,16 @@ def test_portable_schema_removes_unsupported_keywords() -> None:
 
     result = portable_schema(schema=schema)
 
-    assert "title" not in result
-    name_props = result["properties"]["name"]
-    for forbidden in (
-        "title",
-        "default",
-        "examples",
-        "minLength",
-        "maxLength",
-        "pattern",
-        "format",
-    ):
-        assert forbidden not in name_props
-    count_props = result["properties"]["count"]
-    for forbidden in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"):
-        assert forbidden not in count_props
-    items_props = result["properties"]["items"]
-    for forbidden in ("minItems", "maxItems", "uniqueItems"):
-        assert forbidden not in items_props
+    assert result == {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "count": {"type": "integer"},
+            "items": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["name"],
+        "additionalProperties": False,
+    }
 
 
 def test_portable_schema_inlines_defs_and_resolves_nested_refs() -> None:

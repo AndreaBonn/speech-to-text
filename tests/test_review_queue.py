@@ -50,18 +50,30 @@ def test_due_today_three_overdue_thirty_new_returns_twenty_three_sorted() -> Non
     assert len(result) == 23 and tuple(cards) == before
 
 
-def test_due_today_zero_limit_keeps_overdue_and_accepts_empty() -> None:
+def test_due_today_zero_new_limit_keeps_overdue_card() -> None:
     overdue = card_fixture(due=NOW)
     assert due_today(cards=[card_fixture(), overdue], now=NOW, new_limit=0) == (
         overdue,
     )
+
+
+def test_due_today_empty_cards_returns_empty_queue() -> None:
+    card = card_fixture()
+    assert due_today(cards=[card], now=NOW, new_limit=20) == (card,)
+
     assert due_today(cards=[], now=NOW, new_limit=20) == ()
 
 
-def test_due_today_invalid_limit_and_naive_clock_raise() -> None:
+def test_due_today_negative_limit_raises_value_error() -> None:
     assert due_today(cards=[card_fixture()], now=NOW, new_limit=1) == (card_fixture(),)
     with pytest.raises(ValueError, match="limite"):
         due_today(cards=[], now=NOW, new_limit=-1)
+
+
+def test_due_today_naive_clock_raises_value_error() -> None:
+    card = card_fixture()
+    assert due_today(cards=[card], now=NOW, new_limit=1) == (card,)
+
     with pytest.raises(ValueError, match="timezone-aware"):
         due_today(cards=[], now=NOW.replace(tzinfo=None), new_limit=1)
 

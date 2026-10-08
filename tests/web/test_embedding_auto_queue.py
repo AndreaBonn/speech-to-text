@@ -107,7 +107,18 @@ def test_maybe_enqueue_embed_concurrent_submissions_queue_one(
         list(pool.map(lambda _: _enqueue(harness=harness), range(8)))
     assert len(harness.supervisor._queue) == 1
     assert harness.record().status is EmbeddingStatus.QUEUED
+
+
+def test_maybe_enqueue_embed_cancelled_course_is_queued_again(
+    embedding_harness: EmbeddingHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness = embedding_harness
+    _available(monkeypatch=monkeypatch)
+    _enqueue(harness=harness)
     course_actions.cancel_embed(supervisor=harness.supervisor, course_key="diritto")
+    assert harness.record().status is EmbeddingStatus.CANCELLED
+    assert list(harness.supervisor._queue) == []
+
     _enqueue(harness=harness)
     assert harness.record().status is EmbeddingStatus.QUEUED
     assert len(harness.supervisor._queue) == 1

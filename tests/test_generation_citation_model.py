@@ -1,4 +1,7 @@
+import json
+
 import pytest
+from pydantic import TypeAdapter
 
 from sbobina.generation_models import (
     GenerationCitation,
@@ -62,8 +65,19 @@ def test_generation_citation_accepts_document_location() -> None:
         job_id=None,
         timestamp=None,
     )
-    assert citation.doc_id == "manuale"
-    assert citation.page == 214
+    adapter = TypeAdapter(type=GenerationCitation)
+
+    serialized = adapter.dump_json(citation)
+
+    assert json.loads(s=serialized) == {
+        "passage_id": "manuale:p214:c0",
+        "quote": "q",
+        "doc_id": "manuale",
+        "page": 214,
+        "job_id": None,
+        "timestamp": None,
+    }
+    assert adapter.validate_json(serialized) == citation
 
 
 def test_generation_citation_accepts_lecture_location() -> None:
@@ -75,5 +89,16 @@ def test_generation_citation_accepts_lecture_location() -> None:
         job_id="job-1",
         timestamp=42.5,
     )
-    assert citation.job_id == "job-1"
-    assert citation.timestamp == 42.5
+    adapter = TypeAdapter(type=GenerationCitation)
+
+    serialized = adapter.dump_json(citation)
+
+    assert json.loads(s=serialized) == {
+        "passage_id": "Ljob-1-S3",
+        "quote": "q",
+        "doc_id": None,
+        "page": None,
+        "job_id": "job-1",
+        "timestamp": 42.5,
+    }
+    assert adapter.validate_json(serialized) == citation

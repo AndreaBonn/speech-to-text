@@ -116,8 +116,8 @@ def test_mistake_card_idempotent(
     assert len(client.get(url="/api/v1/courses/fisica/cards").json()["data"]) == 1
 
 
-def test_mistakes_pagination_and_scope(
-    client: TestClient, attempt_url: str, tmp_path: Path
+def test_get_mistakes_second_page_returns_older_answer(
+    client: TestClient, attempt_url: str
 ) -> None:
     for index in range(2):
         client.post(url=f"{attempt_url}/answers/{index}", json={"choice": 0})
@@ -130,10 +130,31 @@ def test_mistakes_pagination_and_scope(
         "total_pages": 2,
         "unavailable_attempts": [],
     }
-    assert len(page.json()["data"]) == 1
+    assert [item["question_index"] for item in page.json()["data"]] == [0]
+
+
+def test_get_mistakes_other_course_excludes_existing_mistake(
+    client: TestClient, attempt_url: str, tmp_path: Path
+) -> None:
+    submitted = client.post(url=f"{attempt_url}/answers/0", json={"choice": 0})
+    assert submitted.status_code == 200
     _register_course(tmp_path=tmp_path, key="altro")
-    assert client.get(url=MISTAKES.replace("fisica", "altro")).json()["data"] == []
-    assert client.get(url=MISTAKES, params={"page": 0}).status_code == 422
+
+    own_course = client.get(url=MISTAKES)
+    other_course = client.get(url=MISTAKES.replace("fisica", "altro"))
+
+    assert own_course.status_code == other_course.status_code == 200
+    assert [item["question_index"] for item in own_course.json()["data"]] == [0]
+    assert other_course.json()["data"] == []
+
+
+def test_get_mistakes_invalid_page_returns_validation_error(
+    client: TestClient, attempt_url: str
+) -> None:
+    response = client.get(url=MISTAKES, params={"page": 0})
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_card_requires_submitted_mistake(client: TestClient, attempt_url: str) -> None:

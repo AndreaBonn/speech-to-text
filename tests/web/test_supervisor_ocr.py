@@ -85,23 +85,27 @@ def test_cancel_running_ocr_kills_the_child_before_marking_it(
     assert _status(harness=harness, course_id=course_id) is OcrStatus.INTERRUPTED
 
 
-def test_recover_interrupts_running_ocr_and_requeues_queued(harness: Harness) -> None:
+@pytest.mark.parametrize(
+    ("initial_status", "expected_status", "queued"),
+    [
+        (OcrStatus.RUNNING, OcrStatus.INTERRUPTED, False),
+        (OcrStatus.QUEUED, OcrStatus.QUEUED, True),
+    ],
+)
+def test_recover_on_boot_pending_ocr_restores_expected_state(
+    harness: Harness,
+    initial_status: OcrStatus,
+    expected_status: OcrStatus,
+    queued: bool,
+) -> None:
     course_id, _ = add_scanned_document(courses_dir=harness.store.courses_dir)
-    run = create_ocr(
-        courses_dir=harness.store.courses_dir, course_id=course_id, doc_id=DOC_ID
-    )
-    save_ocr(
-        courses_dir=harness.store.courses_dir,
-        course_id=course_id,
-        doc_id=DOC_ID,
-        record=replace(run, status=OcrStatus.RUNNING),
-    )
+    _save_run(harness=harness, course_id=course_id, status=initial_status)
+    item = WorkItem(job_id=DOC_ID, action="ocr", course_id=course_id)
 
     harness.supervisor.recover_on_boot()
 
-    assert _status(harness=harness, course_id=course_id) is OcrStatus.INTERRUPTED
-    item = WorkItem(job_id=DOC_ID, action="ocr", course_id=course_id)
-    assert item not in harness.supervisor._queue
+    assert _status(harness=harness, course_id=course_id) is expected_status
+    assert list(harness.supervisor._queue) == ([item] if queued else [])
 
 
 def test_pipeline_then_ocr_never_overlap_children(
@@ -251,22 +255,22 @@ def test_claim_ocr_item_refuses_a_run_already_claimed(harness: Harness) -> None:
     assert _status(harness=harness, course_id=course_id) is OcrStatus.RUNNING
 
 
-def test_execute_ocr_action_after_stop_launches_no_child(
-    harness: Harness, monkeypatch: pytest.MonkeyPatch
+def test_execute_ocr_action_stopped_supervisor_does_not_relaunch_child(
+    harness: Harness,
 ) -> None:
-    course_id, _ = add_scanned_document(courses_dir=harness.store.courses_dir)
-    launched: list[WorkItem] = []
-    monkeypatch.setattr(
-        ocr_supervisor,
-        "launch_ocr_process",
-        lambda supervisor, item: launched.append(item),
+    course_id, doc_dir = add_scanned_document(courses_dir=harness.store.courses_dir)
+    item = WorkItem(job_id=DOC_ID, action="ocr", course_id=course_id)
+    marker = doc_dir / "ocr.started"
+    ocr_supervisor.execute_ocr_action(
+        supervisor=harness.supervisor, item=item, ollama_unavailable_exit=2
     )
+    assert marker.is_file()
+    marker.unlink()
     harness.supervisor.stop()
 
     ocr_supervisor.execute_ocr_action(
-        supervisor=harness.supervisor,
-        item=WorkItem(job_id=DOC_ID, action="ocr", course_id=course_id),
-        ollama_unavailable_exit=2,
+        supervisor=harness.supervisor, item=item, ollama_unavailable_exit=2
     )
 
-    assert launched == []
+    assert not marker.exists()
+    assert (doc_dir.parent / "order.log").read_text().splitlines() == [f"{DOC_ID}:ocr"]

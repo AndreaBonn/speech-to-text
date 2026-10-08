@@ -68,27 +68,78 @@ def _fixed_clock(client: TestClient) -> None:
     app.dependency_overrides[review_scheduler] = lambda: Scheduler(enable_fuzzing=False)
 
 
-def test_today_queue_limit_pagination_and_removed_anchor(
+def test_today_daily_limit_returns_twenty_new_cards(
     client: TestClient, store: JobStore
 ) -> None:
     _fixed_clock(client=client)
     course_id = _course(store=store)
-    for _ in range(30):
-        _card(store=store, course_id=course_id)
+    cards = [_card(store=store, course_id=course_id) for _ in range(30)]
+
     response = client.get(url=TODAY_URL)
-    assert response.status_code == 200 and len(response.json()["data"]) == 20
-    assert response.json()["data"][0]["anchor_resolution"]["status"] == "source_removed"
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["data"]] == [
+        card.id for card in cards[:20]
+    ]
     assert response.json()["meta"] == {
         "page": 1,
         "per_page": 20,
         "total": 20,
         "total_pages": 1,
     }
-    page = client.get(url=TODAY_URL, params={"page": 2, "per_page": 3}).json()
-    assert page["data"] == response.json()["data"][3:6]
-    assert page["meta"] == {"page": 2, "per_page": 3, "total": 20, "total_pages": 7}
+
+
+def test_today_second_page_returns_requested_cards(
+    client: TestClient, store: JobStore
+) -> None:
+    _fixed_clock(client=client)
+    course_id = _course(store=store)
+    cards = [_card(store=store, course_id=course_id) for _ in range(30)]
+
+    response = client.get(url=TODAY_URL, params={"page": 2, "per_page": 3})
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["data"]] == [
+        card.id for card in cards[3:6]
+    ]
+    assert response.json()["meta"] == {
+        "page": 2,
+        "per_page": 3,
+        "total": 20,
+        "total_pages": 7,
+    }
+
+
+def test_today_removed_generation_returns_source_removed_anchor(
+    client: TestClient, store: JobStore
+) -> None:
+    _fixed_clock(client=client)
+    card = _card(store=store, course_id=_course(store=store))
+
+    response = client.get(url=TODAY_URL)
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["data"]] == [card.id]
+    assert response.json()["data"][0]["anchor_resolution"] == {
+        "status": "source_removed",
+        "href": f"/corsi/diritto/generazioni/{GONE_GENERATION_ID}",
+    }
+
+
+def test_today_zero_new_limit_excludes_existing_new_card(
+    client: TestClient, store: JobStore
+) -> None:
+    _fixed_clock(client=client)
+    card = _card(store=store, course_id=_course(store=store))
+    available = client.get(url=TODAY_URL)
+    assert available.status_code == 200
+    assert [item["id"] for item in available.json()["data"]] == [card.id]
     cast(FastAPI, client.app).state.settings.review_new_per_day = 0
-    assert client.get(url=TODAY_URL).json()["data"] == []
+
+    response = client.get(url=TODAY_URL)
+
+    assert response.status_code == 200
+    assert response.json()["data"] == []
 
 
 def test_today_overdue_before_new_excludes_future_and_suspended(

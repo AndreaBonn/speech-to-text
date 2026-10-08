@@ -196,7 +196,12 @@ def test_generate_summary_resolves_citations_and_counts_discards() -> None:
     )
 
     assert len(result.sections) == 1
-    assert len(result.sections[0].sentences) == 1
+    assert result.sections[0].title == "Avviamento"
+    assert [sentence.text for sentence in result.sections[0].sentences] == ["buona"]
+    assert [
+        (citation.quote, citation.passage_id)
+        for citation in result.sections[0].sentences[0].citations
+    ] == [("l'avviamento produce profitto", "manuale:p214:c0")]
     assert sum(d.count for d in result.discarded) == 1
 
 

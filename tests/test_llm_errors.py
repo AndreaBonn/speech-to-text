@@ -125,15 +125,16 @@ def test_provider_unavailable_error_busy_uses_the_italian_gpu_label() -> None:
     assert "GPU occupata dalla trascrizione" in str(error)
 
 
-def test_provider_unavailable_error_message_has_no_response_body() -> None:
+def test_provider_unavailable_error_auth_message_identifies_provider_and_reason() -> (
+    None
+):
     error = ProviderUnavailableError(
         kind=FailureKind.AUTH, provider="gemini/flash", retry_after_s=None
     )
 
     message = str(error)
 
-    assert "gemini/flash" in message
-    assert "chiave non valida" in message
+    assert message == "gemini/flash: chiave non valida"
 
 
 def test_chain_exhausted_error_is_a_corrector_unavailable_error() -> None:

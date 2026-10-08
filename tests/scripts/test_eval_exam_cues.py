@@ -2,7 +2,9 @@ import json
 import runpy
 import subprocess
 import sys
+import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 from conftest import make_segment, make_transcript, make_word
@@ -46,27 +48,56 @@ def run_eval(arguments: list[str], cwd: Path) -> subprocess.CompletedProcess[str
     )
 
 
-def test_main_manual_gold_three_correct_reports_precision_075(tmp_path: Path) -> None:
+@pytest.fixture
+def manual_report(tmp_path: Path) -> tuple[dict[str, Any], str]:
     gold = tmp_path / "gold.jsonl"
     write_gold(path=gold, labels=["strong", "strong", "strong", "none", ""])
+    result = run_eval(arguments=[str(gold), "--json"], cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout), result.stderr
 
-    result = subprocess.run(
-        args=[sys.executable, str(SCRIPT), str(gold), "--json"],
-        cwd=tmp_path,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    report = json.loads(result.stdout)
 
+def test_main_manual_gold_reports_precision_075(
+    manual_report: tuple[dict[str, Any], str],
+) -> None:
+    report, _ = manual_report
     assert report["precision"]["strong"] == {"correct": 3, "total": 4, "value": 0.75}
-    assert report["precision"]["weak"]["value"] is None
-    assert report["counts"]["total"] == 5
-    assert report["counts"]["unlabeled"] == 1
+
+
+def test_main_unpredicted_level_reports_undefined_precision(
+    manual_report: tuple[dict[str, Any], str],
+) -> None:
+    report, _ = manual_report
+    assert report["precision"]["strong"]["value"] == 0.75
+    assert report["precision"]["weak"] == {"correct": 0, "total": 0, "value": None}
+
+
+def test_main_manual_gold_counts_all_rows(
+    manual_report: tuple[dict[str, Any], str],
+) -> None:
+    report, _ = manual_report
+    assert report["counts"] == {
+        "total": 5,
+        "labeled": 4,
+        "unlabeled": 1,
+        "by_source": {"detector": 5},
+        "by_label": {"strong": 3, "none": 1, "": 1},
+    }
+
+
+def test_main_manual_gold_groups_rows_by_job(
+    manual_report: tuple[dict[str, Any], str],
+) -> None:
+    report, _ = manual_report
     assert report["by_job"]["lecture"]["counts"]["total"] == 5
-    assert report["latency"]["status"] == "skipped"
-    assert report["warnings"]
-    assert "1" in result.stderr
+
+
+def test_main_unlabeled_row_reports_exact_warning(
+    manual_report: tuple[dict[str, Any], str],
+) -> None:
+    report, stderr = manual_report
+    assert report["warnings"] == ["1 righe non etichettate escluse dalle metriche."]
+    assert stderr == "1 righe non etichettate escluse dalle metriche.\n"
 
 
 def test_parse_row_invalid_label_names_file_and_line(tmp_path: Path) -> None:
@@ -106,14 +137,34 @@ def test_aggregate_mixed_sources_reports_estimated_recall() -> None:
 
 
 @pytest.mark.parametrize(
-    ("second", "overlap", "only_b"),
+    ("second", "overlap", "only_a", "only_b", "common", "common_count"),
     [
-        ("SEGNATEVELO. Ricordatevi il termine", 1.0, []),
-        ("Segnatevelo. All'esame torna", 1 / 3, ["all'esame torna"]),
+        (
+            "SEGNATEVELO. Ricordatevi il termine",
+            1.0,
+            [],
+            [],
+            ["ricordatevi il termine", "segnatevelo"],
+            2,
+        ),
+        (
+            "Segnatevelo. All’esame torna",
+            1 / 3,
+            ["ricordatevi il termine"],
+            ["all’esame torna"],
+            ["segnatevelo"],
+            1,
+        ),
     ],
 )
 def test_main_duplicate_pair_reports_overlap_and_differences(
-    tmp_path: Path, second: str, overlap: float, only_b: list[str]
+    tmp_path: Path,
+    second: str,
+    overlap: float,
+    only_a: list[str],
+    only_b: list[str],
+    common: list[str],
+    common_count: int,
 ) -> None:
     gold = tmp_path / "gold.jsonl"
     write_gold(path=gold, labels=["strong"])
@@ -131,12 +182,40 @@ def test_main_duplicate_pair_reports_overlap_and_differences(
 
     assert report["stability"]["overlap"] == pytest.approx(overlap)
     assert report["stability"]["only_b"] == only_b
-    assert report["stability"]["only_a"] == (
-        [] if overlap == 1.0 else ["ricordatevi il termine"]
-    )
-    assert report["stability"]["common_count"] == (2 if overlap == 1.0 else 1)
-    assert set(report["latency"]["by_job_ms"]) == {"a", "b"}
-    assert all(value >= 0 for value in report["latency"]["by_job_ms"].values())
+    assert report["stability"]["only_a"] == only_a
+    assert report["stability"]["common"] == common
+    assert report["stability"]["common_count"] == common_count
+
+
+def test_main_job_dirs_reports_detector_latency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    gold = tmp_path / "gold.jsonl"
+    write_gold(path=gold, labels=["strong"])
+    jobs = [tmp_path / "a", tmp_path / "b"]
+    for directory in jobs:
+        write_job(directory=directory, text="Segnatevelo")
+    main = runpy.run_path(path_name=str(SCRIPT))["main"]
+    ticks = iter([1.0, 1.125, 2.0, 2.25])
+    monkeypatch.setattr(time, "perf_counter", lambda: next(ticks))
+
+    main(argv=[str(gold), "--json", "--job-dirs", *map(str, jobs)])
+    measured = json.loads(capsys.readouterr().out)["latency"]
+    main(argv=[str(gold), "--json"])
+    skipped = json.loads(capsys.readouterr().out)["latency"]
+
+    assert measured == {
+        "status": "measured",
+        "by_job_ms": {"a": 125.0, "b": 250.0},
+        "total_ms": 375.0,
+        "scope": "find_exam_cues only; one call per job, no warm-up",
+    }
+    assert skipped == {
+        "status": "skipped",
+        "by_job_ms": {},
+        "total_ms": None,
+        "scope": "find_exam_cues only; one call per job, no warm-up",
+    }
 
 
 def test_main_duplicate_pair_without_transcripts_reports_error(tmp_path: Path) -> None:

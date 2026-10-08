@@ -254,9 +254,11 @@ def test_ollama_download_refused_by_server_reports_the_reason() -> None:
 def test_join_unknown_download_returns_immediately() -> None:
     manager = downloads.DownloadManager(settings=Settings())
 
-    manager.join(source="ollama", name="mai-avviato", timeout=0)
+    started = time.monotonic()
+    manager.join(source="ollama", name="mai-avviato", timeout=30)
+    elapsed = time.monotonic() - started
 
-    assert manager.list() == []
+    assert elapsed < 0.5
 
 
 def test_whisper_progress_survives_a_blob_renamed_while_polling(

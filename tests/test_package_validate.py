@@ -1,4 +1,3 @@
-import json
 import stat
 import zlib
 from io import BytesIO
@@ -111,6 +110,11 @@ def test_validate_package_unlisted_payload_ignored(exported: bytes) -> None:
     result = validate_package(source=BytesIO(zip_bytes(members=members)))
     assert result.manifest == manifest
     assert result.total_bytes == validate_package(source=BytesIO(exported)).total_bytes
+
+
+def test_validate_package_missing_manifest_rejected(exported: bytes) -> None:
+    valid_manifest(data=exported)
+
     assert_rejected(data=zip_bytes(members=[("extra.bin", b"alone")]))
 
 
@@ -191,7 +195,7 @@ def test_validate_package_limits_enforced(exported: bytes, field: str) -> None:
     assert error.value.code == "PACKAGE_TOO_LARGE"
 
 
-def test_validate_package_manifest_duplicates_and_missing_rejected(
+def test_validate_package_duplicate_manifest_entry_rejected(
     exported: bytes,
 ) -> None:
     manifest = valid_manifest(data=exported)
@@ -201,6 +205,12 @@ def test_validate_package_manifest_duplicates_and_missing_rejected(
             data=exported, changes={"inventory": [*inventory, inventory[0]]}
         )
     )
+
+
+def test_validate_package_missing_inventory_member_rejected(exported: bytes) -> None:
+    manifest = valid_manifest(data=exported)
+    inventory = manifest.model_dump(mode="json")["inventory"]
+
     assert_rejected(
         data=zip_bytes(
             members=[
@@ -212,15 +222,22 @@ def test_validate_package_manifest_duplicates_and_missing_rejected(
     )
 
 
-def test_validate_package_invalid_manifest_and_archive_rejected(
-    exported: bytes,
+def test_validate_package_invalid_archive_rejected(exported: bytes) -> None:
+    valid_manifest(data=exported)
+
+    assert_rejected(data=b"not a zip")
+
+
+@pytest.mark.parametrize(
+    "manifest", [b"not json", b"{}"], ids=["invalid-json", "missing-fields"]
+)
+def test_validate_package_invalid_manifest_rejected(
+    exported: bytes, manifest: bytes
 ) -> None:
     valid_manifest(data=exported)
-    assert_rejected(data=b"not a zip")
-    assert_rejected(data=zip_bytes(members=[(MANIFEST_PATH, b"not json")]))
-    assert_rejected(
-        data=zip_bytes(members=[(MANIFEST_PATH, json.dumps(obj={}).encode())])
-    )
+    data = zip_bytes(members=[(MANIFEST_PATH, manifest)])
+
+    assert_rejected(data=data)
 
 
 @pytest.mark.parametrize("mode", ["padding", "truncated"])

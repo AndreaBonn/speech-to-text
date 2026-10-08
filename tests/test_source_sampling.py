@@ -37,14 +37,15 @@ def test_sample_across_sources_spreads_picks_over_start_middle_and_end() -> None
         assert any(25 <= i <= 74 for i in indices), "manca un prelievo a metà"
 
 
-def test_sample_across_sources_never_exceeds_budget() -> None:
-    group_a = [_passage("a", i, words=7) for i in range(20)]
-    group_b = [_passage("b", i, words=11) for i in range(20)]
+def test_sample_across_sources_limited_budget_fills_without_overflow() -> None:
+    group_a = [_passage(group="a", index=i, words=7) for i in range(20)]
+    group_b = [_passage(group="b", index=i, words=11) for i in range(20)]
 
     sampled = sample_across_sources(groups=[group_a, group_b], budget_words=50)
 
     total_words = sum(len(passage.text.split()) for passage in sampled)
-    assert total_words <= 50
+    # Enough passages remain: unused budget must be smaller than the shortest.
+    assert 44 <= total_words <= 50
 
 
 def test_sample_across_sources_output_ordered_by_group_then_source_position() -> None:

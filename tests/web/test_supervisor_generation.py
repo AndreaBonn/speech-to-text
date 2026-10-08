@@ -212,25 +212,29 @@ def test_claim_generation_item_refuses_a_generation_already_claimed(
     assert _status(harness, course_id, queued.id) is GenerationStatus.RUNNING
 
 
-def test_execute_generation_action_after_stop_launches_no_child(
-    harness: Harness, monkeypatch: pytest.MonkeyPatch
+def test_execute_generation_action_stopped_supervisor_does_not_relaunch_child(
+    harness: Harness,
 ) -> None:
     course_id = _register_course(harness=harness)
-    launched: list[WorkItem] = []
-    monkeypatch.setattr(
-        generation_supervisor,
-        "launch_generation_process",
-        lambda supervisor, item: launched.append(item),
+    item = WorkItem(job_id="g1", action="generation", course_id=course_id)
+    marker = _generation_marker(
+        harness=harness, course_id=course_id, name="generation.started"
     )
+    generation_supervisor.execute_generation_action(
+        supervisor=harness.supervisor, item=item, ollama_unavailable_exit=2
+    )
+    assert marker.is_file()
+    marker.unlink()
     harness.supervisor.stop()
 
     generation_supervisor.execute_generation_action(
-        supervisor=harness.supervisor,
-        item=WorkItem(job_id="g1", action="generation", course_id=course_id),
-        ollama_unavailable_exit=2,
+        supervisor=harness.supervisor, item=item, ollama_unavailable_exit=2
     )
 
-    assert launched == []
+    assert not marker.exists()
+    assert (harness.store.courses_dir / "order.log").read_text().splitlines() == [
+        f"{course_id}:generation"
+    ]
 
 
 def test_generation_corrupted_while_running_does_not_stop_the_queue(

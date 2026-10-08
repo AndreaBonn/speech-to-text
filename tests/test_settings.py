@@ -1,3 +1,5 @@
+import json
+
 import pydantic
 import pytest
 from pydantic import SecretStr
@@ -94,16 +96,28 @@ def test_settings_llm_chain_entry_rejects_an_empty_model() -> None:
         LlmChainEntry(provider="groq", model="   ")
 
 
-def test_settings_repr_does_not_expose_a_configured_api_key_in_clear() -> None:
+def test_settings_repr_configured_key_masks_real_value() -> None:
     config = Settings(groq_api_key=SecretStr(SENTINEL))
 
-    assert SENTINEL not in repr(config)
+    rendered = repr(config)
+
+    assert isinstance(config.groq_api_key, SecretStr)
+    assert config.groq_api_key.get_secret_value() == SENTINEL
+    assert SENTINEL in repr(config.groq_api_key.get_secret_value())
+    assert "groq_api_key=SecretStr('**********')" in rendered
+    assert SENTINEL not in rendered
 
 
-def test_settings_model_dump_json_does_not_expose_a_configured_api_key() -> None:
+def test_settings_model_dump_json_configured_key_masks_real_value() -> None:
     config = Settings(groq_api_key=SecretStr(SENTINEL))
 
-    assert SENTINEL not in config.model_dump_json()
+    rendered = config.model_dump_json()
+
+    assert isinstance(config.groq_api_key, SecretStr)
+    assert config.groq_api_key.get_secret_value() == SENTINEL
+    assert SENTINEL in json.dumps(obj=config.groq_api_key.get_secret_value())
+    assert json.loads(s=rendered)["groq_api_key"] == "**********"
+    assert SENTINEL not in rendered
 
 
 def test_settings_survives_the_job_config_merge_round_trip_without_losing_fields() -> (

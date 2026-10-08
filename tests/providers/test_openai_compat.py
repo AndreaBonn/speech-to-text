@@ -122,10 +122,27 @@ def test_make_openai_compat_client_maps_429_with_retry_after() -> None:
     assert excinfo.value.retry_after_s == 30.0
 
 
-@pytest.mark.parametrize("status", [503, 529, 413])
+@pytest.mark.parametrize("status", [503, 529])
 def test_make_openai_compat_client_maps_5xx_to_server(status: int) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(status, json={})
+
+    client = make_openai_compat_client(
+        profile=PROFILES["openai"],
+        api_key=SENTINEL_KEY,
+        timeout_s=5,
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(ProviderUnavailableError) as excinfo:
+        client(_request())
+
+    assert excinfo.value.kind == FailureKind.SERVER
+
+
+def test_make_openai_compat_client_maps_413_to_server_fallback() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(413, json={})
 
     client = make_openai_compat_client(
         profile=PROFILES["openai"],
@@ -331,10 +348,12 @@ def test_make_openai_compat_client_openai_never_sends_temperature() -> None:
         transport=httpx.MockTransport(handler),
     )
 
-    client(_request())
+    client(_request(model="model-x", num_predict=256))
 
     body = json.loads(captured[0].content)
     assert "temperature" not in body
+    assert body["model"] == "model-x"
+    assert body["max_completion_tokens"] == 256
 
 
 @pytest.mark.parametrize("provider_name", ["groq", "gemini"])
@@ -406,8 +425,11 @@ def test_list_models_raises_provider_unavailable_on_401() -> None:
     assert excinfo.value.kind == FailureKind.AUTH
 
 
-def test_list_models_does_not_raise_on_200() -> None:
+def test_list_models_valid_key_requests_authenticated_models() -> None:
+    captured: list[httpx.Request] = []
+
     def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
         return httpx.Response(200, json={"data": []})
 
     list_models(
@@ -416,6 +438,11 @@ def test_list_models_does_not_raise_on_200() -> None:
         timeout_s=5,
         transport=httpx.MockTransport(handler),
     )
+
+    assert len(captured) == 1
+    assert captured[0].method == "GET"
+    assert captured[0].url.path == "/v1/models"
+    assert captured[0].headers["Authorization"] == f"Bearer {SENTINEL_KEY}"
 
 
 @pytest.mark.parametrize(

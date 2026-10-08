@@ -164,4 +164,6 @@ def test_list_chats_skips_a_conversation_without_meta(tmp_path: Path) -> None:
 
 
 def test_list_chats_course_without_chats_is_empty(tmp_path: Path) -> None:
+    other = create_chat(courses_dir=tmp_path, course_id="other")
     assert list_chats(courses_dir=tmp_path, course_id=COURSE) == []
+    assert list_chats(courses_dir=tmp_path, course_id="other") == [other]

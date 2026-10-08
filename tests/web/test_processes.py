@@ -70,3 +70,19 @@ def test_reap_child_without_stdin_is_terminated(graceful: bool) -> None:
     _reap(process=process, timeout_s=5, graceful=graceful)
 
     assert process.returncode == -signal.SIGTERM
+
+
+@pytest.mark.parametrize("inherited_utf8", [None, "0"], ids=["unset", "explicit-0"])
+def test_child_env_linux_preserves_environment_without_forcing_utf8(
+    monkeypatch: pytest.MonkeyPatch, inherited_utf8: str | None
+) -> None:
+    monkeypatch.setenv("SB0BINA_TEST_ENV", "preserved")
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.delenv("PYTHONUTF8", raising=False)
+    if inherited_utf8 is not None:
+        monkeypatch.setenv("PYTHONUTF8", inherited_utf8)
+
+    environment = _child_env()
+
+    assert environment["SB0BINA_TEST_ENV"] == "preserved"
+    assert environment.get("PYTHONUTF8") == inherited_utf8

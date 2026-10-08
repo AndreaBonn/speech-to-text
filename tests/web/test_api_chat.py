@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from chat_api_fixtures import BASE_URL, CHATS_URL, ChatApp, chat_app
+from chat_api_fixtures import CHATS_URL, ChatApp, chat_app
 
 from sbobina.web.chat_store import chat_path
 
@@ -73,17 +73,24 @@ def test_delete_chat_then_it_is_gone(chat_app: ChatApp) -> None:
     assert chat_app.client.delete(f"{CHATS_URL}/{chat_id}").status_code == 404
 
 
-def test_foreign_origin_rejected_on_post_and_delete(chat_app: ChatApp) -> None:
+def test_create_chat_foreign_origin_returns_forbidden(chat_app: ChatApp) -> None:
+    foreign = {"Origin": "http://evil.example"}
+
+    response = chat_app.client.post(CHATS_URL, headers=foreign)
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "FORBIDDEN"
+
+
+def test_delete_chat_foreign_origin_returns_forbidden(chat_app: ChatApp) -> None:
     chat_id = chat_app.new_chat()
     foreign = {"Origin": "http://evil.example"}
 
-    assert chat_app.client.post(CHATS_URL, headers=foreign).status_code == 403
-    assert (
-        chat_app.client.delete(f"{CHATS_URL}/{chat_id}", headers=foreign).status_code
-        == 403
-    )
+    response = chat_app.client.delete(f"{CHATS_URL}/{chat_id}", headers=foreign)
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "FORBIDDEN"
     assert chat_app.client.get(f"{CHATS_URL}/{chat_id}").status_code == 200
-    assert BASE_URL.startswith("http://127.0.0.1")
 
 
 def test_corrupt_line_is_skipped_not_a_server_error(chat_app: ChatApp) -> None:

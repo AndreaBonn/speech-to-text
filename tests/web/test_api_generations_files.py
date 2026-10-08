@@ -43,6 +43,12 @@ def test_download_compito_md_never_contains_solution_text(
 
     assert response.status_code == 200
     assert "soluzione segreta" not in response.text
+    assert record.questions[0].question in response.text
+    solutions = client.get(
+        f"{COURSES_URL}/fisica/generations/{record.id}/files/soluzioni.md"
+    )
+    assert solutions.status_code == 200
+    assert "soluzione segreta" in solutions.text
     assert response.headers["x-content-type-options"] == "nosniff"
     assert 'filename="compito.md"' in response.headers["content-disposition"]
 
@@ -136,6 +142,11 @@ def test_download_riassunto_docx(client: TestClient, tmp_path: Path) -> None:
     assert response.headers["content-type"].startswith(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
+    paragraphs = [
+        paragraph.text for paragraph in Document(BytesIO(response.content)).paragraphs
+    ]
+    assert section.title in paragraphs
+    assert section.sentences[0].text in paragraphs
 
 
 def test_download_compito_docx_never_contains_solution_text(

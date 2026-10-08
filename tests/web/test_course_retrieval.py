@@ -132,7 +132,8 @@ def test_retrieve_windows_expands_lecture_hit_beyond_raw_segment(
         )
 
     assert len(windows) == 1
-    assert len(windows[0].text.split()) > 12
+    # Twelve words at the center plus twelve whole 20-word neighbours reach 250.
+    assert len(windows[0].text.split()) == 252
     assert windows[0].source == LectureSource(
         job_id=job_id, segment_index=30, start=30.0
     )
@@ -298,6 +299,21 @@ def test_sample_course_empty_course_returns_no_passages(tmp_path: Path) -> None:
     store = JobStore(data_dir=tmp_path)
 
     with closing(open_index(path=tmp_path / "search.sqlite3")) as index:
+        passage = DocumentPassage(
+            passage_id="doc1:p1:c0", page=1, chunk=0, text="materiale di fisica"
+        )
+        index.replace_document(
+            doc_id="doc1",
+            state=DocumentState(course_id="fisica", text_mtime_ns=1, text_size=1),
+            passages=[passage],
+        )
+        present = sample_course(
+            store=store,
+            index=index,
+            scope=RetrievalScope(course_id="fisica", job_ids=frozenset()),
+            budget_words=100,
+        )
+        assert [item.text for item in present] == ["materiale di fisica"]
         scope = RetrievalScope(course_id="vuoto", job_ids=frozenset())
         sampled = sample_course(store=store, index=index, scope=scope, budget_words=100)
 

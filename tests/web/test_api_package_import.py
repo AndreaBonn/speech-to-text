@@ -1,4 +1,3 @@
-import json
 import shutil
 from dataclasses import replace
 from pathlib import Path
@@ -171,24 +170,60 @@ def test_import_real_exported_package_end_to_end(
     assert documents[0].filename == "Notes.txt"
 
 
-def test_import_real_package_is_searchable_and_listed_at_once(
+def test_import_real_package_lectures_are_searchable_immediately(
     client: TestClient, tmp_path: Path
 ) -> None:
     # T077: no restart and no manual reindex between import and search.
     package = make_package(directory=tmp_path)
-    data = upload(client=client, content=package.read_bytes()).json()["data"]
-    imported_jobs = {
+    imported = upload(client=client, content=package.read_bytes())
+    assert imported.status_code == 201
+    imported_jobs = sorted(
         path.parent.name for path in (tmp_path / "jobs").glob("*/audio.json")
-    }
+    )
+    assert len(imported_jobs) == LECTURE_COUNT
 
-    lectures = client.get(url="/api/v1/search", params={"q": "lezione"}).json()
-    documents = client.get(url="/api/v1/search", params={"q": "notes"}).json()
-    courses = client.get(url="/api/v1/courses").json()["data"]
+    response = client.get(url="/api/v1/search", params={"q": "lezione"})
 
-    lecture_hits = {item["id"] for item in lectures["data"] if "passages" in item}
-    assert imported_jobs and imported_jobs <= lecture_hits
-    assert [item["kind"] for item in documents["data"]] == ["document"]
-    assert data["course_label"] in json.dumps(courses, ensure_ascii=False)
+    assert response.status_code == 200
+    assert sorted(item["id"] for item in response.json()["data"]) == imported_jobs
+
+
+def test_import_real_package_document_is_searchable_immediately(
+    client: TestClient, tmp_path: Path
+) -> None:
+    package = make_package(directory=tmp_path)
+    imported = upload(client=client, content=package.read_bytes())
+    assert imported.status_code == 201
+    documents = list(
+        iter_documents(
+            courses_dir=tmp_path / "courses",
+            course_id=imported.json()["data"]["course_id"],
+        )
+    )
+    assert len(documents) == 1
+
+    response = client.get(url="/api/v1/search", params={"q": "notes"})
+
+    assert response.status_code == 200
+    assert [(item["kind"], item["doc_id"]) for item in response.json()["data"]] == [
+        ("document", documents[0].id)
+    ]
+
+
+def test_import_real_package_course_is_listed_immediately(
+    client: TestClient, tmp_path: Path
+) -> None:
+    package = make_package(directory=tmp_path)
+    imported = upload(client=client, content=package.read_bytes())
+    assert imported.status_code == 201
+
+    response = client.get(url="/api/v1/courses")
+
+    assert response.status_code == 200
+    assert [
+        (item["key"], item["label"], item["lecture_count"])
+        for item in response.json()["data"]
+    ] == [("fisica", "Fisica", LECTURE_COUNT)]
 
 
 def test_import_killed_before_course_rename_leaves_no_visible_lectures(

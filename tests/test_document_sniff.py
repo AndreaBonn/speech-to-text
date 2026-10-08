@@ -34,6 +34,7 @@ def write_archive(path: Path, declared_size: int) -> None:
     ("name", "content", "expected"),
     [
         ("lecture.bin", b"%PDF-1.7\n%%EOF", DocumentKind.PDF),
+        ("office.zip", b"%PDF-", DocumentKind.PDF),
         ("notes.txt", "Perché è valido".encode(), DocumentKind.TXT),
         ("notes.MD", b"# Notes", DocumentKind.MD),
         ("notes.txt", b"", DocumentKind.TXT),
@@ -53,11 +54,6 @@ def test_sniff_document_content_identifies_kind(
     path = tmp_path / name
     path.write_bytes(content)
     assert sniff_document(head=content[:32], path=path, filename=name) == expected
-    path.write_bytes(b"%PDF-1.7")
-    assert (
-        sniff_document(head=path.read_bytes(), path=path, filename=path.name)
-        == DocumentKind.PDF
-    )
 
 
 @pytest.mark.parametrize(
@@ -89,11 +85,6 @@ def test_sniff_document_zip_content_types_identifies_office(
     assert (
         sniff_document(head=path.read_bytes()[:4], path=path, filename=path.name)
         == expected
-    )
-    path.write_bytes(b"%PDF-")
-    assert (
-        sniff_document(head=path.read_bytes(), path=path, filename=path.name)
-        == DocumentKind.PDF
     )
 
 

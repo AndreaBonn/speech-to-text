@@ -7,6 +7,7 @@ import pytest
 from pydantic import SecretStr
 
 from sbobina import llm_factory
+from sbobina.chat_pipeline import ChatClient
 from sbobina.correction import InvalidResponseError
 from sbobina.llm_chain import ChainLink, FallbackChain, ServedByRecorder
 from sbobina.llm_errors import (
@@ -15,7 +16,6 @@ from sbobina.llm_errors import (
     ProviderUnavailableError,
 )
 from sbobina.ollama_chat import ChatRequest
-from sbobina.providers.openai_compat import PROFILES, make_openai_compat_client
 from sbobina.settings import LlmChainEntry, Settings
 
 SENTINEL_KEY = "sk-SENTINEL-abc123"
@@ -116,21 +116,46 @@ def test_build_chat_client_api_missing_key_link_raises_missing_key_on_first_call
     assert excinfo.value.kind == FailureKind.MISSING_KEY
 
 
-def test_build_chat_client_api_chain_falls_back_and_records_served_by() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        if "groq" in str(request.url):
-            return httpx.Response(429, headers={"Retry-After": "30"})
-        return httpx.Response(
-            200,
-            json={
-                "choices": [
-                    {"message": {"content": '{"ok": true}'}, "finish_reason": "stop"}
-                ],
-                "usage": {},
-            },
-        )
+@pytest.fixture
+def api_chain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[ChatClient, ServedByRecorder, list[tuple[str, str]]]:
+    calls: list[tuple[str, str]] = []
 
-    settings = Settings(
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append((request.url.host, json.loads(s=request.content)["model"]))
+        return _api_response(request=request)
+
+    transport = httpx.MockTransport(handler=handler)
+    monkeypatch.setattr(
+        target=httpx.HTTPTransport,
+        name="handle_request",
+        value=lambda self, request: transport.handle_request(request=request),
+    )
+    recorder = ServedByRecorder()
+    chat = llm_factory.build_chat_client(
+        settings=_api_settings(),
+        keys={"groq": SENTINEL_KEY, "openai": SENTINEL_KEY},
+        recorder=recorder,
+    )
+    return chat, recorder, calls
+
+
+def _api_response(request: httpx.Request) -> httpx.Response:
+    if request.url.host == "api.groq.com":
+        return httpx.Response(status_code=429, headers={"Retry-After": "30"})
+    return httpx.Response(
+        status_code=200,
+        json={
+            "choices": [
+                {"message": {"content": '{"ok": true}'}, "finish_reason": "stop"}
+            ]
+        },
+    )
+
+
+def _api_settings() -> Settings:
+    return Settings(
         llm_engine="api",
         llm_chain=[
             LlmChainEntry(provider="groq", model="llama-x"),
@@ -138,24 +163,28 @@ def test_build_chat_client_api_chain_falls_back_and_records_served_by() -> None:
         ],
         llm_ollama_fallback=False,
     )
-    recorder = ServedByRecorder()
-    mocked_links = [
-        ChainLink(
-            provider=entry.provider,
-            model=entry.model,
-            client=make_openai_compat_client(
-                profile=PROFILES[entry.provider],
-                api_key=SENTINEL_KEY,
-                timeout_s=5,
-                transport=httpx.MockTransport(handler),
-            ),
-        )
-        for entry in settings.llm_chain
-    ]
-    chain = FallbackChain(links=mocked_links, recorder=recorder)
+
+
+def test_build_chat_client_rate_limit_uses_next_provider(
+    api_chain: tuple[ChatClient, ServedByRecorder, list[tuple[str, str]]],
+) -> None:
+    chat, _, calls = api_chain
     request = ChatRequest(model="x", system_prompt="s", user_message="u", schema={})
 
-    assert chain(request) == '{"ok": true}'
+    reply = chat(request)
+
+    assert reply == '{"ok": true}'
+    assert calls == [("api.groq.com", "llama-x"), ("api.openai.com", "gpt-x")]
+
+
+def test_build_chat_client_fallback_records_serving_provider(
+    api_chain: tuple[ChatClient, ServedByRecorder, list[tuple[str, str]]],
+) -> None:
+    chat, recorder, _ = api_chain
+    request = ChatRequest(model="x", system_prompt="s", user_message="u", schema={})
+
+    chat(request)
+
     assert recorder.snapshot() == {"openai/gpt-x": 1}
 
 

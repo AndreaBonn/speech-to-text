@@ -147,10 +147,12 @@ def test_make_anthropic_client_never_sends_temperature() -> None:
         api_key=SENTINEL_KEY, timeout_s=5, transport=httpx.MockTransport(handler)
     )
 
-    client(_request())
+    client(_request(model="claude-x", num_predict=256))
 
     body = json.loads(captured[0].content)
     assert "temperature" not in body
+    assert body["model"] == "claude-x"
+    assert body["max_tokens"] == 256
 
 
 def test_make_anthropic_client_uses_default_max_tokens_when_num_predict_is_none() -> (
@@ -311,13 +313,21 @@ def test_list_models_raises_provider_unavailable_on_401() -> None:
     assert excinfo.value.kind == FailureKind.AUTH
 
 
-def test_list_models_does_not_raise_on_200() -> None:
+def test_list_models_valid_key_requests_authenticated_models() -> None:
+    captured: list[httpx.Request] = []
+
     def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
         return httpx.Response(200, json={"data": []})
 
     list_models(
         api_key=SENTINEL_KEY, timeout_s=5, transport=httpx.MockTransport(handler)
     )
+
+    assert len(captured) == 1
+    assert captured[0].method == "GET"
+    assert captured[0].url.path == "/v1/models"
+    assert captured[0].headers["x-api-key"] == SENTINEL_KEY
 
 
 @pytest.mark.parametrize(

@@ -7,12 +7,13 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 from generation_api_fixtures import _register_course, _store, client
-from ollama import ChatResponse, Message
 from test_api_practice import make_url
 from test_practice_store import make_generation
 
 from sbobina import ollama_chat
 from sbobina.generation_models import GenerationFormat
+from sbobina.settings import Settings
+from sbobina.web import api_chat
 from sbobina.web.practice_store import create_attempt, load_attempt
 
 __all__ = ["client"]
@@ -71,34 +72,23 @@ def test_choice_duplicate_returns_409(client: TestClient, attempt_url: str) -> N
     assert saved["answers"][0]["chosen_index"] == 2
 
 
-def test_choice_never_calls_chat_json(
+def test_choice_never_calls_the_judge(
     client: TestClient, attempt_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    spy = Mock(wraps=ollama_chat.chat_json)
-    monkeypatch.setattr(ollama_chat, "chat_json", spy)
+    # api_chat imports chat_json by name: that is where the judge is looked up.
+    spy = Mock(return_value='{"punti_coperti": []}')
+    monkeypatch.setattr(api_chat, "chat_json", spy)
+
     response = client.post(url=f"{attempt_url}/answers/0", json={"choice": 2})
+
     assert response.status_code == 200
     assert response.json()["data"]["outcome"] == "corretta"
-    spy.assert_not_called()
-
-
-def test_chat_json_spy_observes_real_boundary_call(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    spy = Mock(wraps=ollama_chat.chat_json)
-    monkeypatch.setattr(ollama_chat, "chat_json", spy)
-    fake_client = Mock()
-    fake_client.chat.return_value = ChatResponse(
-        message=Message(role="assistant", content='{"punti_coperti": []}')
-    )
+    assert spy.call_count == 0
     request = ollama_chat.ChatRequest(
         model="fake", system_prompt="Judge", user_message="Answer", schema={}
     )
-    assert (
-        ollama_chat.chat_json(client=fake_client, request=request)
-        == '{"punti_coperti": []}'
-    )
-    spy.assert_called_once_with(client=fake_client, request=request)
+    api_chat._build_local_client(settings=Settings())(request)
+    assert spy.call_count == 1
 
 
 @pytest.mark.parametrize("index", [-1, 2])
