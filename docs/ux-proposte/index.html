@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proposte UX</title>
+<style>
+/* ===== 1. Token del prodotto: da src/sbobina/web/static/tokens.css ===== */
+:root{
+  --brand:oklch(47% 0.085 222);--brand-hover:oklch(41% 0.085 222);--brand-soft:oklch(93% 0.025 222);--brand-ink:oklch(98.5% 0.004 222);
+  --n-0:oklch(99.2% 0.003 250);--n-50:oklch(97.6% 0.006 250);--n-100:oklch(95.2% 0.008 250);--n-200:oklch(88.5% 0.010 250);--n-300:oklch(78% 0.014 250);--n-500:oklch(57% 0.016 255);--n-600:oklch(49% 0.014 255);--n-700:oklch(38% 0.016 255);--n-900:oklch(22% 0.018 255);
+  --ok:oklch(50% 0.11 155);--ok-soft:oklch(94.5% 0.035 155);--warn:oklch(52% 0.11 65);--warn-soft:oklch(95% 0.045 85);--bad:oklch(51% 0.16 27);--bad-soft:oklch(95% 0.03 27);--info:oklch(47% 0.085 222);
+  --unc-bg:oklch(91.5% 0.075 85);--unc-ink:oklch(36% 0.07 70);
+  --app-font:"Inter","InterVariable",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --read-font:"Source Serif 4","Source Serif Pro","Iowan Old Style",Georgia,serif;
+  --shadow-sm:0 1px 2px oklch(22% 0.018 255 / .06),0 4px 12px oklch(22% 0.018 255 / .05);--shadow-lg:0 8px 28px oklch(22% 0.018 255 / .14);
+}
+/* ===== 2. Strumento di scelta (cornice esterna): di norma non va toccato ===== */
+:root{--tool-bg:#EEE8E1;--tool-ink:#1E1915;--tool-muted:#6B5D4E;--tool-line:#D9CFC3;--tool-card:#FFFFFF;--tool-accent:#2F5F7A;--tool-on-accent:#FFFFFF;--tool-accent-bg:#E3EDF2}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--tool-bg:#1B1714;--tool-ink:#F1EBE4;--tool-muted:#B3A08A;--tool-line:#3A322B;--tool-card:#241E1A;--tool-accent:#8FBCD6;--tool-on-accent:#10202A;--tool-accent-bg:#22323B}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{font:400 14px/1.5 -apple-system,"Segoe UI",Inter,sans-serif;background:var(--tool-bg);color:var(--tool-ink)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--tool-accent);outline-offset:2px}
+.tool-bar{position:sticky;top:0;z-index:200;background:var(--tool-card);border-bottom:1px solid var(--tool-line);padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.tool-bar h1{font-size:15px;font-weight:700;margin:0}
+.tool-bar h1 span{font-weight:500;color:var(--tool-muted)}
+.tabs{display:flex;gap:2px;background:var(--tool-bg);padding:3px;border-radius:9px;flex-wrap:wrap}
+.tabs button{border:0;background:transparent;padding:6px 12px;border-radius:7px;cursor:pointer;font-weight:500;color:var(--tool-muted)}
+.tabs button[aria-selected="true"]{background:var(--tool-card);color:var(--tool-ink);box-shadow:var(--shadow-sm)}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--tool-line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:5px 10px;cursor:pointer;color:var(--tool-muted);font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--tool-accent-bg);color:var(--tool-ink);font-weight:600}
+.spacer{flex:1}
+.ctrl{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ctrl-label{font-size:12px;color:var(--tool-muted)}
+.tool-btn{border:1px solid var(--tool-accent);background:var(--tool-accent);color:var(--tool-on-accent);border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:600;font-size:13px}
+.tool-btn--ghost{background:var(--tool-card);color:var(--tool-ink);border-color:var(--tool-line)}
+.layout{display:grid;grid-template-columns:minmax(300px,360px) 1fr;min-height:calc(100vh - 56px)}
+.panel{border-right:1px solid var(--tool-line);background:var(--tool-card);padding:16px;overflow:auto;max-height:calc(100vh - 56px);position:sticky;top:56px}
+.stage{padding:20px;overflow:hidden}
+@media (max-width:900px){.layout{grid-template-columns:1fr}.panel{position:static;max-height:52vh;border-right:0;border-bottom:1px solid var(--tool-line)}.stage{padding:12px 0}.tool-bar{position:static}}
+.panel__count{display:flex;align-items:baseline;gap:8px;margin:0 0 4px}
+.panel__count strong{font-size:22px;font-variant-numeric:tabular-nums}
+.panel__intro{font-size:13px;color:var(--tool-muted);margin:0 0 12px}
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 14px}
+.group{margin:0 0 18px}
+.group__head{display:flex;justify-content:space-between;align-items:center;margin:0 0 6px}
+.group__title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tool-muted);margin:0}
+.group__all{border:0;background:none;color:var(--tool-accent);cursor:pointer;font-size:12px;font-weight:600}
+.prop{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;padding:10px;border:1px solid var(--tool-line);border-radius:10px;margin-bottom:6px;transition:border-color .2s,background-color .2s}
+.prop.is-flash{border-color:var(--tool-accent);background:var(--tool-accent-bg)}
+.prop input{margin:3px 0 0;width:18px;height:18px;accent-color:var(--tool-accent);cursor:pointer}
+.prop__head{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.prop__code{font-weight:700;color:var(--tool-accent);cursor:pointer;border:0;background:none;padding:0;font-size:13px;text-decoration:underline;text-underline-offset:2px}
+.prop__title{font-weight:600;font-size:13.5px;cursor:pointer}
+.prop__why,.prop__tags{grid-column:2}
+.prop__why{margin:0;font-size:12.5px;color:var(--tool-muted)}
+.prop__tags{display:flex;gap:4px;flex-wrap:wrap}
+.chip{font-size:11px;font-weight:600;padding:1px 7px;border-radius:99px;border:1px solid var(--tool-line);color:var(--tool-muted);white-space:nowrap}
+.chip--rapida{border-color:#9CC5A6;color:#2C5A38;background:#E8F3EA}
+.chip--media{border-color:#D8BD79;color:#6E5C2B;background:#FBF6E9}
+.chip--ampia{border-color:#E0A79F;color:#941811;background:#FCEDEB}
+.chip--nota{border-style:dashed}
+.chip--fatta{border-color:var(--tool-accent);color:var(--tool-accent)}
+.frame{margin:0 auto;background:var(--n-50);color:var(--n-900);border-radius:12px;box-shadow:var(--shadow-lg);overflow:hidden;container-type:inline-size;max-width:1280px;position:relative;transition:max-width .25s ease}
+.frame.is-mobile{max-width:390px}
+@media (max-width:900px){.frame{border-radius:0}}
+.screen{display:none}
+.screen.is-active{display:block}
+[data-mark]{position:relative}
+.pin{position:absolute;top:-12px;left:-12px;z-index:40;min-width:26px;min-height:26px;display:inline-grid;place-items:center;font:700 11px/1 -apple-system,"Segoe UI",sans-serif;background:var(--tool-accent);color:var(--tool-on-accent);border:2px solid #fff;border-radius:99px;padding:3px 6px;cursor:pointer}
+.pins-off .pin{display:none}
+.flash-target{animation:flash 1.4s ease}
+@keyframes flash{0%,60%{box-shadow:0 0 0 4px rgba(47,95,122,.55)}100%{box-shadow:0 0 0 4px rgba(47,95,122,0)}}
+@media (prefers-reduced-motion:reduce){.flash-target{animation:none;outline:3px solid var(--tool-accent)}}
+.mock-note{font-size:12px;color:var(--n-600);background:repeating-linear-gradient(-45deg,var(--n-100),var(--n-100) 6px,var(--n-50) 6px,var(--n-50) 12px);border:1px dashed var(--n-300);border-radius:8px;padding:6px 10px;margin:0 0 10px}
+.placeholder{background:#FBF6E9;border:1px dashed #9C833E;color:#6E5C2B;border-radius:6px;padding:0 6px;font-weight:600}
+dialog{border:1px solid var(--tool-line);border-radius:14px;padding:20px;max-width:560px;width:calc(100% - 32px);background:var(--tool-card);color:var(--tool-ink)}
+dialog::backdrop{background:rgba(20,15,10,.5)}
+dialog textarea{width:100%;min-height:220px;border:1px solid var(--tool-line);border-radius:8px;padding:10px;background:var(--tool-bg);font:13px/1.5 ui-monospace,Menlo,monospace}
+dialog h2{margin:0 0 6px;font-size:17px}
+dialog p{margin:0 0 10px;color:var(--tool-muted);font-size:13px}
+.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+
+/* ===== 3. Stile dell'app ricostruita ===== */
+.app{font:400 15px/1.5 var(--app-font);color:var(--n-900);background:var(--n-50)}
+.app a{color:var(--brand)}
+.app h2{font-size:20px;font-weight:600;letter-spacing:-.01em;margin:28px 0 12px}
+.app h3{font-size:16px;font-weight:600;margin:18px 0 8px}
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr)}
+.rail{background:var(--n-100);border-right:1px solid var(--n-200);padding:20px 14px;display:flex;flex-direction:column;gap:4px;align-self:start;min-height:760px;position:relative}
+.f-S2 .rail{align-self:stretch}
+.rail__brand{font-weight:600;font-size:15px;padding:4px 10px 14px}
+.rail__nav{display:flex;flex-direction:column;gap:2px;min-width:0}
+.rail__link{display:block;padding:8px 12px;border-radius:6px;color:var(--n-700)!important;text-decoration:none;white-space:nowrap}
+.rail__link.is-active{background:var(--brand-soft);color:var(--brand)!important;font-weight:500}
+.rail__group{margin-top:14px;padding-top:10px;border-top:1px solid var(--n-200);display:flex;flex-direction:column;gap:2px}
+.rail__gtitle{font-size:12px;color:var(--n-600);padding:0 12px 4px}
+.rail__resume{display:block;margin:0 0 10px;padding:8px 12px;border:1px solid var(--n-200);border-radius:8px;background:var(--n-0);text-decoration:none;color:var(--n-900)!important;font-size:13px}
+.rail__resume small{display:block;color:var(--n-600);font-size:12px}
+.rail__more{display:none}
+.rail__foot{margin-top:auto;padding-top:12px;border-top:1px solid var(--n-200);font-size:13px;color:var(--n-600);text-align:center;display:flex;flex-direction:column;gap:6px}
+.rail__theme{font-weight:600;color:var(--n-700)}
+.main{padding:28px 32px 48px;min-width:0}
+.pt{font-size:36px;font-weight:600;letter-spacing:-.02em;margin:0 0 20px;line-height:1.15}
+.f-S1 .pt{font-size:22px;margin-bottom:14px}
+.crumb{font-size:13px;color:var(--n-600);margin:0 0 4px}
+.muted{color:var(--n-600);font-size:13px}
+.small{font-size:13px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--n-500);background:var(--n-0);color:var(--n-900);border-radius:6px;padding:7px 14px;font-weight:500;cursor:pointer;text-decoration:none;font-size:14px}
+.btn--primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.btn--ghost{border-color:transparent;background:transparent}
+.btn--danger{color:var(--bad);border-color:var(--n-500)}
+.btn--danger-text{color:var(--bad);border-color:transparent;background:transparent}
+.btn[disabled]{color:var(--n-600);cursor:default}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:500;padding:1px 8px;border-radius:4px}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.badge--ok{background:var(--ok-soft);color:var(--ok)}
+.badge--warn{background:var(--warn-soft);color:var(--warn)}
+.badge--bad{background:var(--bad-soft);color:var(--bad)}
+.badge--off{background:var(--n-100);color:var(--n-700)}
+.f-L2 .badge--cancel{background:var(--n-100);color:var(--n-700)}
+.field{margin:0 0 18px;max-width:448px}
+.field__label{display:block;font-weight:500;margin:0 0 6px}
+.input,.select{width:100%;border:1px solid var(--n-500);border-radius:6px;padding:9px 12px;background:var(--n-0);font-size:15px;color:var(--n-600)}
+.select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--n-700) 50%),linear-gradient(135deg,var(--n-700) 50%,transparent 50%);background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.select--off{background-color:var(--n-100)}
+.check{display:flex;gap:10px;align-items:center;margin:0 0 18px}
+.check input{width:18px;height:18px;margin:0;accent-color:var(--brand)}
+.drop{border:1.5px dashed var(--n-300);border-radius:10px;padding:30px 16px;text-align:center;background:var(--n-0);margin:0 0 18px}
+.drop small{display:block;color:var(--n-600)}
+.details{border:1px solid var(--n-200);border-radius:10px;padding:16px;margin:0 0 18px;background:var(--n-50);font-weight:600}
+.hint{font-size:13px;color:var(--n-700);margin:-8px 0 18px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chip-s{border:1px solid var(--n-300);border-radius:6px;padding:2px 10px;font-size:13px;background:var(--n-0)}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,300px);gap:32px}
+.qcard{background:var(--n-0);border:1px solid var(--n-200);border-radius:10px;padding:14px 16px;margin:0 0 12px}
+.qcard__top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.qcard__name{font-weight:500;min-width:0;overflow-wrap:anywhere}
+.qcard__file{display:block;font-size:12px;color:var(--n-600);font-weight:400}
+.qcard__meta{font-size:14px;color:var(--n-600);margin:8px 0}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{text-align:left;font-size:12px;font-weight:500;color:var(--n-700);padding:10px 12px;border-bottom:1px solid var(--n-200)}
+.tbl td{padding:12px;border-bottom:1px solid var(--n-200);vertical-align:top}
+.tbl td.num{font-variant-numeric:tabular-nums}
+.tbl .sub td{background:var(--n-100);font-size:13px;color:var(--n-700)}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap}
+.anchors{display:flex;gap:4px;flex-wrap:wrap;position:sticky;top:0;z-index:5;background:var(--n-50);border-bottom:1px solid var(--n-200);padding:8px 0;margin:8px 0 4px}
+.anchors a{padding:5px 10px;border-radius:6px;text-decoration:none;font-size:14px;color:var(--n-700)!important}
+.anchors a.is-active{background:var(--brand-soft);color:var(--brand)!important;font-weight:500}
+.summary{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin:6px 0 4px}
+.summary a{text-decoration:none}
+.summary strong{font-variant-numeric:tabular-nums}
+.search-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,290px) auto;gap:12px;align-items:end}
+.search-row .field{margin:0;max-width:none}
+.search-mini{display:flex;gap:8px;max-width:520px;margin:0 0 6px}
+.cue{border-bottom:1px solid var(--n-200);padding:12px 0}
+.cue__time{font-variant-numeric:tabular-nums;font-weight:500;margin-right:8px}
+.cue__text{margin:6px 0}
+.cue__follow{font-size:13px;color:var(--n-700);margin:0 0 6px}
+.cue__btn{display:block;margin:0 auto;border:0;background:none;font-weight:500;font-size:14px;cursor:pointer;color:var(--n-900)}
+.f-C6 .cue{display:grid;grid-template-columns:120px minmax(0,1fr) auto;gap:4px 12px;align-items:start}
+.f-C6 .cue__follow{display:none}
+.f-C6 .cue__text{margin:0}
+.f-C6 .cue__btn{margin:0;border:1px solid var(--n-500);border-radius:6px;padding:4px 10px;background:var(--n-0)}
+.chip-ok{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--ok);background:var(--ok-soft);border-radius:4px;padding:2px 8px}
+.file-row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--n-200)}
+.f-C9 .file-row .btn--danger{border-color:transparent;background:transparent}
+.gen{display:flex;flex-direction:column}
+.f-C8 .gen__list{order:-1}
+.gen-item{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.empty{border:1px solid var(--n-200);border-radius:10px;padding:18px;text-align:center;color:var(--n-700);font-size:14px;max-width:520px}
+.chat{display:grid;grid-template-columns:240px minmax(0,1fr);gap:24px}
+.textarea{width:100%;height:70px;border:1px solid var(--n-500);border-radius:6px;background:var(--n-0)}
+.reader-head{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.seg2{display:inline-flex;border:1px solid var(--n-500);border-radius:6px;overflow:hidden}
+.seg2 span{padding:7px 12px;font-size:14px}
+.seg2 .on{background:var(--brand-soft);color:var(--brand);font-weight:500}
+.dl-row{display:flex;flex-wrap:wrap;gap:4px 18px;margin:4px 0 14px;font-weight:500;font-size:14px}
+.menu{border:1px solid var(--n-200);border-radius:8px;background:var(--n-0);box-shadow:var(--shadow-sm);padding:6px;max-width:300px;margin:4px 0 14px}
+.menu div{padding:6px 10px;font-size:14px;border-radius:4px}
+.menu div small{color:var(--n-600)}
+.unc-ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px;margin:0 0 12px}
+.reader{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,250px);gap:24px}
+.para{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px;margin:0 0 18px}
+.para__t{font-size:12px;color:var(--n-600);padding-top:6px}
+.para__x{font-family:var(--read-font);font-size:19px;line-height:1.7;margin:0}
+.u{background:var(--unc-bg);color:var(--unc-ink);text-decoration:underline dotted;text-underline-offset:3px;border-radius:3px}
+.f-R1 .u--mild{background:none;color:inherit;text-decoration:none}
+.points{display:flex;flex-direction:column;gap:8px}
+.point{border:1px solid var(--n-200);border-radius:10px;background:var(--n-0);padding:8px 12px;font-size:14px}
+.point small{display:block;color:var(--n-600);font-size:12px}
+.points__nav{display:flex;justify-content:space-between;align-items:center;gap:6px;margin:0 0 4px}
+.abar{position:sticky;bottom:0;background:var(--n-0);border-top:1px solid var(--n-200);padding:12px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;z-index:4}
+.abar__range{flex:1;min-width:120px;height:4px;background:var(--n-500);border-radius:2px;position:relative}
+.abar__range::before{content:"";position:absolute;left:0;top:-5px;width:14px;height:14px;border-radius:50%;background:var(--brand)}
+.abar__time{font-variant-numeric:tabular-nums;font-size:14px}
+.hint-line{font-size:13px;color:var(--n-700);background:var(--brand-soft);border-radius:6px;padding:6px 10px;margin:0 0 12px;max-width:68ch}
+.rcard{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--n-0);border:1px solid var(--n-200);border-radius:10px;padding:14px 16px;margin:0 0 12px}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.inuse{background:var(--n-0);border:1px solid var(--n-200);border-radius:10px;padding:14px 16px;margin:0 0 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.olist{display:flex;flex-direction:column;gap:6px}
+.orow{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid var(--n-200);border-radius:8px;background:var(--n-0);padding:10px 12px}
+.orow small{display:block;color:var(--n-600);font-weight:400}
+.radio-card{border:1px solid var(--n-500);border-radius:8px;background:var(--n-0);padding:10px 14px;margin:0 0 10px;display:flex;gap:12px}
+.radio-card input{accent-color:var(--brand);margin-top:4px}
+.keyrow{display:grid;grid-template-columns:110px 130px minmax(0,1fr) auto auto auto;gap:10px;align-items:center;border:1px solid var(--n-200);border-radius:8px;background:var(--n-0);padding:10px 12px;margin:0 0 8px}
+.keyrow .rm{color:var(--n-500)}
+.collapsed{border:1px solid var(--n-200);border-radius:8px;background:var(--n-0);padding:12px 14px;font-weight:500}
+.cov{border:1px solid var(--n-200);border-radius:8px;background:var(--n-0);padding:10px 12px;margin:0 0 8px}
+.tbl-wrap{overflow-x:auto}
+
+@container (max-width:760px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .rail{min-height:0;flex-direction:row;align-items:center;padding:8px 12px;border-right:0;border-bottom:1px solid var(--n-200);gap:8px}
+  .rail__brand{padding:0}
+  .rail__nav{flex-direction:row;overflow-x:auto;flex:1}
+  .rail__group{flex-direction:row;margin:0;padding:0;border:0}
+  .rail__gtitle,.rail__resume,.rail__hw{display:none}
+  .rail__foot{margin:0;padding:0;border:0}
+  .f-S3 .rail__nav{mask-image:linear-gradient(90deg,#000 75%,transparent)}
+  .rail__more{display:inline-block;font-size:12px;color:var(--n-700);white-space:nowrap}
+  .main{padding:18px 16px 32px}
+  .pt{font-size:30px}
+  .f-S1 .pt{font-size:20px}
+  .two,.reader,.chat,.search-row{grid-template-columns:minmax(0,1fr)}
+  .keyrow{grid-template-columns:minmax(0,1fr) auto}
+  .keyrow .input{grid-column:1/-1}
+  .f-C6 .cue{grid-template-columns:minmax(0,1fr) auto}
+  .f-C6 .cue__text{grid-column:1/-1}
+  .f-C6 .cue__btn{grid-row:1;grid-column:2}
+  .abar{padding:10px 12px;gap:8px}
+  .f-R5 .abar__skip{display:none}
+  .f-R5 .abar__range{min-width:60px}
+  .para{grid-template-columns:minmax(0,1fr)}
+}
+</style>
+</head>
+<body>
+
+<header class="tool-bar">
+  <h1>Proposte UX <span>· Transcriber (sbobina)</span></h1>
+  <div class="tabs" role="tablist" aria-label="Schermata">
+    <!-- Una scheda per schermata; data-tab = data-screen della sezione -->
+    <button role="tab" data-tab="home" aria-selected="true">Nuova trascrizione</button>
+    <button role="tab" data-tab="corso" aria-selected="false">Corso</button>
+    <button role="tab" data-tab="lettore" aria-selected="false">Lettore</button>
+    <button role="tab" data-tab="ripasso" aria-selected="false">Ripasso</button>
+    <button role="tab" data-tab="storico" aria-selected="false">Storico</button>
+    <button role="tab" data-tab="modelli" aria-selected="false">Modelli</button>
+    <button role="tab" data-tab="impostazioni" aria-selected="false">Impostazioni</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="ctrl"><span class="ctrl-label">Mostra</span>
+    <div class="seg" id="mode">
+      <button data-mode="sel" aria-pressed="true">La mia selezione</button>
+      <button data-mode="all" aria-pressed="false">Tutte le proposte</button>
+      <button data-mode="none" aria-pressed="false">Com'è oggi</button>
+    </div>
+  </div>
+  <div class="ctrl"><span class="ctrl-label">Vista</span>
+    <div class="seg" id="view">
+      <button data-view="desktop" aria-pressed="true">Desktop</button>
+      <button data-view="mobile" aria-pressed="false">Mobile</button>
+    </div>
+  </div>
+  <label class="ctrl"><input type="checkbox" id="pins" checked><span class="ctrl-label">Etichette</span></label>
+  <button class="tool-btn" id="copy">Copia la selezione</button>
+</header>
+
+<div class="layout">
+  <aside class="panel" aria-label="Proposte">
+    <p class="panel__count"><strong id="sel-count">0</strong><span>proposte tenute</span></p>
+    <p class="panel__intro">Spunta ciò che vuoi tenere: la schermata cambia subito. "Com'è oggi" mostra l'interfaccia attuale, "Tutte le proposte" l'insieme completo. Le etichette blu portano alla proposta. La scelta resta salvata in questo browser.</p>
+    <div class="legend">
+      <span class="chip chip--rapida">Rapida: template, CSS, testi</span>
+      <span class="chip chip--media">Media: anche query o logica</span>
+      <span class="chip chip--ampia">Ampia: funzione nuova</span>
+    </div>
+    <div id="groups"></div>
+  </aside>
+  <main class="stage">
+    <div class="frame" id="frame">
+
+<!-- ===== 4. Schermate ===== -->
+<section class="screen app is-active" data-screen="home" aria-label="Nuova trascrizione">
+ <div class="shell">
+  <aside class="rail" data-rail="home"></aside>
+  <main class="main">
+   <h1 class="pt">Nuova trascrizione</h1>
+   <div class="two">
+    <div>
+     <span class="field__label">File audio</span>
+     <div class="drop">Trascina un file qui, o scegli dal disco.<small>m4a, mp3, wav, ogg, opus, flac, webm, aac</small></div>
+     <div data-mark="N2">
+      <label class="check"><input type="checkbox"><span data-swap="N2|Correggi gli errori con l'AI locale">Correggi con Ollama dopo la trascrizione</span></label>
+      <div data-off="N2">
+       <div class="field"><span class="field__label">Modello Ollama</span><div class="select select--off">qwen3.5:9b · installato</div></div>
+       <p class="hint"><strong>Precisione: alta · Velocità: media</strong><br>Corregge bene. Stima in base ai 9,7 miliardi di parametri.<br>Misurato: lezione di 85 min corretta in circa 18 min su RTX 4060.<br><span class="muted">Usato solo se la correzione è attiva.</span></p>
+      </div>
+      <p class="hint" data-on="N2">Aggiunge circa 18 minuti per una lezione di 85 minuti. Il modello si sceglie in Impostazioni avanzate.</p>
+     </div>
+     <div class="field" data-mark="N1">
+      <span class="field__label" data-swap="N1|Corso">Materia</span>
+      <div class="input" data-off="N1">Es. Analisi matematica</div>
+      <div class="input" data-on="N1">Scrivi o scegli un corso</div>
+      <div class="chips" data-on="N1"><span class="chip-s">Diritto</span><span class="chip-s">Prova T044</span></div>
+     </div>
+     <div class="details">Impostazioni avanzate</div>
+     <button class="btn btn--primary">Trascrivi</button>
+    </div>
+    <div>
+     <h2 style="margin-top:0" data-mark="N3"><span data-swap="N3|In corso e recenti">Coda</span></h2>
+     <div class="qcard" data-mark="N4">
+      <div class="qcard__top"><span class="qcard__name" data-mark="L1"><span data-off="L1">lezione-prova.m4a</span><span data-on="L1">Lezione di prova<span class="qcard__file">lezione-prova.m4a</span></span></span><span class="badge badge--ok">Completata</span></div>
+      <div class="qcard__meta" data-mark="L4"><span data-on="N4">Prova T044 · </span><span data-swap="L4|oggi, 01:11">08/10/2026, 01:11:48</span></div>
+      <a class="btn" href="#" data-goto="lettore">Apri</a>
+     </div>
+     <div class="qcard">
+      <div class="qcard__top"><span class="qcard__name"><span data-off="L1">AUDIO-2025-04-30-15-44-18.m4a</span><span data-on="L1">Il possesso, seconda parte<span class="qcard__file">AUDIO-2025-04-30-15-44-18.m4a</span></span></span><span class="badge badge--ok">Completata</span></div>
+      <div class="qcard__meta"><span data-on="N4">Diritto · </span><span data-swap="L4|dom 04/10, 17:35">04/10/2026, 17:35:55</span></div>
+      <a class="btn" href="#" data-goto="lettore">Apri</a>
+     </div>
+     <div class="qcard">
+      <div class="qcard__top"><span class="qcard__name"><span data-off="L1">AUDIO-2025-04-30-16-02-14.m4a</span><span data-on="L1">Il possesso<span class="qcard__file">AUDIO-2025-04-30-16-02-14.m4a</span></span></span><span class="badge badge--ok">Completata</span></div>
+      <div class="qcard__meta"><span data-on="N4">Diritto · </span><span data-swap="L4|ven 02/10, 16:03">02/10/2026, 16:03:18</span></div>
+      <a class="btn" href="#" data-goto="lettore">Apri</a>
+     </div>
+     <div class="qcard" data-mark="N5">
+      <div class="qcard__top"><span class="qcard__name">AUDIO-2025-04-30-16-02-14.m4a</span><span class="badge badge--warn">Interrotta</span></div>
+      <div class="qcard__meta"><span data-on="N4">Diritto · </span><span data-swap="L4|ven 02/10, 15:42">02/10/2026, 15:42:07</span></div>
+      <button class="btn" data-on="N5">Riprova con lo stesso audio</button>
+     </div>
+     <div class="qcard" data-off="N3">
+      <div class="qcard__top"><span class="qcard__name">AUDIO-2025-04-30-16-02-14.m4a</span><span class="badge badge--warn badge--cancel"><span data-swap="L2|Annullata da te">Annullata</span></span></div>
+      <div class="qcard__meta"><span data-on="N4">Diritto · </span><span data-swap="L4|ven 02/10, 15:17">02/10/2026, 15:17:59</span></div>
+     </div>
+     <p data-on="N3" class="small">1 trascrizione annullata non mostrata. <a href="#" data-goto="storico">Tutte le trascrizioni nello storico</a></p>
+    </div>
+   </div>
+  </main>
+ </div>
+</section>
+
+<section class="screen app" data-screen="corso" aria-label="Dettaglio corso">
+ <div class="shell">
+  <aside class="rail" data-rail="corso"></aside>
+  <main class="main">
+   <p class="crumb" data-on="S1"><a href="#">Corsi</a> › Diritto</p>
+   <h1 class="pt" data-mark="S1"><span data-swap="S1|Diritto">Corsi</span></h1>
+   <div data-mark="C2">
+    <div data-off="C2">
+     <h2 style="margin-top:0">Cerca nelle lezioni e nei materiali</h2>
+     <div class="search-row">
+      <div class="field"><span class="field__label">Parole o frase</span><div class="input">Es. causa del contratto</div></div>
+      <div class="field"><span class="field__label">Corso</span><div class="select">Tutti i corsi</div></div>
+      <button class="btn btn--primary">Cerca</button>
+     </div>
+     <p class="muted">La frase esatta va tra virgolette. Trova anche le forme simili: «contratti» trova «contratto».</p>
+     <p><a href="#" style="text-decoration:none;font-weight:500">← Tutti i corsi</a></p>
+     <h2>Diritto</h2>
+    </div>
+    <div class="search-mini" data-on="C2"><div class="input">Cerca in Diritto: parole o «frase esatta»</div><button class="btn">Cerca</button></div>
+   </div>
+   <div class="summary" data-on="C10" data-mark="C10"><a href="#lez"><strong>2</strong> lezioni</a><a href="#mat"><strong>1</strong> materiale</a><a href="#es"><strong>1</strong> esercitazione</a><a href="#" data-goto="ripasso"><strong>0</strong> carte da ripassare oggi</a></div>
+   <div class="row-actions" style="align-items:center;margin:8px 0">
+    <span data-mark="C7"><span class="muted" data-off="C7">Ricerca per significato</span><span class="chip-ok" data-on="C7" title="Le domande trovano anche frasi con parole diverse ma stesso senso">Ricerca per significato attiva</span></span>
+    <button class="btn">Esporta il corso</button>
+   </div>
+   <nav class="anchors" data-on="C1" data-mark="C1"><a href="#" class="is-active">Lezioni</a><a href="#">Frasi da esame</a><a href="#">Materiali</a><a href="#">Esercitazioni</a><a href="#">Domande sul corso</a></nav>
+   <div class="tbl-wrap" data-mark="C3">
+    <table class="tbl" data-mark="C4">
+     <thead><tr><th>Lezione</th><th>Data</th><th data-off="C4">Durata</th><th>Stato</th></tr></thead>
+     <tbody>
+      <tr><td><a href="#" data-goto="lettore"><span data-off="L1">AUDIO-2025-04-30-15-44-18.m4a</span><span data-on="L1">Il possesso, seconda parte</span></a><br><a href="#" class="small">Materiali di studio</a></td><td class="num" data-swap="L4|dom 04/10">04/10/2026, 17:35:55</td><td data-off="C4">—</td><td><span class="badge badge--ok">Completata</span></td></tr>
+      <tr><td><a href="#" data-goto="lettore"><span data-off="L1">AUDIO-2025-04-30-16-02-14.m4a</span><span data-on="L1">Il possesso</span></a><br><a href="#" class="small">Materiali di studio</a></td><td class="num" data-swap="L4|ven 02/10">02/10/2026, 16:03:18</td><td data-off="C4">—</td><td><span class="badge badge--ok">Completata</span></td></tr>
+      <tr data-off="C3"><td>AUDIO-2025-04-30-16-02-14.m4a</td><td class="num" data-swap="L4|ven 02/10">02/10/2026, 15:42:07</td><td data-off="C4">—</td><td><span class="badge badge--warn">Interrotta</span></td></tr>
+      <tr data-off="C3"><td>AUDIO-2025-04-30-16-02-14.m4a</td><td class="num" data-swap="L4|ven 02/10">02/10/2026, 15:17:59</td><td data-off="C4">—</td><td><span class="badge badge--warn badge--cancel">Annullata</span></td></tr>
+      <tr class="sub" data-on="C3"><td colspan="4">2 tentativi non completati · <a href="#">Mostra</a></td></tr>
+     </tbody>
+    </table>
+   </div>
+
+   <h2>Frasi da esame</h2>
+   <label class="check"><input type="checkbox"><span>Mostra anche i segnali deboli</span></label>
+   <div data-mark="C5">
+    <h3><span data-off="L1">AUDIO-2025-04-30-16-02-14.m4a</span><span data-on="L1">Il possesso</span></h3>
+    <div class="cue" data-mark="C6"><div><a href="#" class="cue__time">25:20</a><span class="badge badge--ok">forte</span></div><p class="cue__text">e all'esame</p><p class="cue__follow">Segue: «la classica domanda è sì ma che differenza c'è tra l'azione negatoria e l'azione di passazione...»</p><button class="cue__btn">Crea carta</button></div>
+    <div class="cue"><div><a href="#" class="cue__time">33:50</a><span class="badge badge--ok">forte</span></div><p class="cue__text">Ricordatevi che per i frequentanti gli argomenti del tuo esame</p><button class="cue__btn">Crea carta</button></div>
+    <div data-off="C5">
+     <h3>AUDIO-2025-04-30-16-02-14.m4a</h3>
+     <div class="cue"><div><a href="#" class="cue__time">25:20</a><span class="badge badge--ok">forte</span></div><p class="cue__text">e all'esame</p><p class="cue__follow">Segue: «la classica domanda è sì ma che differenza c'è tra l'azione negatoria e l'azione di passazione...»</p><button class="cue__btn">Crea carta</button></div>
+     <div class="cue"><div><a href="#" class="cue__time">33:50</a><span class="badge badge--ok">forte</span></div><p class="cue__text">Ricordatevi che per i frequentanti gli argomenti del tuo esame</p><button class="cue__btn">Crea carta</button></div>
+    </div>
+    <h3><span data-off="L1">AUDIO-2025-04-30-15-44-18.m4a</span><span data-on="L1">Il possesso, seconda parte</span></h3>
+    <div class="cue"><div><a href="#" class="cue__time">41:47</a><span class="badge badge--ok">forte</span></div><p class="cue__text">ricordatevi sempre cosa sono</p><p class="cue__follow">Segue: «solo i mezzi di prova che si basano su ragionamenti di vita partendo da un fatto...»</p><button class="cue__btn">Crea carta</button></div>
+   </div>
+
+   <h2>Materiali</h2>
+   <div class="drop" style="max-width:500px">Trascina un file qui o scegli<small>pdf, docx, pptx, txt, md</small></div>
+   <div class="file-row" data-mark="C9"><div><strong class="small">Modulo TFR - scelta destinazione.pdf</strong><br><span class="muted">149 KB · 2 pag.</span></div><div class="row-actions" style="align-items:center"><span class="badge badge--ok">Pronto</span><a class="btn btn--ghost" href="#">Apri</a><a class="btn btn--ghost" href="#">Scarica</a><button class="btn btn--danger">Elimina</button></div></div>
+
+   <h2>Esercitazioni e riassunti</h2>
+   <div class="gen" data-mark="C8">
+    <div class="gen__form" data-off="C8">
+     <div class="field"><span class="field__label">Formato</span><div class="select">Crocette</div></div>
+     <div class="field"><span class="field__label">Numero di domande</span><div class="input" style="color:var(--n-900)">10</div></div>
+     <div class="field"><span class="field__label">Argomento (facoltativo)</span><div class="input">Es. leggi di Newton</div></div>
+     <div class="details" style="max-width:448px">Fonti (facoltativo)</div>
+     <button class="btn btn--primary" style="width:100%;max-width:448px;justify-content:center">Genera</button>
+    </div>
+    <div data-on="C8" style="margin-top:12px"><button class="btn">Nuove domande o riassunto…</button></div>
+    <div class="gen__list">
+     <div class="gen-item" data-off="C9"><strong class="small">Crocette</strong><span class="badge badge--ok">Completata</span></div>
+     <div class="gen-item" data-off="C9"><button class="btn btn--danger">Elimina</button><button class="btn btn--ghost">Mostra</button><button class="btn btn--primary">Svolgi</button></div>
+     <div class="gen-item small" data-off="C9"><span>compito.md</span>·<span>soluzioni.md</span>·<span>compito.docx</span>·<span>soluzioni.docx</span></div>
+     <div class="gen-item" data-on="C9"><strong class="small">Crocette · 2 domande</strong><button class="btn btn--primary">Svolgi</button><button class="btn btn--ghost">Mostra</button><button class="btn btn--ghost">Scarica ▾</button><button class="btn btn--danger-text">Elimina</button></div>
+    </div>
+   </div>
+   <h3>Tentativi</h3>
+   <div class="empty">Non hai ancora svolto esercitazioni: genera delle domande qui sopra e premi Svolgi.</div>
+   <h2>Domande sul corso</h2>
+   <div class="chat">
+    <div><button class="btn btn--primary">Nuova conversazione</button><p class="small" style="margin:10px 0 0">Che cos'è il possesso?<br><span class="muted">08/10/2026, 01:11:55</span></p></div>
+    <div><span class="field__label">Domanda</span><div class="textarea"></div><button class="btn btn--primary" style="margin-top:8px">Invia</button></div>
+   </div>
+  </main>
+ </div>
+</section>
+
+<section class="screen app" data-screen="lettore" aria-label="Lettore">
+ <div class="shell">
+  <aside class="rail" data-rail="lettore"></aside>
+  <main class="main" style="padding-bottom:0">
+   <p class="crumb" data-on="S1"><a href="#" data-goto="corso">Diritto</a> › Lezione del 02/10</p>
+   <h1 class="pt" data-off="S1">Lettore</h1>
+   <h2 style="margin:0;font-size:26px;overflow-wrap:anywhere"><span data-off="L1">AUDIO-2025-04-30-16-02-14.m4a</span><span data-on="L1">Il possesso</span></h2>
+   <p class="muted" style="margin:2px 0 12px">Caricata il 02/10/2026<span data-on="R3"> · Corso: <strong>Diritto</strong> <a href="#">Modifica</a></span></p>
+   <div data-mark="R3"><div data-off="R3" class="row-actions" style="max-width:448px"><div class="input" style="flex:1;color:var(--n-900)">Diritto</div><button class="btn">Salva corso</button></div></div>
+   <div class="reader-head">
+    <span class="seg2"><span class="on">Originale</span><span>Corretta</span></span>
+    <button class="btn">Materiali di studio</button><button class="btn">Correggi a mano</button>
+    <span data-on="L3" data-mark="L3"><button class="btn btn--ghost">Scarica ▾</button></span>
+   </div>
+   <div class="dl-row" data-off="L3"><span>Scarica .md</span><span>Scarica .json</span><span>Scarica corretta (.md)</span><span>Scarica .docx</span><span>Scarica .txt</span><span>Report correzioni</span></div>
+   <div class="menu" data-on="L3"><div>Documento Word <small>.docx</small></div><div>Testo semplice <small>.txt</small></div><div>Markdown, originale o corretta <small>.md</small></div><div>Report delle correzioni</div><div>Dati completi con tempi <small>.json</small></div></div>
+   <p class="hint-line" data-on="R4" data-mark="R4">Clicca una parola per ascoltare l'audio da quel punto.</p>
+   <div class="unc-ctl" data-on="R1" data-mark="R1"><span>Parole incerte:</span><span class="seg2"><span>Nessuna</span><span class="on">Le più dubbie</span><span>Tutte</span></span></div>
+   <div class="reader">
+    <div>
+     <div class="para"><span class="para__t">0:01</span><p class="para__x"><span class="u">un</span> profilo molto importante come la <span class="u">punta</span> e la <span class="u">possessoria</span> infatti come vi ho anticipato io <span class="u u--mild">e</span> <span class="u u--mild">mio</span> rivalito <span class="u u--mild">nel</span> passato conclusivo della relazione di ieri il possesso, ormai l'abbiamo capito, non è la <span class="u">punta</span> <span class="u u--mild">il</span> possesso non è un diritto il possesso è una situazione di <span class="u">fame</span> il possesso è appunto il potere di fame <span class="u u--mild">che</span> un soggetto eserce <span class="u u--mild">la</span> prima cosa e che <span class="u u--mild">ha</span> <span class="u u--mild">un</span> <span class="u">punto</span> sorrispondente alla proprietà o <span class="u u--mild">al</span> <span class="u">punto</span> di vista reale <span class="u u--mild">tra</span> <span class="u">l'amore</span> di un potere di fatto <span class="u u--mild">cioè</span> tra l'amore della <span class="u">completa</span> situazione <span class="u u--mild">in</span> cui un soggetto si comporta come se <span class="u u--mild">una</span> cosa <span class="u u--mild">fosse</span> propria <span class="u u--mild">ed</span> è possibile che il possesso si associ al diritto.</p></div>
+     <div class="para"><span class="para__t">0:58</span><p class="para__x">il possesso <span class="u u--mild">anche</span> se legittimo e anche se di malafede, è comunque tutelato. Il possessore è tutelato in quanto <span class="u u--mild">tale</span> nei confronti di quei comportamenti che possono in qualche modo turbare o leggere quello che è il suo possessore. <span class="u u--mild">e</span> come <span class="u u--mild">è</span> tutelato il possessore innanzitutto il possessore può proteggere <span class="u u--mild">la</span> sua posizione in via di <span class="u">autocontera</span></p></div>
+    </div>
+    <aside data-mark="R2">
+     <div data-off="R2" class="points">
+      <div class="point"><small>0:01</small><span class="u">un</span> profilo molto importante come</div>
+      <div class="point"><small>0:03</small>molto importante come la <span class="u">punta</span> e</div>
+      <div class="point"><small>0:04</small>la punta e la <span class="u">possessoria</span> infatti come vi ho</div>
+      <div class="point"><small>0:09</small>vi ho anticipato io <span class="u">e mio</span> rivalito nel</div>
+      <div class="point"><small>0:11</small>io e mio rivalito <span class="u">nel</span> passato</div>
+      <div class="point"><small>0:25</small>è una situazione di <span class="u">fame</span> il possesso</div>
+     </div>
+     <div data-on="R2">
+      <div class="points__nav"><strong class="small">Punti da riascoltare</strong><span class="row-actions"><button class="btn btn--ghost">‹</button><button class="btn btn--ghost">›</button></span></div>
+      <div class="points">
+       <div class="point"><small>0:01 – 0:11 · 5 parole</small>«punta», «possessoria», «mio rivalito»</div>
+       <div class="point"><small>0:25 – 0:31 · 3 parole</small>«fame», «eserce», «sorrispondente»</div>
+       <div class="point"><small>1:12 – 1:20 · 1 parola</small>«autocontera»</div>
+      </div>
+      <p class="mock-note" style="margin-top:8px">Raggruppamento d'esempio sui passaggi mostrati.</p>
+     </div>
+    </aside>
+   </div>
+   <div class="abar" data-mark="R5"><button class="btn">▶</button><button class="btn btn--ghost abar__skip">−10s</button><button class="btn btn--ghost abar__skip">+10s</button><span class="abar__time">0:00 / 1:10:14</span><span class="abar__range"></span><span class="select" style="width:auto;padding-right:32px;color:var(--n-900)">1×</span></div>
+  </main>
+ </div>
+</section>
+
+<section class="screen app" data-screen="ripasso" aria-label="Ripasso">
+ <div class="shell">
+  <aside class="rail" data-rail="ripasso"></aside>
+  <main class="main">
+   <h1 class="pt">Ripasso</h1>
+   <p class="hint-line" data-on="P2" data-mark="P2">Le carte nascono dalle <a href="#" data-goto="corso">Frasi da esame</a>, dai materiali di studio e dalle risposte sbagliate nelle esercitazioni.</p>
+   <h2 style="margin-top:0">Oggi</h2>
+   <div class="rcard" data-mark="P1"><div><strong>Diritto</strong> <span class="muted">0 carte oggi</span><span class="muted" data-on="P1"> · prossime: <span class="placeholder">[DATA PROSSIMA SCADENZA]</span></span></div><button class="btn" disabled data-off="P1">Nessuna carta oggi</button></div>
+   <div class="rcard"><div><strong>Prova T044</strong> <span class="muted">0 carte oggi</span><span class="muted" data-on="P1"> · prossime: <span class="placeholder">[DATA PROSSIMA SCADENZA]</span></span></div><button class="btn" disabled data-off="P1">Nessuna carta oggi</button></div>
+  </main>
+ </div>
+</section>
+
+<section class="screen app" data-screen="storico" aria-label="Storico">
+ <div class="shell">
+  <aside class="rail" data-rail="storico"></aside>
+  <main class="main">
+   <h1 class="pt">Storico</h1>
+   <div class="filters" data-on="T1" data-mark="T1"><span class="chip-s" style="background:var(--brand-soft)">Tutte (5)</span><span class="chip-s">Completate (3)</span><span class="chip-s">Non completate (2)</span><span class="chip-s">Corso: tutti ▾</span></div>
+   <div class="tbl-wrap">
+   <table class="tbl" data-mark="T2">
+    <thead><tr><th>Lezione</th><th data-on="T1">Corso</th><th>Data</th><th>Stato</th><th>Azioni</th></tr></thead>
+    <tbody>
+     <tr><td><strong class="small">lezione-prova.m4a</strong></td><td data-on="T1">Prova T044</td><td class="num" data-swap="L4|oggi, 01:11">08/10/2026, 01:11:48</td><td><span class="badge badge--ok">Completata</span></td><td class="row-actions"><button class="btn">Apri</button><button class="btn btn--danger" data-off="T2">Elimina</button><button class="btn btn--danger-text" data-on="T2">Elimina</button></td></tr>
+     <tr><td><strong class="small">AUDIO-2025-04-30-15-44-18.m4a</strong></td><td data-on="T1">Diritto</td><td class="num" data-swap="L4|dom 04/10, 17:35">04/10/2026, 17:35:55</td><td><span class="badge badge--ok">Completata</span></td><td class="row-actions"><button class="btn">Apri</button><button class="btn btn--danger" data-off="T2">Elimina</button><button class="btn btn--danger-text" data-on="T2">Elimina</button></td></tr>
+     <tr><td><strong class="small">AUDIO-2025-04-30-16-02-14.m4a</strong></td><td data-on="T1">Diritto</td><td class="num" data-swap="L4|ven 02/10, 16:03">02/10/2026, 16:03:18</td><td><span class="badge badge--ok">Completata</span></td><td class="row-actions"><button class="btn">Apri</button><button class="btn btn--danger" data-off="T2">Elimina</button><button class="btn btn--danger-text" data-on="T2">Elimina</button></td></tr>
+     <tr><td><strong class="small">AUDIO-2025-04-30-16-02-14.m4a</strong></td><td data-on="T1">Diritto</td><td class="num" data-swap="L4|ven 02/10, 15:42">02/10/2026, 15:42:07</td><td><span class="badge badge--warn">Interrotta</span></td><td><button class="btn btn--danger" data-off="T2">Elimina</button><input type="checkbox" data-on="T2" aria-label="Seleziona"></td></tr>
+     <tr><td><strong class="small">AUDIO-2025-04-30-16-02-14.m4a</strong></td><td data-on="T1">Diritto</td><td class="num" data-swap="L4|ven 02/10, 15:17">02/10/2026, 15:17:59</td><td><span class="badge badge--warn badge--cancel" data-mark="L2"><span data-swap="L2|Annullata da te">Annullata</span></span></td><td><button class="btn btn--danger" data-off="T2">Elimina</button><input type="checkbox" data-on="T2" aria-label="Seleziona"></td></tr>
+    </tbody>
+   </table>
+   </div>
+   <p data-on="T2" style="margin-top:12px"><button class="btn btn--danger">Elimina i 2 tentativi non completati</button></p>
+  </main>
+ </div>
+</section>
+
+<section class="screen app" data-screen="modelli" aria-label="Modelli">
+ <div class="shell">
+  <aside class="rail" data-rail="modelli"></aside>
+  <main class="main">
+   <h1 class="pt">Modelli</h1>
+   <p class="small" style="max-width:68ch">I download dei modelli possono pesare diversi gigabyte e richiedere qualche minuto, a seconda della connessione.</p>
+   <div class="inuse" data-on="M2" data-mark="M2"><span class="badge badge--ok">In uso</span><strong>large-v3</strong><span class="muted">Consigliato per la tua scheda video · 2,9 GB</span></div>
+   <h2>Whisper</h2>
+   <div class="tbl-wrap">
+   <table class="tbl" data-mark="M1">
+    <thead><tr><th>Modello</th><th>Dimensione</th><th>Stato</th><th>Azione</th></tr></thead>
+    <tbody>
+     <tr data-off="M1"><td>tiny.en</td><td>74,5 MB</td><td><span class="badge badge--ok">Scaricato</span></td><td>—</td></tr>
+     <tr data-off="M1"><td>tiny</td><td>74,6 MB</td><td><span class="badge badge--ok">Scaricato</span></td><td>—</td></tr>
+     <tr data-off="M1"><td>base.en</td><td>—</td><td><span class="badge badge--off">Non scaricato</span></td><td><button class="btn">Scarica</button></td></tr>
+     <tr data-off="M1"><td>base</td><td>—</td><td><span class="badge badge--off">Non scaricato</span></td><td><button class="btn">Scarica</button></td></tr>
+     <tr data-off="M1"><td>small.en</td><td>—</td><td><span class="badge badge--off">Non scaricato</span></td><td><button class="btn">Scarica</button></td></tr>
+     <tr data-off="M1"><td>small</td><td>463,7 MB</td><td><span class="badge badge--ok">Scaricato</span></td><td>—</td></tr>
+     <tr data-off="M1"><td>medium.en · medium · large-v1 · large-v2 · distil-*</td><td>—</td><td><span class="badge badge--off">Non scaricato</span></td><td class="muted">9 righe con Scarica</td></tr>
+     <tr><td>large-v3, large</td><td>2,9 GB</td><td><span class="badge badge--ok">Scaricato</span><br><span class="muted" data-off="M2">Consigliato per GPU · In uso ora</span></td><td>—</td></tr>
+     <tr><td>large-v3-turbo, turbo</td><td>1,5 GB</td><td><span class="badge badge--ok">Scaricato</span><br><span class="muted">Consigliato per CPU</span></td><td>—</td></tr>
+     <tr class="sub" data-on="M1"><td colspan="4">Altri 9 modelli multilingua ▸ <span class="muted">· 6 modelli solo inglese nascosti</span></td></tr>
+    </tbody>
+   </table>
+   </div>
+   <p class="mock-note" data-off="M1">Ricostruzione: la tabella reale ha 17 righe; quelle centrali sono riassunte in una.</p>
+   <h2>Ollama</h2>
+   <div class="olist" data-mark="M3">
+    <div class="orow"><strong>qwen3-embedding:8b<small data-on="M3">Ricerca per significato · in uso</small></strong><span>4,4 GB</span></div>
+    <div class="orow"><strong>gemma3:4b<small data-on="M3">Non usato dall'app</small></strong><span>3,1 GB</span></div>
+    <div class="orow"><strong>qwen3.5:9b<small data-on="M3">Correzione, materiali di studio, esercitazioni · in uso</small></strong><span>6,1 GB</span></div>
+    <div class="orow"><strong>qwen2.5vl:7b<small data-on="M3">Lettura di PDF scansionati e immagini (OCR)</small></strong><span>5,6 GB</span></div>
+   </div>
+  </main>
+ </div>
+</section>
+
+<section class="screen app" data-screen="impostazioni" aria-label="Impostazioni">
+ <div class="shell">
+  <aside class="rail" data-rail="impostazioni"></aside>
+  <main class="main">
+   <h1 class="pt">Impostazioni</h1>
+   <h2>Motore per testi e studio</h2>
+   <p class="muted">Scegli come vengono corretti i testi e generati i materiali di studio.</p>
+   <label class="radio-card"><input type="radio" checked><span><strong>Locale</strong><br><span class="muted">Tutto resta sul computer</span></span></label>
+   <label class="radio-card"><input type="radio"><span><strong>API</strong><br><span class="muted">Usa i provider cloud configurati qui sotto</span></span></label>
+   <div data-mark="I1">
+    <div class="collapsed" data-on="I1">Servizi cloud: ordine dei modelli e chiavi API ▸ <span class="muted">(si apre scegliendo API)</span></div>
+    <div data-off="I1">
+     <h2>Ordine dei modelli</h2>
+     <p class="muted">In caso di errore o limite raggiunto si passa al modello successivo.</p>
+     <div class="empty" style="max-width:none">Nessun modello in catena. Aggiungi il primo modello.</div>
+     <p><button class="btn">Aggiungi modello</button> <button class="btn btn--primary">Salva</button></p>
+     <h2>Chiavi API</h2>
+     <div data-mark="I2">
+      <div class="keyrow"><strong>Groq</strong><span class="muted">Non configurata</span><div class="input"></div><button class="btn btn--primary" data-off="I2">Salva</button><span class="rm" data-off="I2">Rimuovi</span><button class="btn" data-off="I2">Prova</button><button class="btn" data-on="I2">Salva e prova</button></div>
+      <div class="keyrow"><strong>Gemini</strong><span class="muted">Non configurata</span><div class="input"></div><button class="btn btn--primary" data-off="I2">Salva</button><span class="rm" data-off="I2">Rimuovi</span><button class="btn" data-off="I2">Prova</button><button class="btn" data-on="I2">Salva e prova</button></div>
+      <p class="muted">OpenAI, Anthropic, AssemblyAI: stesse righe.</p>
+     </div>
+    </div>
+   </div>
+   <h2>Ricerca semantica</h2>
+   <label class="check"><input type="checkbox" checked><span>Attiva la ricerca semantica</span></label>
+   <h3>Copertura per corso</h3>
+   <div data-mark="I3">
+    <div class="cov"><strong>Diritto</strong> <span data-swap="I3|· pronta su tutte le lezioni e i materiali">· 97/97 unità indicizzate</span></div>
+    <div class="cov"><strong>Prova T044</strong> <span data-swap="I3|· pronta su tutte le lezioni e i materiali">· 85/85 unità indicizzate</span></div>
+   </div>
+  </main>
+ </div>
+</section>
+
+    </div>
+  </main>
+</div>
+
+<dialog id="copy-dialog" role="dialog" aria-modal="true" aria-labelledby="copy-title">
+  <h2 id="copy-title">La tua selezione</h2>
+  <p id="copy-status">Testo pronto da incollare in chat.</p>
+  <textarea id="copy-text" readonly></textarea>
+  <div class="dialog-actions"><button class="tool-btn tool-btn--ghost" id="copy-close">Chiudi</button><button class="tool-btn" id="copy-again">Copia</button></div>
+</dialog>
+
+<script>
+/* ===== 5. Dati: l'unica parte di script da compilare =====
+   id: codice stabile (lettera area + numero) · g: chiave del gruppo (data-screen, oppure "x" per le trasversali)
+   t: titolo (max 8 parole) · w: problema osservato e proposta, 1-2 frasi · e: "rapida" | "media" | "ampia"
+   src (facoltativo): fonte, es. "riunione del 12/11" · note (facoltativo): conflitto o rischio da valutare
+   done (facoltativo, Fase B): true quando la proposta è già applicata nel codice */
+const PRODUCT = "Transcriber (sbobina)";
+const GROUPS = {home: "Nuova trascrizione", corso: "Dettaglio corso", lettore: "Lettore", ripasso: "Ripasso", storico: "Storico", modelli: "Modelli", impostazioni: "Impostazioni", x: "Trasversali (tutte le schermate)"};
+const PROPOSALS = [
+  {id: "S1", g: "x", t: "Titolo compatto con percorso, non titolo-poster", w: "Ogni pagina apre con un titolo da 36 px che ripete la voce della barra (\"Corsi\" sopra il corso Diritto, \"Lettore\" sopra la lezione). Titolo piccolo con il nome dell'oggetto e il percorso Corsi › Diritto.", e: "rapida"},
+  {id: "S2", g: "x", t: "Barra laterale alta quanto la pagina", w: "Sulle pagine lunghe (corso, lettore, modelli) lo sfondo della barra laterale finisce a 900 px e sotto resta il vuoto bianco.", e: "rapida"},
+  {id: "S3", g: "x", t: "Al telefono si vede che il menu scorre", w: "A 375 px la barra in alto mostra solo \"Nuova trascrizione\": le altre sette voci sono fuori schermo senza alcun segnale. Sfumatura a destra e voce attiva sempre in vista.", e: "rapida"},
+  {id: "S4", g: "x", t: "Stato della macchina in parole d'uso", w: "In fondo alla barra c'è \"CUDA · large-v3\": per chi studia non significa niente. \"Trascrizione veloce (scheda video)\", con il dettaglio tecnico nel tooltip.", e: "rapida"},
+  {id: "S5", g: "x", t: "Modelli, Confronto e Impostazioni sotto \"Strumenti\"", w: "Le voci tecniche hanno lo stesso peso di Corsi e Ripasso, che si usano ogni giorno. Un gruppo separato in fondo alla barra.", e: "rapida", note: "design.md elenca le pagine come destinazioni della rail"},
+  {id: "L1", g: "x", t: "Lezione chiamata col suo titolo, non col file", w: "Ovunque la lezione è \"AUDIO-2025-04-30-16-02-14.m4a\", e tre righe del corso hanno lo stesso nome. Un titolo modificabile (\"Il possesso\") con il file sotto in piccolo.", e: "ampia", note: "LectureMeta oggi ha solo il corso: serve un campo titolo; titoli del mockup d'esempio"},
+  {id: "L2", g: "x", t: "Annullata distinta da Interrotta", w: "\"Annullata\" e \"Interrotta\" hanno lo stesso badge arancione da avviso, ma la prima è una scelta tua e non chiede attenzione. Annullata in grigio neutro.", e: "rapida"},
+  {id: "L3", g: "x", t: "Un solo menu \"Scarica\" con nomi d'uso", w: "Nel lettore ci sono sei link (.md, .json, corretta .md, .docx, .txt, report) in fila. Un menu con \"Documento Word\", \"Testo semplice\" e il formato tecnico accanto.", e: "rapida"},
+  {id: "L4", g: "x", t: "Date leggibili, senza secondi", w: "\"02/10/2026, 15:42:07\" su ogni riga: il secondo non serve a nessuno e l'anno è quasi sempre l'attuale. \"oggi, 01:11\", \"ven 02/10, 16:03\".", e: "rapida"},
+
+  {id: "N1", g: "home", t: "\"Corso\" al posto di \"Materia\", con suggerimenti", w: "Qui il campo si chiama Materia, nel resto dell'app Corso. Scrivere a mano \"diritto\" o \"Diritto \" rischia un corso doppio: proporre i corsi esistenti.", e: "rapida"},
+  {id: "N2", g: "home", t: "Correzione AI: una riga, il modello in avanzate", w: "Il selettore del modello Ollama resta visibile anche disattivato, con quattro righe di dettagli. Basta dire cosa fa e quanto tempo aggiunge; \"Ollama\" è un nome tecnico.", e: "rapida"},
+  {id: "N3", g: "home", t: "Coda: in corso e ultime 3", w: "La \"Coda\" mostra tutto lo storico, incluse le prove fallite di giorni fa, e duplica la pagina Storico. Restano ciò che è in corso, ciò che chiede un'azione e le ultime tre; il resto a un link.", e: "media"},
+  {id: "N4", g: "home", t: "Il corso nella scheda della coda", w: "La scheda mostra solo file e data: con più corsi non si capisce di cosa sia la lezione appena finita.", e: "rapida"},
+  {id: "N5", g: "home", t: "Riprova su una trascrizione interrotta", w: "Una trascrizione interrotta non ha azioni: per ripartire bisogna ricaricare il file. L'audio è già in data/input.", e: "ampia", note: "oggi non esiste un'azione di ripresa: è una funzione nuova"},
+
+  {id: "C1", g: "corso", t: "Barra di sezioni fissa in alto", w: "La pagina del corso è lunga oltre 4000 px: le Domande sul corso stanno in fondo dopo esercitazioni e materiali. Ancore fisse: Lezioni, Frasi da esame, Materiali, Esercitazioni, Domande.", e: "rapida"},
+  {id: "C2", g: "corso", t: "Dentro un corso, ricerca solo in quel corso", w: "Sopra il corso si ripete la ricerca globale con il menu \"Tutti i corsi\", poi \"← Tutti i corsi\" e il nome del corso. Un campo unico \"Cerca in Diritto\".", e: "rapida"},
+  {id: "C3", g: "corso", t: "Tentativi non completati raccolti in una riga", w: "L'elenco lezioni ha quattro righe con lo stesso nome file, due delle quali sono prove interrotte o annullate. Le lezioni vere in vista, i tentativi in una riga apribile.", e: "media"},
+  {id: "C4", g: "corso", t: "Togliere la colonna Durata sempre vuota", w: "La colonna Durata mostra \"—\" su ogni riga: il dato non è nel record del job (commento in corso-dettaglio.js). Toglierla finché il dato non c'è; in alternativa calcolarla, sforzo Ampia.", e: "rapida"},
+  {id: "C5", g: "corso", t: "Frasi da esame solo da lezioni completate", w: "Lo stesso blocco \"AUDIO-...-16-02-14\" con le stesse frasi compare due volte: viene letta anche la trascrizione parziale della prova interrotta.", e: "media"},
+  {id: "C6", g: "corso", t: "Frasi da esame in righe compatte", w: "Ogni frase occupa 5 righe con il contesto \"Segue: «…»\" sempre aperto e \"Crea carta\" centrato. Ora, frase e bottone su una riga; il contesto si apre a richiesta.", e: "rapida"},
+  {id: "C7", g: "corso", t: "Stato della ricerca per significato chiaro", w: "\"Ricerca per significato\" è una scritta grigia isolata sopra Esporta: non dice se è attiva né cosa cambia. Etichetta di stato con spiegazione nel tooltip.", e: "rapida"},
+  {id: "C8", g: "corso", t: "Prima le esercitazioni fatte, poi il modulo", w: "Il modulo di generazione è sempre aperto e spinge in basso ciò che è già pronto. Elenco in alto, modulo dietro un bottone.", e: "rapida"},
+  {id: "C9", g: "corso", t: "Azione principale prima, Elimina in fondo", w: "Nella riga dell'esercitazione il primo bottone è Elimina (bordato rosso), prima di Mostra e Svolgi; nei materiali Elimina è il più marcato. Svolgi primo, Elimina come testo in coda.", e: "rapida"},
+  {id: "C10", g: "corso", t: "Riepilogo del corso con numeri cliccabili", w: "Per sapere cosa c'è nel corso bisogna scorrere tutta la pagina. Una riga: lezioni, materiali, esercitazioni, carte da ripassare oggi, ognuno un link.", e: "media"},
+
+  {id: "R1", g: "lettore", t: "Livello delle parole incerte regolabile", w: "Circa una parola su tre è evidenziata (anche \"e\", \"la\", \"un\"), e il testo si legge a fatica. Interruttore Nessuna, Le più dubbie, Tutte.", e: "media", note: "la soglia è fissata per job; il client non riceve le probabilità delle parole"},
+  {id: "R2", g: "lettore", t: "Punti da riascoltare raggruppati per passaggio", w: "La colonna destra ha una scheda per ogni parola dubbia, che ripete il testo: centinaia di schede quasi uguali. Passaggi raggruppati con navigazione Precedente/Successivo.", e: "media"},
+  {id: "R3", g: "lettore", t: "Corso come dato, non come modulo", w: "Campo \"Corso\" e bottone \"Salva corso\" stanno in testa al lettore, prima del testo. Il corso va nella riga dei dettagli con un link Modifica.", e: "rapida"},
+  {id: "R4", g: "lettore", t: "Dire che si clicca una parola per ascoltarla", w: "Cliccare una parola fa partire l'audio da lì (reader.js), ma nulla lo dice.", e: "rapida"},
+  {id: "R5", g: "lettore", t: "Barra audio più bassa al telefono", w: "A 375 px la barra audio va su due righe e copre un quarto dello schermo di lettura. Una riga sola: −10s e +10s si tolgono, resta la barra di avanzamento.", e: "rapida"},
+  {id: "R6", g: "lettore", t: "\"Riprendi l'ultima lezione\" al posto di \"Lettore\"", w: "\"Lettore\" in barra non è una destinazione: apre l'ultima lezione aperta, senza dire quale. Una scorciatoia che nomina la lezione.", e: "rapida", note: "design.md elenca Lettore fra le pagine"},
+
+  {id: "P1", g: "ripasso", t: "Stato al posto del bottone disattivato", w: "\"Nessuna carta oggi\" è disegnato come bottone grigio: sembra rotto. Testo di stato e data delle prossime carte.", e: "media", note: "la data di scadenza esiste nelle carte; nel mockup è un segnaposto"},
+  {id: "P2", g: "ripasso", t: "Spiegare da dove arrivano le carte", w: "Con zero carte la pagina non dice come crearne. Una riga con il link alle Frasi da esame.", e: "rapida"},
+
+  {id: "T1", g: "storico", t: "Colonna Corso e filtri per stato", w: "Lo storico non dice di che corso è ogni lezione e non si filtra: con un semestre di lezioni diventa una lista lunga.", e: "media"},
+  {id: "T2", g: "storico", t: "Pulizia in blocco dei tentativi falliti", w: "Ogni riga ha un Elimina bordato rosso, uguale per lezioni buone e prove fallite. Elimina più discreto sulle lezioni, e un'azione unica per i tentativi non completati.", e: "media"},
+
+  {id: "M1", g: "modelli", t: "Consigliati in vista, gli altri raccolti", w: "La tabella Whisper ha 17 righe, 6 delle quali sono modelli solo inglese (.en), inutili per lezioni in italiano. I due consigliati in vista, gli altri in una riga apribile.", e: "rapida"},
+  {id: "M2", g: "modelli", t: "Modello in uso in evidenza", w: "\"In uso ora\" è una scritta grigia sotto lo stato della riga 11. Un riquadro in alto con il modello in uso.", e: "rapida"},
+  {id: "M3", g: "modelli", t: "Per ogni modello Ollama, a cosa serve", w: "La lista Ollama mostra quattro nomi e i GB, senza dire quale serve alla correzione, alla ricerca o all'OCR, né quale l'app non usa (gemma3:4b).", e: "media"},
+
+  {id: "I1", g: "impostazioni", t: "Servizi cloud chiusi se il motore è Locale", w: "Con \"Locale\" scelto la pagina mostra comunque l'ordine dei modelli e cinque righe di chiavi API. Si aprono scegliendo API.", e: "rapida"},
+  {id: "I2", g: "impostazioni", t: "Una sola azione per chiave", w: "Ogni chiave ha Salva, Rimuovi (grigio, sembra disattivato) e Prova. \"Salva e prova\" quando si scrive; Rimuovi solo se la chiave c'è.", e: "media"},
+  {id: "I3", g: "impostazioni", t: "Copertura detta in parole", w: "\"97/97 unità indicizzate\": l'unità è un concetto interno. \"Pronta su tutte le lezioni e i materiali\", oppure quante lezioni mancano.", e: "rapida"}
+];
+
+function railHTML(active){
+  const link = (k, label, go) => `<a href="#" class="rail__link${k === active ? " is-active" : ""}" data-goto="${go}">${label}</a>`;
+  const tools = link("modelli", "Modelli", "modelli") + link("confronto", "Confronto (WER)", "confronto") + link("impostazioni", "Impostazioni", "impostazioni");
+  const m = (code, scr) => active === scr ? ` data-mark="${code}"` : "";
+  return `<div class="rail__brand">Transcriber</div>
+  <a href="#" class="rail__resume" data-on="R6" data-goto="lettore"${m("R6", "lettore")}><small>Riprendi</small>Il possesso · Diritto</a>
+  <nav class="rail__nav"${m("S3", "home")}${m("S2", "corso")}>
+   ${link("home", "Nuova trascrizione", "home")}${link("corso", "Corsi", "corso")}${link("ripasso", "Ripasso", "ripasso")}
+   <a href="#" class="rail__link${active === "lettore" ? " is-active" : ""}" data-off="R6" data-goto="lettore">Lettore</a>
+   ${link("storico", "Storico", "storico")}
+   <span data-off="S5" style="display:contents">${tools}</span>
+   <div class="rail__group" data-on="S5"${m("S5", "impostazioni")}><span class="rail__gtitle">Strumenti</span>${tools}</div>
+  </nav>
+  <span class="rail__more" data-on="S3">altre voci ›</span>
+  <div class="rail__foot"${m("S4", "home")}><span class="rail__theme">Tema: Auto</span><span class="rail__hw" data-off="S4">CUDA · large-v3</span><span class="rail__hw" data-on="S4" title="CUDA · large-v3">Trascrizione veloce (scheda video)</span></div>`;
+}
+document.querySelectorAll("[data-rail]").forEach(el => { el.innerHTML = railHTML(el.dataset.rail); });
+
+/* ===== Engine: non modificare sotto questa riga ===== */
+const EFFORT = {rapida: "Rapida", media: "Media", ampia: "Ampia"};
+const KEY = "ux-improver:" + PRODUCT;
+function load(){ try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch(e){ return null; } }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(ui)); } catch(e){} }
+const saved = load();
+const ui = {
+  sel: Object.assign(Object.fromEntries(PROPOSALS.map(p => [p.id, true])), saved && saved.sel || {}),
+  mode: saved && saved.mode || "sel",
+  tab: saved && saved.tab || document.querySelector("[role=tab]").dataset.tab,
+  view: saved && saved.view || "desktop",
+  pins: saved ? saved.pins !== false : true
+};
+if (!document.querySelector(`[data-screen="${ui.tab}"]`)) ui.tab = document.querySelector("[role=tab]").dataset.tab;
+const frame = document.getElementById("frame");
+const isOn = id => ui.mode === "all" ? true : ui.mode === "none" ? false : !!ui.sel[id];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+
+function apply(){
+  document.querySelectorAll("[data-on]").forEach(el => { el.hidden = !el.dataset.on.split(" ").every(isOn); });
+  document.querySelectorAll("[data-off]").forEach(el => { el.hidden = el.dataset.off.split(" ").some(isOn); });
+  document.querySelectorAll("[data-swap]").forEach(el => {
+    if (el.dataset.orig === undefined) el.dataset.orig = el.textContent;
+    const cut = el.dataset.swap.indexOf("|");
+    el.textContent = isOn(el.dataset.swap.slice(0, cut)) ? el.dataset.swap.slice(cut + 1) : el.dataset.orig;
+  });
+  PROPOSALS.forEach(p => frame.classList.toggle("f-" + p.id, isOn(p.id)));
+  document.getElementById("sel-count").textContent = PROPOSALS.filter(p => ui.sel[p.id]).length + " / " + PROPOSALS.length;
+  document.querySelectorAll("#mode button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === ui.mode));
+  document.querySelectorAll("#view button").forEach(b => b.setAttribute("aria-pressed", b.dataset.view === ui.view));
+  document.querySelectorAll("[role=tab]").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === ui.tab));
+  document.querySelectorAll(".screen").forEach(s => s.classList.toggle("is-active", s.dataset.screen === ui.tab));
+  frame.classList.toggle("is-mobile", ui.view === "mobile");
+  frame.classList.toggle("pins-off", !ui.pins);
+  document.getElementById("pins").checked = ui.pins;
+  renderPanel();
+  save();
+  document.dispatchEvent(new CustomEvent("ux:applied"));
+}
+
+function renderPanel(){
+  const wrap = document.getElementById("groups");
+  const order = [ui.tab, "x"].filter((g, i, a) => GROUPS[g] && a.indexOf(g) === i);
+  wrap.innerHTML = "";
+  order.forEach(g => {
+    const items = PROPOSALS.filter(p => p.g === g);
+    if (!items.length) return;
+    const sec = document.createElement("section");
+    sec.className = "group";
+    const allOn = items.every(p => ui.sel[p.id]);
+    sec.innerHTML = `<div class="group__head"><h2 class="group__title">${esc(GROUPS[g])}</h2><button class="group__all" data-group="${g}">${allOn ? "Togli tutte" : "Tieni tutte"}</button></div>`;
+    items.forEach(p => {
+      const div = document.createElement("div");
+      div.className = "prop";
+      div.id = "prop-" + p.id;
+      div.innerHTML = `<input type="checkbox" id="cb-${p.id}" ${ui.sel[p.id] ? "checked" : ""} aria-describedby="why-${p.id}">
+        <div class="prop__head"><button class="prop__code" data-show="${p.id}" title="Mostra sulla schermata">${p.id}</button><label class="prop__title" for="cb-${p.id}">${esc(p.t)}</label></div>
+        <p class="prop__why" id="why-${p.id}">${esc(p.w)}</p>
+        <div class="prop__tags"><span class="chip chip--${p.e}">${EFFORT[p.e]}</span>${p.src ? `<span class="chip chip--nota">${esc(p.src)}</span>` : ""}${p.note ? `<span class="chip chip--nota" title="${esc(p.note)}">da valutare: ${esc(p.note)}</span>` : ""}${p.done ? '<span class="chip chip--fatta">applicata</span>' : ""}</div>`;
+      sec.appendChild(div);
+    });
+    wrap.appendChild(sec);
+  });
+  const others = Object.keys(GROUPS).filter(g => !order.includes(g));
+  if (others.length){
+    const rest = document.createElement("p");
+    rest.className = "panel__intro";
+    rest.textContent = "Altre schermate: " + others.map(g => `${GROUPS[g]} ${PROPOSALS.filter(p => p.g === g && ui.sel[p.id]).length}/${PROPOSALS.filter(p => p.g === g).length}`).join(" · ");
+    wrap.appendChild(rest);
+  }
+}
+
+function show(id){
+  const p = PROPOSALS.find(x => x.id === id);
+  if (p && p.g !== "x" && p.g !== ui.tab && GROUPS[p.g]){ ui.tab = p.g; apply(); }
+  const target = [...document.querySelectorAll(`.screen.is-active [data-mark="${id}"]`)].find(el => el.offsetParent !== null);
+  if (!target) return;
+  target.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center"});
+  target.classList.remove("flash-target"); void target.offsetWidth; target.classList.add("flash-target");
+}
+
+function addPins(){
+  document.querySelectorAll("[data-mark]").forEach(el => {
+    const b = document.createElement("button");
+    b.className = "pin"; b.type = "button"; b.textContent = el.dataset.mark;
+    b.setAttribute("aria-label", "Proposta " + el.dataset.mark);
+    b.addEventListener("click", e => {
+      e.preventDefault(); e.stopPropagation();
+      const card = document.getElementById("prop-" + el.dataset.mark);
+      if (!card) return;
+      card.scrollIntoView({behavior: "smooth", block: "center"});
+      card.classList.add("is-flash"); setTimeout(() => card.classList.remove("is-flash"), 1400);
+    });
+    el.appendChild(b);
+  });
+}
+
+function selectionText(){
+  const line = p => `${p.id} ${p.t} [${EFFORT[p.e]}]`;
+  const keep = PROPOSALS.filter(p => ui.sel[p.id]);
+  const drop = PROPOSALS.filter(p => !ui.sel[p.id]);
+  return `Proposte UX ${PRODUCT}: ${keep.length} tenute su ${PROPOSALS.length}\n\nTENERE\n${keep.map(line).join("\n") || "-"}\n\nSCARTARE\n${drop.map(line).join("\n") || "-"}\n`;
+}
+async function copyText(){
+  const txt = selectionText();
+  document.getElementById("copy-text").value = txt;
+  const status = document.getElementById("copy-status");
+  try { await navigator.clipboard.writeText(txt); status.textContent = "Copiato negli appunti."; }
+  catch(e){ status.textContent = "Copia automatica non disponibile: seleziona il testo e copialo a mano."; }
+}
+
+document.getElementById("groups").addEventListener("change", e => {
+  if (e.target.matches("input[type=checkbox]")){ ui.sel[e.target.id.slice(3)] = e.target.checked; ui.mode = "sel"; apply(); }
+});
+document.getElementById("groups").addEventListener("click", e => {
+  const g = e.target.closest("[data-group]");
+  if (g){ const items = PROPOSALS.filter(p => p.g === g.dataset.group); const v = !items.every(p => ui.sel[p.id]); items.forEach(p => ui.sel[p.id] = v); ui.mode = "sel"; apply(); }
+  const s = e.target.closest("[data-show]");
+  if (s) show(s.dataset.show);
+});
+document.querySelectorAll("#mode button").forEach(b => b.addEventListener("click", () => { ui.mode = b.dataset.mode; apply(); }));
+document.querySelectorAll("#view button").forEach(b => b.addEventListener("click", () => { ui.view = b.dataset.view; apply(); }));
+document.querySelectorAll("[role=tab]").forEach(b => b.addEventListener("click", () => { ui.tab = b.dataset.tab; apply(); window.scrollTo({top: 0}); }));
+document.getElementById("pins").addEventListener("change", e => { ui.pins = e.target.checked; apply(); });
+frame.addEventListener("click", e => {
+  const a = e.target.closest("a, button");
+  if (!a || a.classList.contains("pin")) return;
+  if (a.matches("a")) e.preventDefault();
+  if (a.dataset.goto && document.querySelector(`[data-screen="${a.dataset.goto}"]`)){ ui.tab = a.dataset.goto; apply(); frame.scrollIntoView({block: "start"}); }
+});
+const dlg = document.getElementById("copy-dialog");
+document.getElementById("copy").addEventListener("click", () => { copyText(); dlg.showModal(); });
+document.getElementById("copy-again").addEventListener("click", copyText);
+document.getElementById("copy-close").addEventListener("click", () => dlg.close());
+dlg.addEventListener("keydown", e => {
+  if (e.key !== "Tab") return;
+  const items = [...dlg.querySelectorAll("button, textarea, a[href], input")].filter(el => !el.disabled);
+  const first = items[0], last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+});
+
+window.UX = {PRODUCT, PROPOSALS, GROUPS, ui, apply, selectionText};
+document.title = "Proposte UX · " + PRODUCT;
+addPins();
+apply();
+</script>
+</body>
+</html>
