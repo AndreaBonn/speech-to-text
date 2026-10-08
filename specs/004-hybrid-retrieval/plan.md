@@ -96,7 +96,7 @@ decisione con `SPEDITO:` (§ Scelta).
 
 Aperti:
 
-- [ ] Harness entro i limiti del repo: nessun file oltre 300 righe (`scripts/eval_hybrid.py` è a
+- [x] Harness entro i limiti del repo: nessun file oltre 300 righe (`scripts/eval_hybrid.py` è a
       651), la metrica "rilevante = voto 2 oppure riferimento del gold" in
       `src/sbobina/retrieval_metrics.py` con test, nessun file di misura che viva solo in una
       scratchpad.
@@ -104,7 +104,7 @@ Aperti:
         lancia `scripts/eval_hybrid.py --system dense --model qwen3-embedding:8b` con la metrica
         dei giudizi; Then stampa recall@8 1,00 e MRR@10 0,908 sulle 82 domande con risposta, gli
         stessi numeri di eval.md § Scelta.
-- [ ] Soglia di coseno per `qwen3-embedding:8b` (Dis.4 B), dalle liste top-50 già salvate
+- [x] Soglia di coseno per `qwen3-embedding:8b` (Dis.4 B), dalle liste top-50 già salvate
       (`out/x8b-dense.json`): la più alta che tiene la recall@8 sulle 82 domande con risposta
       entro 1 domanda da "nessuna soglia", minimizzando i passaggi sopra soglia per le 11
       `negative`. Registrata in eval.md § Varianti e § Scelta.
@@ -112,17 +112,17 @@ Aperti:
 
 ### C2 - Ricerca densa in produzione, indice da CLI (fase F2)
 
-- [ ] Configurazione: `Settings.semantic_search: bool = True`, `Settings.embedding_model: str =
+- [x] Configurazione: `Settings.semantic_search: bool = True`, `Settings.embedding_model: str =
       "qwen3-embedding:8b"`. Modello, digest (da `/api/tags`), dimensioni (da `/api/show`,
       4096 per l'8b), `num_ctx` e `EMBEDDING_PROMPT_VERSION` formano la `model_key`. Nessun
       `os.getenv` nuovo.
-- [ ] Confine Ollama `src/sbobina/ollama_embed.py`, unico punto che chiama `/api/embed`. Batch da
+- [x] Confine Ollama `src/sbobina/ollama_embed.py`, unico punto che chiama `/api/embed`. Batch da
       32. Documenti su GPU con `num_ctx` 2048 esplicito (la configurazione misurata, che non
       dipende dal default di Ollama). Query con `options.num_gpu=0`, stesso `num_ctx`,
       `keep_alive` "30m". Mai `pull`. Errori → `EmbeddingUnavailableError` con `reason:
       model_missing | unreachable | bad_response`; vettore di dimensione diversa da quella
       registrata → `bad_response`.
-- [ ] Politica di troncamento (Dis.9): ogni chiamata usa `truncate=false`. Un 400 "exceeds the
+- [x] Politica di troncamento (Dis.9): ogni chiamata usa `truncate=false`. Un 400 "exceeds the
       context length" su un batch fa ripartire quel batch testo per testo; il solo testo oltre il
       contesto si incorpora con `truncate=true`, viene marcato `truncated` nell'indice e produce
       un WARNING con `passage_id`, caratteri e `num_ctx`. Il conteggio dei troncati compare
@@ -130,29 +130,29 @@ Aperti:
       - Given un corso con una tavola numerica da 3.000 token e 40 passaggi normali; When si
         indicizza; Then 41 vettori scritti, 1 con `truncated = 1`, un WARNING col suo
         `passage_id`, la CLI stampa "1 passaggio troncato".
-- [ ] Prompt in `src/sbobina/embedding_prompts.py` (puro, `EMBEDDING_PROMPT_VERSION`): per la
+- [x] Prompt in `src/sbobina/embedding_prompts.py` (puro, `EMBEDDING_PROMPT_VERSION`): per la
       famiglia Qwen la domanda diventa `Instruct: Given a question, retrieve relevant passages
       that answer it\nQuery:{q}`, i documenti restano senza prefisso; soglia per modello da
       T016. Un modello non misurato non ha soglia e lo stato lo dichiara "non misurato".
-- [ ] Unità di embedding in `src/sbobina/embedding_units.py` (puro), **la stessa** funzione usata
+- [x] Unità di embedding in `src/sbobina/embedding_units.py` (puro), **la stessa** funzione usata
       dall'harness (oggi in `hybrid_eval.py`): passaggi documento 1:1 con quelli FTS, finestre di
       lezione da `partition_lecture_segments` (~250 parole) con primo e ultimo segmento e
       `sha256` del testo. Harness e produzione non possono divergere sulle unità.
-- [ ] Indice vettoriale in un file separato `data/vectors.sqlite3` (Dis.2): tabelle `models`,
+- [x] Indice vettoriale in un file separato `data/vectors.sqlite3` (Dis.2): tabelle `models`,
       `units`, `vectors(model_key, text_sha256, vector BLOB float32, truncated)`. WAL e
       `busy_timeout`. Mismatch di schema o corruzione: il file va in `.bak`, stato
       `rebuild_needed` con WARNING; nessuna cancellazione silenziosa.
-- [ ] Comando `sbobina indicizza-semantico --corso <chiave>` (e `--tutti`): riconcilia le unità,
+- [x] Comando `sbobina indicizza-semantico --corso <chiave>` (e `--tutti`): riconcilia le unità,
       calcola solo i vettori mancanti per la `model_key` attiva, scrive a batch (un'interruzione
       conserva il fatto), stampa copertura, troncati e unità al secondo.
       - Given un corso con 120 unità e 100 vettori già presenti; When si lancia il comando;
         Then partono 20 testi verso il fake embedder e la copertura passa a 120/120.
-- [ ] Ramo denso `src/sbobina/dense_retrieval.py`, nella forma misurata: due liste (documenti,
+- [x] Ramo denso `src/sbobina/dense_retrieval.py`, nella forma misurata: due liste (documenti,
       finestre di lezione) da al massimo 50 candidati sopra la soglia, unite con `fuse_by_rank`
       su punteggio `-cosine` (test che fallisce se il segno si inverte, R5). Una finestra densa è
       già una finestra: diventa un `RetrievedPassage` della finestra intera, senza passare da
       `expand_lecture_windows`.
-- [ ] Scelta del percorso in `course_retrieval.retrieve_windows(..., dense: DenseRanker | None =
+- [x] Scelta del percorso in `course_retrieval.retrieve_windows(..., dense: DenseRanker | None =
       None)`: denso se il modello risponde e la copertura del corso è 100%; altrimenti il BM25
       di oggi, invariato. `dense=None` dà output identico a oggi (la suite esistente è il test di
       non regressione). `RetrievalReport` con `mode: dense | bm25` (nome interno; l'etichetta mostrata all'utente si decide in C4), `reason` (`disabled`,
@@ -161,61 +161,62 @@ Aperti:
       qualche unità è cambiato dopo l'indicizzazione (finding F7 della review di T026).
       - Given un corso con copertura 118/120; When lo studente fa una domanda; Then risponde il
         BM25, `retrieval_mode = {"mode": "bm25", "reason": "partial"}`, copertura 118/120.
-- [ ] Chat e generazioni passano il ramo denso e registrano `retrieval_mode` (campo opzionale:
+- [x] Chat e generazioni passano il ramo denso e registrano `retrieval_mode` (campo opzionale:
       JSONL e metadati vecchi si leggono ancora); la risposta API della chat lo espone; WARNING
       nel log a ogni degrado, una volta per processo e motivo.
       - Given il modello configurato non installato; When lo studente fa una domanda in chat;
         Then la risposta arriva dal BM25, il record ha `retrieval_mode = {"mode": "bm25",
         "reason": "model_missing"}` e il log ha un WARNING col nome del modello.
-- [ ] `gpu_release.unload_ollama_models` scarica ogni modello in un `try` separato.
-- [ ] Riproduzione attraverso il codice di produzione: harness `--system production` sul corpus
+- [x] `gpu_release.unload_ollama_models` scarica ogni modello in un `try` separato.
+- [x] Riproduzione attraverso il codice di produzione: harness `--system production` sul corpus
       di F1 dà i numeri di eval.md § Scelta (denso 8b) ±1 domanda. Embedding della domanda con
       9B residente p95 ≤ 2,5 s (tetto di regressione sui 2,05 s accettati, al posto del gate L),
       misurato anche mentre il 9B sta generando; `qwen3.5:9b` ancora in `/api/ps` con
       `size_vram` invariata.
-- [ ] Throughput reale di indicizzazione dell'8b misurato in condizioni dichiarate (T033): unità
+- [x] Throughput reale di indicizzazione dell'8b misurato in condizioni dichiarate (T033): unità
       al secondo con GPU libera e 9B scaricato, layer su GPU dal log di Ollama; comportamento di
       una query su CPU mentre lo stesso modello indicizza su GPU.
 
 ### C3 - Indicizzazione automatica (fase F3)
 
-- [ ] Azione `embed` per corso nella FIFO del supervisor, in `web/embedding_supervisor.py`
+- [x] Azione `embed` per corso nella FIFO del supervisor, in `web/embedding_supervisor.py`
       (`supervisor.py` è a 299 righe), sul modello di `ocr_supervisor.py`: processo figlio,
       annullabile, una sola azione in attesa per corso.
-- [ ] L'azione prende la lease GPU come la trascrizione (`transcription_lease(stage="embedding")`),
+- [x] L'azione prende la lease GPU come la trascrizione (`transcription_lease(stage="embedding")`),
       scarica prima i modelli residenti e a fine lavoro rilascia il modello (`keep_alive=0`).
       Durante l'indicizzazione la chat su motore locale risponde 409 `GPU_BUSY` con
       "indicizzazione semantica" e una stima calcolata con le unità/s di T033. Con motore API la
       chat continua; la sua query segue l'esito di T033 (CPU se le due istanze convivono,
       altrimenti BM25 con `reason="gpu_busy"`).
-- [ ] Indicizzazione a fette (Dis.10, attiva solo se T033 conferma meno di 0,5 unità/s): un'azione
+- [x] Indicizzazione a fette (Dis.10, attiva solo se T033 conferma meno di 0,5 unità/s): un'azione
       `embed` lavora al massimo 10 minuti, poi rilascia la lease e riaccoda il resto in coda alla
       FIFO, così una trascrizione accodata non aspetta ore.
-- [ ] Accodamento automatico, solo se `semantic_search` è attivo e il modello è installato:
+      Non necessario: T033 misura 0,85-1,71 unità/s, T044 2,6 unità/s (T045).
+- [x] Accodamento automatico, solo se `semantic_search` è attivo e il modello è installato:
       lezione completata, documento `READY` (estrazione o OCR), modifica manuale salvata. Con
       modello assente non si accoda niente e lo stato del corso dice perché.
       - Given una lezione già indicizzata; When lo studente corregge 3 parole nel lettore; Then
         si accoda un'azione `embed` e alla sua fine sono ricalcolati solo i vettori delle
         finestre il cui testo è cambiato (contatore del fake embedder).
-- [ ] Backfill: pulsante (F4) e comando CLI accodano un'azione per ogni corso con copertura <
+- [x] Backfill: pulsante (F4) e comando CLI accodano un'azione per ogni corso con copertura <
       100%; il cambio di modello dichiara l'indice da ricostruire e accoda il backfill solo dopo
       conferma. I vettori di altre `model_key` si eliminano quando il nuovo indice è completo.
-- [ ] Il cambio di corso di una lezione non richiede re-embedding: le unità di lezione non
+- [x] Il cambio di corso di una lezione non richiede re-embedding: le unità di lezione non
       portano il corso, lo scope si risolve a ogni query.
 
 ### C4 - Stato e scelta nelle Impostazioni (fase F4)
 
-- [ ] `GET /api/v1/semantic-index/status`: modello configurato, installato sì/no, dimensioni,
+- [x] `GET /api/v1/semantic-index/status`: modello configurato, installato sì/no, dimensioni,
       misurato sì/no, copertura e troncati per corso, ultima indicizzazione, azione in coda.
       `POST /api/v1/courses/{key}/semantic-index` accoda l'azione (stessi controlli `Origin` di
       `/api/v1/settings/*`).
-- [ ] `embedding_model` e `semantic_search` in `UserPreferences` e in `_ENV_LOCKABLE_FIELDS`.
-- [ ] Sezione "Ricerca semantica" nelle Impostazioni: modello (fra quelli installati con capacità
+- [x] `embedding_model` e `semantic_search` in `UserPreferences` e in `_ENV_LOCKABLE_FIELDS`.
+- [x] Sezione "Ricerca semantica" nelle Impostazioni: modello (fra quelli installati con capacità
       `embedding`, col consigliato `qwen3-embedding:8b`), comando `ollama pull <modello>` da
       copiare quando manca, copertura, "Indicizza ora" con la durata stimata. Pagina del corso e
       risposta della chat mostrano "ricerca per significato" oppure "solo parole chiave: <motivo
       in chiaro>".
-- [ ] `a11y-gate` sulla sezione, render a 375 e 1280 px, click-through registrato.
+- [x] `a11y-gate` sulla sezione, render a 375 e 1280 px, click-through registrato.
 
 ## Assunzioni
 
@@ -341,7 +342,8 @@ Solo preferenze che il codice non può dare; default raccomandato in testa.
   (performance.md). Responsabile: esecutore di T032.
 - **R12 Stesso modello su CPU e su GPU insieme.** Poiché la query chiede l'8b con `num_gpu=0`
   mentre l'azione `embed` lo tiene su GPU (con motore API la chat non è in 409), Ollama potrebbe
-  scaricare l'istanza GPU per caricare quella CPU (UNVERIFIED) e l'indicizzazione
+  scaricare l'istanza GPU per caricare quella CPU (misurato in T033: succede, eval.md
+  § Indicizzazione; risolto con `gpu_busy` in T041) e l'indicizzazione
   rallenterebbe a ogni domanda (effetto: ore di backfill in più, lavoro di F3 sprecato). → T033
   lo osserva in `/api/ps`; se c'è il ricarico, durante `embed` la query va a BM25 con `reason =
   gpu_busy` (T041).

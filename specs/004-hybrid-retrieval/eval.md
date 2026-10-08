@@ -637,3 +637,8 @@ dopo 2 Tab". Percorso del focus osservato: Annulla → Conferma → fuori dal do
 dialog è `:modal` (ruolo e modalità impliciti) e il contenuto dietro resta inerte, mai raggiunto.
 È il comportamento del `<dialog>` modale nativo, lo stesso dei cinque dialog già nel progetto
 (VERDETTO: strumento).
+
+Copertura parziale (`/analyze` A1): nella copia isolata un'unità in più nel manifest di Diritto
+porta la copertura a 97/98. Pagina corso: "Solo parole chiave: indicizzazione incompleta
+(97/98)"; una domanda in chat sullo stesso corso risponde `DONE` con `retrieval_mode` `bm25`,
+motivo `partial`, copertura 97/98. Pagina e ricerca coincidono. BASIS: measured.
