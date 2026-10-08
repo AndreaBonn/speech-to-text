@@ -253,3 +253,29 @@
   }
 }
 
+
+/* M2: the model in use, once, above the catalogue. */
+.models__in-use {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-card);
+}
+
+.models__in-use[hidden],
+.models__other[hidden] {
+  display: none;
+}
+
+/* M3: the role under each Ollama model name. */
+.models__role {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-3);
+}

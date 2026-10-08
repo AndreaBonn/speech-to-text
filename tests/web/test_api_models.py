@@ -79,7 +79,7 @@ def test_models_endpoint_returns_catalog_and_ollama_state(
 
     assert response.status_code == 200
     data = response.json()["data"]
-    assert set(data) == {"whisper", "ollama"}
+    assert set(data) == {"whisper", "ollama", "ollama_roles"}
     assert (
         next(model for model in data["whisper"] if model["name"] == "tiny")
         == EXPECTED_TINY
@@ -108,3 +108,51 @@ def test_endpoints_share_ollama_payload(tmp_path: Path, path: str) -> None:
         "message": "Ollama è pronto.",
         "models": [{"model": "qwen3.5:9b", "size": 1024, "parameter_size": None}],
     }
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("qwen3.5:9b", ["Correzione, materiali di studio ed esercitazioni"]),
+        ("qwen3-embedding:8b", ["Ricerca per significato"]),
+        ("qwen2.5vl:7b", ["Lettura di PDF scansionati e immagini"]),
+        ("gemma3:4b", []),
+    ],
+)
+def test_ollama_roles_name_what_each_installed_model_does(
+    name: str, expected: list[str]
+) -> None:
+    """M3: roles come from the effective settings, not from a fixed list."""
+    settings = Settings(
+        ollama_model="qwen3.5:9b",
+        embedding_model="qwen3-embedding:8b",
+        ocr_model="qwen2.5vl:7b",
+        semantic_search=True,
+    )
+
+    assert model_service.ollama_roles(name=name, settings=settings) == expected
+
+
+def test_ollama_roles_ignore_latest_tag_and_disabled_semantic_search() -> None:
+    settings = Settings(
+        ollama_model="gemma3",
+        embedding_model="qwen3-embedding:8b",
+        semantic_search=False,
+    )
+
+    assert model_service.ollama_roles(name="gemma3:latest", settings=settings) == [
+        "Correzione, materiali di studio ed esercitazioni"
+    ]
+    assert (
+        model_service.ollama_roles(name="qwen3-embedding:8b", settings=settings) == []
+    )
+
+
+def test_models_endpoint_adds_roles_to_ollama_models(
+    models_probe: tuple[TestClient, Mock],
+) -> None:
+    transport, _ = models_probe
+
+    roles = transport.get("/api/v1/models").json()["data"]["ollama_roles"]
+
+    assert roles == {"qwen3.5:9b": ["Correzione, materiali di studio ed esercitazioni"]}

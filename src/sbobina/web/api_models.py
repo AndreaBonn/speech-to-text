@@ -8,9 +8,10 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import JsonValue
 
+from sbobina.runtime_config import runtime_settings
 from sbobina.settings import Settings
 from sbobina.web.downloads import DownloadManager, DownloadRequest, DownloadState
-from sbobina.web.model_service import list_whisper_models, ollama_status
+from sbobina.web.model_service import list_whisper_models, ollama_roles, ollama_status
 
 DOWNLOADS_POLL_INTERVAL_S = 0.5
 DOWNLOADS_PING_INTERVAL_S = 15.0
@@ -52,6 +53,24 @@ async def _download_events(
         await anyio.sleep(DOWNLOADS_POLL_INTERVAL_S)
 
 
+def _roles_by_model(
+    ollama: dict[str, JsonValue], settings: Settings
+) -> dict[str, JsonValue]:
+    """M3: model name -> what the app uses it for. Kept beside the Ollama
+    block so /system and /models still share that block unchanged."""
+    effective = runtime_settings(settings=settings)
+    models = ollama.get("models")
+    if not isinstance(models, list):
+        return {}
+    return {
+        str(model["model"]): list(
+            ollama_roles(name=str(model["model"]), settings=effective)
+        )
+        for model in models
+        if isinstance(model, dict) and "model" in model
+    }
+
+
 def create_models_router(settings: Settings) -> APIRouter:
     router = APIRouter(prefix="/api/v1")
 
@@ -60,10 +79,12 @@ def create_models_router(settings: Settings) -> APIRouter:
         whisper: list[JsonValue] = [
             model for model in list_whisper_models(settings=settings)
         ]
+        ollama = ollama_status(host=settings.ollama_host)
         return {
             "data": {
                 "whisper": whisper,
-                "ollama": ollama_status(host=settings.ollama_host),
+                "ollama": ollama,
+                "ollama_roles": _roles_by_model(ollama=ollama, settings=settings),
             }
         }
 

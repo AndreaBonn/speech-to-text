@@ -7,6 +7,8 @@
     qualche minuto, a seconda della connessione.
   </p>
 
+  <p id="models-in-use" class="models__in-use" hidden></p>
+
   <section aria-labelledby="models-whisper-heading">
     <h2 id="models-whisper-heading" class="section-title">Whisper</h2>
     <div id="models-whisper-status" class="history__status" role="alert" hidden></div>
@@ -53,5 +55,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/modelli-scelta.js" defer></script>
 <script src="/static/js/modelli.js" defer></script>
 {% endblock %}

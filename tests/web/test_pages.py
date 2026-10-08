@@ -232,3 +232,17 @@ def test_ripasso_page_says_where_cards_come_from(tmp_path: Path) -> None:
         "materiali di studio",
     ):
         assert source in " ".join(sources.split())
+
+
+def test_modelli_page_has_the_in_use_slot_and_model_choice_script(
+    tmp_path: Path,
+) -> None:
+    """M1/M2: the in-use line sits above the catalogue; the split loads first."""
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/modelli").text
+
+    assert body.index('id="models-in-use"') < body.index('id="models-whisper-heading"')
+    assert body.index("/static/js/modelli-scelta.js") < body.index(
+        "/static/js/modelli.js"
+    )

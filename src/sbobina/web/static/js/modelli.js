@@ -21,8 +21,18 @@
   var ollamaNameError = document.getElementById("ollama-download-error");
   var ollamaProgressEl = document.getElementById("ollama-download-progress");
 
-  var catalog = { whisper: [], ollama: { status: "ready", message: "", models: [] } };
+  var inUseEl = document.getElementById("models-in-use");
+  var Choice = window.SbobinaModelChoice;
+
+  var catalog = {
+    whisper: [],
+    ollama: { status: "ready", message: "", models: [] },
+    ollama_roles: {},
+  };
   var activeWhisperModel = null;
+  var activeDevice = null;
+  // M1: the folded models open on request and stay open across re-renders.
+  var othersOpen = false;
   // key "source:name" -> latest DownloadState.to_json()
   var downloads = {};
   // key "source:name" -> timestamp (ms) since fraction first dropped/stayed
@@ -150,8 +160,8 @@
     if (model.recommended_cpu) {
       tags.push("Consigliato per CPU");
     }
-    if (activeWhisperModel && (model.name === activeWhisperModel || model.aliases.indexOf(activeWhisperModel) !== -1)) {
-      tags.push("In uso ora");
+    if (Choice.isEnglishOnly(model)) {
+      tags.push("Solo inglese: non adatto alle lezioni in italiano");
     }
     if (tags.length === 0) {
       return "";
@@ -179,11 +189,11 @@
     );
   }
 
-  function whisperRow(model) {
+  function whisperRow(model, folded) {
     var names = [model.name].concat(model.aliases).join(", ");
     var size = formatBytes(model.size_bytes);
     return (
-      '<tr>' +
+      (folded ? '<tr class="models__other"' + (othersOpen ? "" : " hidden") + ">" : "<tr>") +
       '<td class="cell-name" data-label="Modello">' + escapeHtml(names) + "</td>" +
       '<td data-label="Dimensione">' + (size || "—") + "</td>" +
       '<td data-label="Stato">' + whisperStatusBadge(model) + whisperTags(model) + "</td>" +
@@ -197,7 +207,33 @@
       whisperTbody.innerHTML = '<tr><td colspan="4">Nessun modello Whisper disponibile.</td></tr>';
       return;
     }
-    whisperTbody.innerHTML = catalog.whisper.map(whisperRow).join("");
+    var split = Choice.split(catalog.whisper, activeWhisperModel);
+    var english = split.others.filter(Choice.isEnglishOnly).length;
+    var moreRow = split.others.length
+      ? '<tr class="models__more"><td colspan="4">' +
+        '<button type="button" class="btn btn--ghost" id="models-more" aria-expanded="' +
+        othersOpen + '">' + (othersOpen ? "Nascondi gli altri modelli" : "Altri " + split.others.length + " modelli") +
+        "</button>" +
+        (english ? ' <span class="models__tags">' + english + " solo inglese, in fondo</span>" : "") +
+        "</td></tr>"
+      : "";
+    whisperTbody.innerHTML =
+      split.primary.map(function (model) {
+        return whisperRow(model, false);
+      }).join("") +
+      moreRow +
+      split.others.map(function (model) {
+        return whisperRow(model, true);
+      }).join("");
+    var more = document.getElementById("models-more");
+    if (more) {
+      more.addEventListener("click", function () {
+        othersOpen = !othersOpen;
+        renderWhisper();
+        document.getElementById("models-more").focus();
+      });
+    }
+    renderInUse();
     whisperTbody.querySelectorAll("[data-download-source]").forEach(function (button) {
       button.addEventListener("click", function () {
         startDownload(
@@ -206,6 +242,31 @@
         );
       });
     });
+  }
+
+  // M2: the model in use, said once at the top instead of a grey tag.
+  function renderInUse() {
+    var active = catalog.whisper.filter(function (model) {
+      return Choice.isActive(model, activeWhisperModel);
+    })[0];
+    if (!inUseEl || !active) {
+      if (inUseEl) {
+        inUseEl.hidden = true;
+      }
+      return;
+    }
+    var reason = "";
+    if (active.recommended_gpu && activeDevice === "cuda") {
+      reason = "consigliato per la tua scheda video";
+    } else if (active.recommended_cpu && activeDevice === "cpu") {
+      reason = "consigliato per il processore";
+    }
+    var size = formatBytes(active.size_bytes);
+    inUseEl.innerHTML =
+      '<span class="badge badge--done">In uso</span> <strong>' + escapeHtml(active.name) + "</strong>" +
+      (reason ? ' <span class="models__tags">' + reason + "</span>" : "") +
+      (size ? ' <span class="models__tags">' + size + "</span>" : "");
+    inUseEl.hidden = false;
   }
 
   // ---------- ollama section ----------
@@ -220,12 +281,19 @@
       '<div class="banner banner--warning">' + escapeHtml(ollama.message) + "</div>";
   }
 
+  // M3: what the app uses each installed model for.
+  function ollamaRoleText(name) {
+    var roles = (catalog.ollama_roles || {})[name] || [];
+    return roles.length ? roles.join(" · ") : "Non usato dall'app";
+  }
+
   function ollamaModelRow(model) {
     var key = downloadKey("ollama", model.model);
     var state = downloads[key];
     return (
       '<div class="models__ollama-row">' +
-      '<span class="cell-name">' + escapeHtml(model.model) + "</span>" +
+      '<span class="cell-name">' + escapeHtml(model.model) +
+      '<span class="models__role">' + escapeHtml(ollamaRoleText(model.model)) + "</span></span>" +
       '<span>' + (formatBytes(model.size) || "—") + "</span>" +
       (state && state.status === "running" ? progressMarkup(state, key) : "") +
       "</div>"
@@ -311,6 +379,7 @@
       })
       .then(function (body) {
         activeWhisperModel = body.data.whisper_model;
+        activeDevice = body.data.device;
         renderWhisper();
       })
       .catch(function () {

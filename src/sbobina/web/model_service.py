@@ -93,3 +93,39 @@ def ollama_status(host: str) -> dict[str, JsonValue]:
             for model in models
         ],
     }
+
+
+ROLE_TEXT = "Correzione, materiali di studio ed esercitazioni"
+ROLE_SEMANTIC = "Ricerca per significato"
+ROLE_OCR = "Lettura di PDF scansionati e immagini"
+
+
+def _bare_ollama_name(name: str) -> str:
+    """Ollama lists "gemma3" as "gemma3:latest": compare without that tag."""
+    return name.removesuffix(":latest")
+
+
+def ollama_roles(name: str, settings: Settings) -> list[str]:
+    """What the app uses an installed Ollama model for (M3).
+
+    Parameters
+    ----------
+    name : str
+        Model name as Ollama lists it.
+    settings : Settings
+        Effective settings, with the user's saved preferences applied.
+
+    Returns
+    -------
+    list[str]
+        Roles in display order; empty when the app does not use the model.
+    """
+    bare = _bare_ollama_name(name)
+    roles = []
+    if bare == _bare_ollama_name(settings.ollama_model):
+        roles.append(ROLE_TEXT)
+    if settings.semantic_search and bare == _bare_ollama_name(settings.embedding_model):
+        roles.append(ROLE_SEMANTIC)
+    if bare == _bare_ollama_name(settings.ocr_model):
+        roles.append(ROLE_OCR)
+    return roles
