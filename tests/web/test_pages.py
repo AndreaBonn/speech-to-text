@@ -216,3 +216,19 @@ def test_index_non_list_ollama_models_renders_default_only(tmp_path: Path) -> No
     assert b'value="default-model" selected' in bytes(malformed.body)
     assert b'value="installed-model"' not in bytes(malformed.body)
     assert b'value="installed-model"' in bytes(populated.body)
+
+
+def test_ripasso_page_says_where_cards_come_from(tmp_path: Path) -> None:
+    """P2: an empty deck explains how to fill it."""
+    app = create_app(settings=Settings(), data_dir=tmp_path)
+    with TestClient(app=app, base_url=BASE_URL) as client:
+        body = client.get("/ripasso").text
+
+    sources = body.split('class="review__sources"')[1].split("</p>")[0]
+    assert 'href="/corsi"' in sources
+    for source in (
+        "frasi da esame",
+        "errori delle esercitazioni",
+        "materiali di studio",
+    ):
+        assert source in " ".join(sources.split())

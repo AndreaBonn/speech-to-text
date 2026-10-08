@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from datetime import datetime
 from pathlib import Path
 from typing import cast
 from uuid import uuid4
@@ -159,8 +160,20 @@ def test_summary_registered_courses_returns_due_counts(
         "total_pages": 1,
     }
     assert sorted(response.json()["data"], key=lambda item: item["course_key"]) == [
-        {"course_key": "diritto", "label": "Diritto", "due": 2},
-        {"course_key": "fisica", "label": "Fisica", "due": 1},
+        {
+            "course_key": "diritto",
+            "label": "Diritto",
+            "due": 2,
+            "cards": 2,
+            "next_due": None,
+        },
+        {
+            "course_key": "fisica",
+            "label": "Fisica",
+            "due": 1,
+            "cards": 1,
+            "next_due": None,
+        },
     ]
 
 
@@ -174,7 +187,15 @@ def test_summary_second_page_returns_second_course(
 
     assert response.status_code == 200
     assert response.json() == {
-        "data": [{"course_key": "fisica", "label": "Fisica", "due": 1}],
+        "data": [
+            {
+                "course_key": "fisica",
+                "label": "Fisica",
+                "due": 1,
+                "cards": 1,
+                "next_due": None,
+            }
+        ],
         "meta": {"page": 2, "per_page": 1, "total": 2, "total_pages": 2},
     }
 
@@ -193,3 +214,24 @@ def test_today_registered_course_returns_its_due_cards(
     assert [item["id"] for item in response.json()["data"]] == [
         card.id for card in cards
     ]
+
+
+def test_summary_tells_when_the_next_card_falls_due(
+    client: TestClient, store: JobStore
+) -> None:
+    """P1: a course with nothing due today says when cards come back."""
+    _fixed_clock(client=client)
+    course_id = _course(store=store, key="diritto")
+    card = _card(store=store, course_id=course_id)
+    reviewed = client.post(
+        url=f"/api/v1/courses/diritto/cards/{card.id}/review",
+        json={"rating": "Bene", "observed_due": None},
+    )
+    assert reviewed.status_code == 200
+
+    item = client.get(url=SUMMARY_URL).json()["data"][0]
+
+    assert item["due"] == 0
+    assert item["cards"] == 1
+    assert item["next_due"] is not None
+    assert datetime.fromisoformat(item["next_due"]) > NOW

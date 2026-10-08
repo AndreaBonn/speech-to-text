@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from sbobina.card_models import Card, GenerationAnchor
 from sbobina.flashcard_scheduler import FsrsState, FsrsStateLabel
-from sbobina.review_queue import due_today
+from sbobina.review_queue import due_today, next_due
 from sbobina.settings import Settings
 
 NOW = datetime(2026, 10, 4, 12, tzinfo=UTC)
@@ -87,3 +87,26 @@ def test_settings_review_new_per_day_default_environment_and_validation(
     assert Settings().review_new_per_day == 0
     with pytest.raises(ValidationError):
         Settings(review_new_per_day=-1)
+
+
+def test_next_due_returns_the_earliest_future_due_card() -> None:
+    """P1: with nothing due today the review page says when cards come back."""
+    now = datetime(2026, 10, 8, 12, tzinfo=UTC)
+    cards = [
+        card_fixture(identifier="later", due=now + timedelta(days=5)),
+        card_fixture(identifier="sooner", due=now + timedelta(days=2)),
+        card_fixture(identifier="past", due=now - timedelta(days=1)),
+        replace(
+            card_fixture(identifier="paused", due=now + timedelta(days=1)),
+            suspended=True,
+        ),
+    ]
+
+    assert next_due(cards=cards, now=now) == now + timedelta(days=2)
+
+
+def test_next_due_without_scheduled_cards_is_none() -> None:
+    now = datetime(2026, 10, 8, 12, tzinfo=UTC)
+
+    assert next_due(cards=[card_fixture(identifier="new")], now=now) is None
+    assert next_due(cards=[], now=now) is None

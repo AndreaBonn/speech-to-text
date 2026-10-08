@@ -139,3 +139,11 @@
 .review-card__back-wrap[hidden] {
   display: none;
 }
+
+/* P2: where cards come from, for a deck that is still empty. */
+.review__sources {
+  max-width: var(--measure-reading);
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}

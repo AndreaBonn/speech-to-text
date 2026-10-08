@@ -30,3 +30,27 @@ def due_today(cards: Sequence[Card], now: datetime, new_limit: int) -> tuple[Car
     )
     fresh = tuple(card for card in cards if not card.suspended and card.fsrs is None)
     return tuple(card for _, _, card in overdue) + fresh[:new_limit]
+
+
+def next_due(cards: Sequence[Card], now: datetime) -> datetime | None:
+    """Return when the next scheduled card falls due after ``now``.
+
+    Parameters
+    ----------
+    cards : Sequence[Card]
+        Current card views; suspended and never-reviewed cards are ignored.
+    now : datetime
+        Timezone-aware instant; cards due at or before it are already in today's queue.
+
+    Returns
+    -------
+    datetime | None
+        The earliest future due date, or None when no card is scheduled.
+    """
+    require_aware(value=now, field="now")
+    upcoming = [
+        card.fsrs.due
+        for card in cards
+        if not card.suspended and card.fsrs is not None and card.fsrs.due > now
+    ]
+    return min(upcoming, default=None)

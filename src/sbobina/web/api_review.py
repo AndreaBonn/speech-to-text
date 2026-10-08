@@ -14,7 +14,7 @@ from sbobina.course_registry import (
 )
 from sbobina.courses import course_key, effective_course
 from sbobina.flashcard_scheduler import Rating
-from sbobina.review_queue import due_today
+from sbobina.review_queue import due_today, next_due
 from sbobina.study_render import load_study
 from sbobina.time_guards import require_aware
 from sbobina.web.api_files import existing_file, find_job
@@ -109,14 +109,23 @@ def summary(services: Services, query: Page) -> dict[str, Any]:
     )
     return {
         "data": [
-            {
-                "course_key": course.key,
-                "label": course.label,
-                "due": len(_queue(course_id=course.id, services=services)),
-            }
+            _summary_item(course=course, services=services)
             for course in courses[page_bounds(query=query)]
         ],
         "meta": page_meta(total=len(courses), query=query),
+    }
+
+
+def _summary_item(course: Course, services: ReviewServices) -> dict[str, Any]:
+    """Due today, cards in the deck and when the next one comes back (P1)."""
+    cards = load_cards(courses_dir=services.store.courses_dir, course_id=course.id)
+    upcoming = next_due(cards=cards, now=services.now)
+    return {
+        "course_key": course.key,
+        "label": course.label,
+        "due": len(_queue(course_id=course.id, services=services)),
+        "cards": sum(1 for card in cards if not card.suspended),
+        "next_due": None if upcoming is None else upcoming.isoformat(),
     }
 
 

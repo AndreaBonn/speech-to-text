@@ -48,6 +48,16 @@
   function countLabel(due) {
     return due === 1 ? "1 carta oggi" : due + " carte oggi";
   }
+  // P1: with nothing due, a state in words instead of a disabled button.
+  function idleLabel(item) {
+    if (!item.cards) {
+      return "nessuna carta nel mazzo";
+    }
+    if (item.next_due) {
+      return "nessuna carta ora · prossime: " + window.SbobinaWhen.format(item.next_due);
+    }
+    return "nessuna carta oggi";
+  }
   function summaryItem(item) {
     var li = document.createElement("li");
     li.className = "review__summary-item";
@@ -56,23 +66,19 @@
     label.textContent = item.label;
     var count = document.createElement("span");
     count.className = "review__summary-count";
-    count.textContent = countLabel(item.due);
-    var button = document.createElement("button");
-    button.type = "button";
+    count.textContent = item.due > 0 ? countLabel(item.due) : idleLabel(item);
+    li.appendChild(label);
+    li.appendChild(count);
     if (item.due > 0) {
+      var button = document.createElement("button");
+      button.type = "button";
       button.className = "btn btn--primary";
       button.textContent = "Ripassa";
       button.addEventListener("click", function () {
         startSession(item.course_key, item.label);
       });
-    } else {
-      button.className = "btn btn--secondary";
-      button.textContent = "Nessuna carta oggi";
-      button.disabled = true;
+      li.appendChild(button);
     }
-    li.appendChild(label);
-    li.appendChild(count);
-    li.appendChild(button);
     return li;
   }
   function loadSummary(page) {
